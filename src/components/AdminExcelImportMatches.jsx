@@ -28,9 +28,11 @@ function formatExcelDate(value) {
   if (typeof value === "number") {
     const parsed = XLSX.SSF.parse_date_code(value);
     if (!parsed) return "";
+
     const year = parsed.y;
     const month = String(parsed.m).padStart(2, "0");
     const day = String(parsed.d).padStart(2, "0");
+
     return `${year}-${month}-${day}`;
   }
 
@@ -53,6 +55,7 @@ function formatExcelHour(value) {
     const totalMinutes = Math.round(value * 24 * 60);
     const hours = String(Math.floor(totalMinutes / 60) % 24).padStart(2, "0");
     const minutes = String(totalMinutes % 60).padStart(2, "0");
+
     return `${hours}:${minutes}`;
   }
 
@@ -75,13 +78,22 @@ function buildJournees(matches) {
   }, {});
 }
 
+function isBonusMatch(match) {
+  const type = String(match.type || "").toLowerCase();
+  const championnat = String(match.championnat || "").toLowerCase();
+
+  return (
+    type.includes("bonus") ||
+    championnat.includes("premier league") ||
+    championnat.includes("liga") ||
+    championnat.includes("serie a") ||
+    championnat.includes("bundesliga")
+  );
+}
+
 function saveMatches(matches, mode) {
   const oldMatches = JSON.parse(localStorage.getItem("matches") || "[]");
-
-  const nextMatches =
-    mode === "append"
-      ? [...oldMatches, ...matches]
-      : matches;
+  const nextMatches = mode === "append" ? [...oldMatches, ...matches] : matches;
 
   const unique = [];
   const seen = new Set();
@@ -97,11 +109,15 @@ function saveMatches(matches, mode) {
     }
   });
 
+  const bonusMatches = unique.filter(isBonusMatch);
+
   localStorage.setItem("matches", JSON.stringify(unique));
   localStorage.setItem("allMatches", JSON.stringify(unique));
   localStorage.setItem("ligue1Matches", JSON.stringify(unique));
   localStorage.setItem("matchs", JSON.stringify(unique));
   localStorage.setItem("journees", JSON.stringify(buildJournees(unique)));
+  localStorage.setItem("bonusMatches", JSON.stringify(bonusMatches));
+  localStorage.setItem("adminBonusMatches", JSON.stringify(bonusMatches));
 
   window.dispatchEvent(new Event("storage"));
   window.dispatchEvent(new CustomEvent("matches-updated"));
@@ -192,13 +208,18 @@ export default function AdminExcelImportMatches() {
               ])
             ).trim() || "Ligue 1";
 
+          const type =
+            String(
+              getValue(row, ["type", "categorie", "catégorie", "bonus"])
+            ).trim() || (championnat === "Ligue 1" ? "LIGUE1" : "BONUS");
+
           if (!domicile || !exterieur) return null;
 
           const cleanJournee = Number(String(journee).replace(/\D/g, "")) || 1;
 
           return {
             id: `j${cleanJournee}-${index + 1}-${Date.now()}`,
-            type: "LIGUE1",
+            type,
             championnat,
             journee: cleanJournee,
             date,
@@ -223,20 +244,16 @@ export default function AdminExcelImportMatches() {
 
       if (!matches.length) {
         throw new Error(
-          "Aucun match reconnu. Vérifie les colonnes : Date, Heure, Domicile, Extérieur."
+          "Aucun match reconnu. Vérifie les colonnes : Journée, Date, Heure, Domicile, Extérieur."
         );
       }
 
       const total = saveMatches(matches, mode);
 
-      setPreview(matches.slice(0, 8));
-      setMessage(
-        `${matches.length} match(s) importé(s). Total enregistré : ${total}.`
-      );
+      setPreview(matches.slice(0, 10));
+      setMessage(`${matches.length} match(s) importé(s). Total enregistré : ${total}.`);
 
-      alert(
-        `${matches.length} match(s) importé(s).\n\nRecharge la page si les matchs ne s'affichent pas directement.`
-      );
+      alert(`${matches.length} match(s) importé(s) ✅`);
     } catch (error) {
       console.error(error);
       setMessage(error.message);
@@ -247,16 +264,18 @@ export default function AdminExcelImportMatches() {
   }
 
   return (
-    <div className="admin-excel-import-card">
+    <div className="admin-excel-only-card">
       <div>
         <h3>📥 Import Excel des matchs</h3>
         <p>
-          Importe un fichier Excel avec les colonnes : Journée, Date, Heure,
-          Domicile, Extérieur, Championnat.
+          Gestion des journées simplifiée : importe uniquement les matchs depuis Excel.
+        </p>
+        <p className="admin-excel-help">
+          Colonnes conseillées : Journée, Date, Heure, Domicile, Extérieur, Championnat, Type.
         </p>
       </div>
 
-      <div className="excel-import-controls">
+      <div className="admin-excel-only-controls">
         <label>
           Mode import
           <select value={mode} onChange={(event) => setMode(event.target.value)}>
@@ -265,7 +284,7 @@ export default function AdminExcelImportMatches() {
           </select>
         </label>
 
-        <label className="excel-file-button">
+        <label className="admin-excel-only-button">
           Importer Excel
           <input
             type="file"
@@ -275,18 +294,17 @@ export default function AdminExcelImportMatches() {
         </label>
       </div>
 
-      {message && <p className="excel-import-message">{message}</p>}
+      {message && <p className="admin-excel-only-message">{message}</p>}
 
       {preview.length > 0 && (
-        <div className="excel-import-preview">
+        <div className="admin-excel-only-preview">
           {preview.map((match) => (
-            <div className="excel-import-row" key={match.id}>
+            <div key={match.id}>
               <strong>J{match.journee}</strong>
               <span>{match.date}</span>
               <span>{match.heure}</span>
-              <span>
-                {match.domicile} - {match.exterieur}
-              </span>
+              <span>{match.domicile} - {match.exterieur}</span>
+              <span>{match.championnat}</span>
             </div>
           ))}
         </div>
