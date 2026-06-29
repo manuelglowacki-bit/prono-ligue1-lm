@@ -1,6 +1,15 @@
 ﻿export function getApiUrl(path = '') {
-  const host = window.location.hostname || 'localhost';
-  const cleanPath = String(path || '');
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
 
-  return `http://${host}:4000${cleanPath}`;
+  const envUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+
+  const isBadLocalUrl =
+    envUrl &&
+    (envUrl.includes('localhost') || envUrl.includes('127.0.0.1'));
+
+  if (envUrl && !isBadLocalUrl) {
+    return `${envUrl.replace(/\/$/, '')}${cleanPath}`;
+  }
+
+  return cleanPath;
 }
