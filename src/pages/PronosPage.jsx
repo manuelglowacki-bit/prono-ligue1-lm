@@ -1,533 +1,601 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
-import '../styles/pronos.css';
+﻿import React, { useMemo, useState } from "react";
+import { CLUB_OPTIONS, isFavoriteClubMatch } from "../utils/clubNames.js";
 
-const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';
-const PRONOS_KEY = 'prono_ligue1_lm_pronos_joueurs';
-const VALIDATIONS_KEY = 'prono_ligue1_lm_validations_journees';
-const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
-const PLAYER_KEY = 'prono_ligue1_lm_current_player';
-const BONUS_CHOICES_KEY = 'prono_ligue1_lm_bonus_choices';
+const MATCH_KEYS = [
+  "matches",
+  "allMatches",
+  "ligue1Matches",
+  "matchs",
+  "journees",
+  "calendar",
+  "fixtures",
+  "bonusMatches",
+  "adminBonusMatches",
+  "bonus"
+];
 
-function clean(value) {
-  return String(value || '')
+const USER_KEYS = [
+  "currentUser",
+  "user",
+  "authUser",
+  "loggedUser",
+  "profile",
+  "userProfile",
+  "pronoUser"
+];
+
+function readJson(key, fallback = null) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return raw;
+    }
+  } catch {
+    return fallback;
+  }
+}
+
+function normalize(value) {
+  return String(value || "")
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/^0+/, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-function getResult(match) {
-  const home = match.scoreDomicile;
-  const away = match.scoreExterieur;
-
-  if (home === null || home === undefined || away === null || away === undefined) return null;
-
-  const h = Number(home);
-  const a = Number(away);
-
-  if (Number.isNaN(h) || Number.isNaN(a)) return null;
-  if (h > a) return '1';
-  if (h < a) return '2';
-  return 'N';
+function getHome(match) {
+  return (
+    match?.domicile ||
+    match?.home ||
+    match?.equipeDomicile ||
+    match?.équipeDomicile ||
+    match?.teamHome ||
+    match?.homeTeam ||
+    match?.clubDomicile ||
+    ""
+  );
 }
 
-function isLocked(isJourneeValidated) {
-  return isJourneeValidated;
+function getAway(match) {
+  return (
+    match?.exterieur ||
+    match?.extérieur ||
+    match?.away ||
+    match?.equipeExterieur ||
+    match?.equipeExtérieur ||
+    match?.teamAway ||
+    match?.awayTeam ||
+    match?.clubExterieur ||
+    match?.clubExtérieur ||
+    ""
+  );
 }
 
-function hasScoreProno(prono) {
-  return prono && prono.home !== '' && prono.home !== undefined && prono.away !== '' && prono.away !== undefined;
+function getRound(match) {
+  return (
+    match?.journee ||
+    match?.journée ||
+    match?.round ||
+    match?.matchday ||
+    match?.numeroJournee ||
+    match?.numeroJournée ||
+    ""
+  );
 }
 
-function getEvaluation(match, prono, scoreExactMode) {
-  const result = getResult(match);
+function getDate(match) {
+  return match?.date || match?.jour || match?.matchDate || "";
+}
 
-  if (!result || !prono) {
-    return { status: 'neutral', label: '' };
+function getHour(match) {
+  return match?.heure || match?.horaire || match?.time || match?.kickoff || "";
+}
+
+function getLeague(match) {
+  return match?.championnat || match?.competition || match?.compétition || match?.league || "Ligue 1";
+}
+
+function getMatchId(match) {
+  return match?.id || match?.matchId || match?.idMatch || match?.match_id || "";
+}
+
+function looksLikeMatch(value) {
+  return Boolean(value && typeof value === "object" && getHome(value) && getAway(value));
+}
+
+function flattenMatches(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => flattenMatches(item));
   }
 
-  if (scoreExactMode) {
-    if (!hasScoreProno(prono)) {
-      return { status: 'neutral', label: '' };
-    }
-
-    const homeProno = Number(prono.home);
-    const awayProno = Number(prono.away);
-    const homeScore = Number(match.scoreDomicile);
-    const awayScore = Number(match.scoreExterieur);
-
-    if (homeProno === homeScore && awayProno === awayScore) {
-      return { status: 'good', label: 'Score exact' };
-    }
-
-    const predictedResult =
-      homeProno > awayProno ? '1' : homeProno < awayProno ? '2' : 'N';
-
-    if (predictedResult === result) {
-      return { status: 'partial', label: 'Résultat OK' };
-    }
-
-    return { status: 'bad', label: 'Faux' };
+  if (typeof value === "object") {
+    if (looksLikeMatch(value)) return [value];
+    return Object.values(value).flatMap((item) => flattenMatches(item));
   }
 
-  if (prono.value === result) {
-    return { status: 'good', label: 'Bon prono' };
-  }
-
-  return { status: 'bad', label: 'Faux' };
+  return [];
 }
 
-function getPoints(match, prono, scoreExactMode, isBonus) {
-  const result = getResult(match);
-  if (!result || !prono) return 0;
+function collectMatches() {
+  const all = MATCH_KEYS.flatMap((key) => flattenMatches(readJson(key, [])));
+  const seen = new Set();
+  const clean = [];
 
-  if (scoreExactMode) {
-    if (!hasScoreProno(prono)) return 0;
+  all.forEach((match) => {
+    if (!looksLikeMatch(match)) return;
 
-    const homeProno = Number(prono.home);
-    const awayProno = Number(prono.away);
-    const homeScore = Number(match.scoreDomicile);
-    const awayScore = Number(match.scoreExterieur);
+    const key = matchKey(match);
+    if (seen.has(key)) return;
 
-    if (homeProno === homeScore && awayProno === awayScore) {
-      return isBonus ? 3 : 2;
-    }
+    seen.add(key);
+    clean.push(match);
+  });
 
-    const predictedResult =
-      homeProno > awayProno ? '1' : homeProno < awayProno ? '2' : 'N';
+  return clean.sort((a, b) => {
+    const roundA = Number(String(getRound(a)).replace(/\D/g, "")) || 999;
+    const roundB = Number(String(getRound(b)).replace(/\D/g, "")) || 999;
 
-    if (predictedResult === result) {
-      return isBonus ? 2 : 1;
-    }
+    if (roundA !== roundB) return roundA - roundB;
 
-    return 0;
-  }
+    const dateCompare = String(getDate(a)).localeCompare(String(getDate(b)));
+    if (dateCompare !== 0) return dateCompare;
 
-  return prono.value === result ? 1 : 0;
+    return String(getHour(a)).localeCompare(String(getHour(b)));
+  });
 }
 
-function cardClass(evaluation, isSelectedBonus, isDisabledBonus) {
-  let className = 'prono-card';
+function matchKey(match) {
+  const id = getMatchId(match);
+  if (id) return String(id);
 
-  if (evaluation.status === 'good') className += ' is-good';
-  if (evaluation.status === 'bad') className += ' is-bad';
-  if (evaluation.status === 'partial') className += ' is-partial';
-  if (isSelectedBonus) className += ' is-selected-bonus';
-  if (isDisabledBonus) className += ' is-disabled-bonus';
+  return [
+    getRound(match),
+    getDate(match),
+    getHour(match),
+    getHome(match),
+    getAway(match),
+    getLeague(match)
+  ].map(normalize).join("|");
+}
 
-  return className;
+function isBonusMatch(match) {
+  const type = normalize(match?.type);
+  const id = normalize(getMatchId(match));
+  const league = normalize(getLeague(match));
+
+  return (
+    type.includes("bonus") ||
+    id.includes("bonus") ||
+    league.includes("premier league") ||
+    league.includes("liga") ||
+    league.includes("serie a") ||
+    league.includes("bundesliga")
+  );
+}
+
+function getCurrentUser() {
+  for (const key of USER_KEYS) {
+    const user = readJson(key, null);
+    if (user && typeof user === "object") return user;
+  }
+
+  return {};
+}
+
+function getFavoriteFromObject(value) {
+  if (!value || typeof value !== "object") return "";
+
+  return (
+    value.clubFavori ||
+    value.club ||
+    value.favoriteTeam ||
+    value.team ||
+    value.equipeFavorite ||
+    value.équipeFavorite ||
+    value.selectedClub ||
+    value.favClub ||
+    ""
+  );
+}
+
+function getFavoriteClub(user) {
+  const fromUser = getFavoriteFromObject(user);
+
+  if (fromUser) return fromUser;
+
+  const possibleKeys = [
+    "clubFavori",
+    "favoriteTeam",
+    "selectedClub",
+    "favClub",
+    "favoriteClub"
+  ];
+
+  for (const key of possibleKeys) {
+    const value = readJson(key, "");
+    if (typeof value === "string" && value) return value;
+    const inside = getFavoriteFromObject(value);
+    if (inside) return inside;
+  }
+
+  return "";
+}
+
+function getPlayerKey(user) {
+  return (
+    user?.email ||
+    user?.id ||
+    user?.uid ||
+    user?.name ||
+    user?.nom ||
+    user?.pseudo ||
+    user?.username ||
+    "local-player"
+  );
+}
+
+function getPronosKey(user) {
+  return `pronos:${getPlayerKey(user)}`;
+}
+
+function readPronos(user) {
+  const keys = [
+    getPronosKey(user),
+    "pronos",
+    "pronostics",
+    "userPronos"
+  ];
+
+  for (const key of keys) {
+    const value = readJson(key, null);
+
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value;
+    }
+  }
+
+  return {};
+}
+
+function savePronos(user, next) {
+  localStorage.setItem(getPronosKey(user), JSON.stringify(next));
+  localStorage.setItem("pronos", JSON.stringify(next));
+  localStorage.setItem("pronostics", JSON.stringify(next));
+  localStorage.setItem("userPronos", JSON.stringify(next));
+
+  window.dispatchEvent(new Event("storage"));
+  window.dispatchEvent(new CustomEvent("pronos-updated"));
+}
+
+function resultFromScore(scoreDom, scoreExt) {
+  if (scoreDom === "" || scoreExt === "") return "";
+
+  const d = Number(scoreDom);
+  const e = Number(scoreExt);
+
+  if (Number.isNaN(d) || Number.isNaN(e)) return "";
+
+  if (d > e) return "1";
+  if (d < e) return "2";
+  return "N";
+}
+
+function sameRound(match, selectedRound) {
+  return normalize(getRound(match)) === normalize(selectedRound);
+}
+
+function roundNumber(value) {
+  return Number(String(value || "").replace(/\D/g, "")) || 999;
+}
+
+function getRounds(matches) {
+  const set = new Set();
+
+  matches.forEach((match) => {
+    const round = getRound(match);
+    if (round !== "" && round !== null && round !== undefined) {
+      set.add(String(round).replace(/^0+/, "") || String(round));
+    }
+  });
+
+  return Array.from(set).sort((a, b) => roundNumber(a) - roundNumber(b));
+}
+
+function getBonusChoiceKey(user, selectedRound) {
+  return `bonusChoice:${getPlayerKey(user)}:J${normalize(selectedRound)}`;
 }
 
 export default function PronosPage() {
-  const [matches, setMatches] = useState([]);
-  const [selectedJournee, setSelectedJournee] = useState('');
-  const [currentPlayer, setCurrentPlayer] = useState('Manu');
-  const [favoriteTeam, setFavoriteTeam] = useState('');
-  const [pronos, setPronos] = useState({});
-  const [validations, setValidations] = useState({});
-  const [bonusChoices, setBonusChoices] = useState({});
+  const [refresh, setRefresh] = useState(0);
+  const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    const savedMatches = JSON.parse(localStorage.getItem(MATCHS_KEY) || '[]');
-    const savedPronos = JSON.parse(localStorage.getItem(PRONOS_KEY) || '{}');
-    const savedValidations = JSON.parse(localStorage.getItem(VALIDATIONS_KEY) || '{}');
-    const savedBonusChoices = JSON.parse(localStorage.getItem(BONUS_CHOICES_KEY) || '{}');
-    const savedTeam = localStorage.getItem(FAVORITE_TEAM_KEY) || '';
-    const savedPlayer = localStorage.getItem(PLAYER_KEY) || 'Manu';
+  const user = useMemo(() => getCurrentUser(), [refresh]);
+  const [manualFavorite, setManualFavorite] = useState(() => getFavoriteClub(user));
 
-    setMatches(savedMatches);
-    setPronos(savedPronos);
-    setValidations(savedValidations);
-    setBonusChoices(savedBonusChoices);
-    setFavoriteTeam(savedTeam);
-    setCurrentPlayer(savedPlayer);
+  const favoriteClub = manualFavorite || getFavoriteClub(user);
 
-    const journees = [
-      ...new Set(savedMatches.map((m) => String(m.journee || '').trim()).filter(Boolean)),
-    ].sort((a, b) => Number(a) - Number(b));
+  const matches = useMemo(() => collectMatches(), [refresh]);
+  const rounds = useMemo(() => getRounds(matches), [matches]);
+  const [selectedRound, setSelectedRound] = useState(() => rounds[0] || "1");
 
-    if (journees.length > 0) {
-      setSelectedJournee(journees[0]);
-    }
-  }, []);
+  const currentRound = rounds.includes(String(selectedRound)) ? selectedRound : (rounds[0] || selectedRound || "1");
 
-  const journees = useMemo(() => {
-    return [...new Set(matches.map((m) => String(m.journee || '').trim()).filter(Boolean))]
-      .sort((a, b) => Number(a) - Number(b));
-  }, [matches]);
+  const pronos = readPronos(user);
+  const bonusChoiceKey = getBonusChoiceKey(user, currentRound);
+  const selectedBonusId = readJson(bonusChoiceKey, "");
 
-  const matchesJournee = useMemo(() => {
-    return matches
-      .filter((match) => String(match.journee || '') === String(selectedJournee))
-      .sort((a, b) => {
-        const dateA = `${a.date || ''} ${a.heure || ''}`;
-        const dateB = `${b.date || ''} ${b.heure || ''}`;
-        return dateA.localeCompare(dateB);
-      });
-  }, [matches, selectedJournee]);
+  const roundMatches = matches.filter((match) => sameRound(match, currentRound));
+  const ligue1Matches = roundMatches.filter((match) => !isBonusMatch(match));
+  const bonusMatches = roundMatches.filter((match) => isBonusMatch(match)).slice(0, 3);
 
-  const l1Matches = matchesJournee.filter((match) => match.type !== 'BONUS');
-  const bonusMatches = matchesJournee.filter((match) => match.type === 'BONUS');
-
-  const playerPronos = pronos[currentPlayer] || {};
-  const validationKey = `${currentPlayer}-J${selectedJournee}`;
-  const bonusKey = `${currentPlayer}-J${selectedJournee}`;
-  const isJourneeValidated = Boolean(validations[validationKey]);
-  const selectedBonusId = bonusChoices[bonusKey];
-
-  const totalJournee = useMemo(() => {
-    return matchesJournee.reduce((total, match) => {
-      const isBonus = match.type === 'BONUS';
-      const isSelectedBonus = isBonus && selectedBonusId === match.id;
-
-      if (isBonus && !isSelectedBonus) return total;
-
-      const isFavoriteMatch =
-        favoriteTeam &&
-        (clean(match.domicile) === clean(favoriteTeam) ||
-          clean(match.exterieur) === clean(favoriteTeam));
-
-      const scoreExactMode = isFavoriteMatch || isSelectedBonus;
-      const prono = playerPronos[match.id];
-
-      return total + getPoints(match, prono, scoreExactMode, isBonus);
-    }, 0);
-  }, [matchesJournee, playerPronos, favoriteTeam, selectedBonusId]);
-
-  const pronosStats = useMemo(() => {
-    const l1Done = l1Matches.filter((match) => {
-      const prono = playerPronos[match.id];
-
-      const isFavoriteMatch =
-        favoriteTeam &&
-        (clean(match.domicile) === clean(favoriteTeam) ||
-          clean(match.exterieur) === clean(favoriteTeam));
-
-      if (isFavoriteMatch) {
-        return hasScoreProno(prono);
-      }
-
-      return Boolean(prono?.value);
-    }).length;
-
-    const selectedBonusProno = selectedBonusId ? playerPronos[selectedBonusId] : null;
-    const bonusDone = selectedBonusId && hasScoreProno(selectedBonusProno) ? 1 : 0;
-
-    const totalToDo = l1Matches.length + (bonusMatches.length > 0 ? 1 : 0);
-    const done = l1Done + bonusDone;
-
-    return {
-      done,
-      totalToDo,
-      remaining: Math.max(totalToDo - done, 0),
-      bonusSelected: Boolean(selectedBonusId),
-      bonusDone: Boolean(bonusDone),
-    };
-  }, [l1Matches, bonusMatches, playerPronos, favoriteTeam, selectedBonusId]);
-
-  function savePronos(nextPronos) {
-    setPronos(nextPronos);
-    localStorage.setItem(PRONOS_KEY, JSON.stringify(nextPronos));
-  }
-
-  function updateProno(matchId, value) {
-    if (isJourneeValidated) return;
+  function updateProno(match, patch) {
+    const key = matchKey(match);
+    const current = readPronos(user);
 
     const next = {
-      ...pronos,
-      [currentPlayer]: {
-        ...(pronos[currentPlayer] || {}),
-        [matchId]: value,
-      },
+      ...current,
+      [key]: {
+        ...(current[key] || {}),
+        matchId: key,
+        id: key,
+        domicile: getHome(match),
+        exterieur: getAway(match),
+        journee: getRound(match),
+        date: getDate(match),
+        heure: getHour(match),
+        championnat: getLeague(match),
+        type: isBonusMatch(match) ? "BONUS" : "LIGUE1",
+        ...patch,
+        updatedAt: new Date().toISOString()
+      }
     };
 
-    savePronos(next);
+    savePronos(user, next);
+    setMessage("Prono enregistré ✅");
+    setRefresh((value) => value + 1);
   }
 
-  function choisirBonus(matchId) {
-    if (isJourneeValidated) return;
-
-    const oldBonusId = selectedBonusId;
-
-    const nextChoices = {
-      ...bonusChoices,
-      [bonusKey]: matchId,
-    };
-
-    const nextPlayerPronos = { ...(pronos[currentPlayer] || {}) };
-
-    if (oldBonusId && oldBonusId !== matchId) {
-      delete nextPlayerPronos[oldBonusId];
-    }
-
-    const nextPronos = {
-      ...pronos,
-      [currentPlayer]: nextPlayerPronos,
-    };
-
-    setBonusChoices(nextChoices);
-    localStorage.setItem(BONUS_CHOICES_KEY, JSON.stringify(nextChoices));
-    savePronos(nextPronos);
+  function saveFavoriteClub(value) {
+    setManualFavorite(value);
+    localStorage.setItem("clubFavori", value);
+    localStorage.setItem("favoriteTeam", value);
+    localStorage.setItem("selectedClub", value);
+    setMessage(`Club favori enregistré : ${value}`);
+    setRefresh((v) => v + 1);
   }
 
-  function toggleValidationJournee() {
-    const next = { ...validations };
-
-    if (next[validationKey]) {
-      delete next[validationKey];
-      alert(`Journée ${selectedJournee} dévalidée. Tu peux modifier tes pronos.`);
-    } else {
-      next[validationKey] = true;
-      alert(`Journée ${selectedJournee} validée.`);
-    }
-
-    setValidations(next);
-    localStorage.setItem(VALIDATIONS_KEY, JSON.stringify(next));
+  function save1N2(match, value) {
+    updateProno(match, {
+      mode: "1N2",
+      prediction: value,
+      resultat: value,
+      resultat1N2: value,
+      scoreDom: "",
+      scoreExt: "",
+      homeScore: "",
+      awayScore: "",
+      scoreExact: ""
+    });
   }
 
-  function renderMatch(match, options = {}) {
-    const isBonus = Boolean(options.isBonus);
-    const isSelectedBonus = isBonus && selectedBonusId === match.id;
-    const isDisabledBonus = isBonus && selectedBonusId && selectedBonusId !== match.id;
+  function saveExact(match, side, value) {
+    const key = matchKey(match);
+    const old = readPronos(user)[key] || {};
 
-    const prono = playerPronos[match.id];
+    const scoreDom = side === "home" ? value : old.scoreDom ?? "";
+    const scoreExt = side === "away" ? value : old.scoreExt ?? "";
+    const resultat1N2 = resultFromScore(scoreDom, scoreExt);
 
-    const isFavoriteMatch =
-      favoriteTeam &&
-      (clean(match.domicile) === clean(favoriteTeam) ||
-        clean(match.exterieur) === clean(favoriteTeam));
+    updateProno(match, {
+      mode: "SCORE_EXACT",
+      scoreDom,
+      scoreExt,
+      homeScore: scoreDom,
+      awayScore: scoreExt,
+      scoreExact: scoreDom !== "" && scoreExt !== "" ? `${scoreDom}-${scoreExt}` : "",
+      prediction: resultat1N2,
+      resultat: resultat1N2,
+      resultat1N2
+    });
+  }
 
-    const scoreExactMode = isFavoriteMatch || isSelectedBonus;
-    const result = getResult(match);
-    const locked = isLocked(isJourneeValidated);
-    const evaluation = getEvaluation(match, prono, scoreExactMode);
-    const points = getPoints(match, prono, scoreExactMode, isBonus);
+  function chooseBonus(match) {
+    localStorage.setItem(bonusChoiceKey, matchKey(match));
+    updateProno(match, {
+      bonusSelected: true,
+      mode: "BONUS"
+    });
+  }
+
+  function renderMatchCard(match, variant = "ligue1") {
+    const key = matchKey(match);
+    const prono = pronos[key] || {};
+    const bonus = variant === "bonus";
+    const favoriteMatch = isFavoriteClubMatch(match, favoriteClub);
+    const canExact = favoriteMatch || bonus;
+    const isSelectedBonus = selectedBonusId === key;
 
     return (
-      <article key={match.id} className={cardClass(evaluation, isSelectedBonus, isDisabledBonus)}>
-        <div className="prono-card-top">
-          <div>
-            <div className="prono-date">
-              {match.date || 'Date à définir'} · {match.heure || '--:--'}
-            </div>
-
-            <div className="prono-teams">
-              <span>{match.domicile}</span>
-              <strong>VS</strong>
-              <span>{match.exterieur}</span>
-            </div>
-
-            {isBonus && match.championnat && (
-              <div className="bonus-league">{match.championnat}</div>
-            )}
+      <article className={`lm-prono-card ${bonus ? "bonus-card" : ""}`} key={key}>
+        <div className="lm-prono-card-top">
+          <div className="lm-prono-tags">
+            <span>{bonus ? "BONUS" : "LIGUE 1"}</span>
+            <span>J{getRound(match) || "-"}</span>
+            <span>{getDate(match) || "Date ?"}</span>
+            <span>{getHour(match) || "Heure ?"}</span>
           </div>
 
-          <div className="prono-mode">
-            {isBonus ? 'Bonus' : isFavoriteMatch ? 'Score exact' : '1N2'}
-          </div>
-        </div>
-
-        {isBonus && !isSelectedBonus && (
-          <button
-            type="button"
-            className="bonus-choice-button"
-            onClick={() => choisirBonus(match.id)}
-            disabled={locked}
-          >
-            {selectedBonusId ? 'Changer pour ce bonus' : 'Choisir ce bonus'}
-          </button>
-        )}
-
-        {scoreExactMode && (!isBonus || isSelectedBonus) && (
-          <div className="score-exact-box">
-            <input
-              type="number"
-              min="0"
-              disabled={locked}
-              value={prono?.home ?? ''}
-              onChange={(e) =>
-                updateProno(match.id, {
-                  mode: 'SCORE',
-                  home: e.target.value,
-                  away: prono?.away ?? '',
-                })
-              }
-              placeholder="0"
-            />
-
-            <span>-</span>
-
-            <input
-              type="number"
-              min="0"
-              disabled={locked}
-              value={prono?.away ?? ''}
-              onChange={(e) =>
-                updateProno(match.id, {
-                  mode: 'SCORE',
-                  home: prono?.home ?? '',
-                  away: e.target.value,
-                })
-              }
-              placeholder="0"
-            />
-          </div>
-        )}
-
-        {!scoreExactMode && !isBonus && (
-          <div className="one-n-two">
-            {[
-              ['1', match.domicile],
-              ['N', 'Nul'],
-              ['2', match.exterieur],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                disabled={locked}
-                onClick={() =>
-                  updateProno(match.id, {
-                    mode: '1N2',
-                    value,
-                  })
-                }
-                className={prono?.value === value ? 'active' : ''}
-              >
-                <strong>{value}</strong>
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="prono-result-line">
-          {result ? (
-            <>
-              <span>
-                Résultat : {match.scoreDomicile} - {match.scoreExterieur}
-              </span>
-
-              {evaluation.label && (
-                <strong className={`result-label ${evaluation.status}`}>
-                  {evaluation.label} · +{points} pt{points > 1 ? 's' : ''}
-                </strong>
-              )}
-            </>
-          ) : (
-            <span>Résultat non disponible</span>
+          {favoriteMatch && !bonus && (
+            <span className="lm-fav-badge">⭐ Club favori</span>
           )}
 
-          {isSelectedBonus && <em>Bonus choisi</em>}
-          {locked && <em>🔒</em>}
+          {bonus && isSelectedBonus && (
+            <span className="lm-fav-badge bonus-selected">✅ Bonus choisi</span>
+          )}
         </div>
+
+        <div className="lm-prono-teams">
+          <strong>{getHome(match)}</strong>
+          <span>vs</span>
+          <strong>{getAway(match)}</strong>
+        </div>
+
+        {!canExact && (
+          <div className="lm-prono-actions">
+            <button className={prono.resultat1N2 === "1" ? "active" : ""} onClick={() => save1N2(match, "1")}>
+              1
+            </button>
+            <button className={prono.resultat1N2 === "N" ? "active" : ""} onClick={() => save1N2(match, "N")}>
+              N
+            </button>
+            <button className={prono.resultat1N2 === "2" ? "active" : ""} onClick={() => save1N2(match, "2")}>
+              2
+            </button>
+          </div>
+        )}
+
+        {canExact && (
+          <div className="lm-score-zone">
+            {bonus && !isSelectedBonus && (
+              <button className="lm-choose-bonus" onClick={() => chooseBonus(match)}>
+                Choisir ce bonus
+              </button>
+            )}
+
+            {(!bonus || isSelectedBonus) && (
+              <>
+                <div className="lm-score-inputs">
+                  <input
+                    type="number"
+                    min="0"
+                    value={prono.scoreDom ?? ""}
+                    onChange={(event) => {
+                      if (bonus) chooseBonus(match);
+                      saveExact(match, "home", event.target.value);
+                    }}
+                    placeholder="Dom."
+                  />
+
+                  <span>-</span>
+
+                  <input
+                    type="number"
+                    min="0"
+                    value={prono.scoreExt ?? ""}
+                    onChange={(event) => {
+                      if (bonus) chooseBonus(match);
+                      saveExact(match, "away", event.target.value);
+                    }}
+                    placeholder="Ext."
+                  />
+                </div>
+
+                <small>
+                  {bonus ? "Score exact bonus" : "Score exact club favori"}
+                </small>
+              </>
+            )}
+          </div>
+        )}
       </article>
     );
   }
 
   return (
-    <div className="pronos-page">
-      <section className="pronos-header">
+    <main className="lm-prono-page">
+      <section className="lm-prono-hero">
         <div>
-          <p>PRONOS</p>
-          <h1>Mes pronostics</h1>
-          <span>
-            Club favori : <strong>{favoriteTeam || 'aucun club choisi'}</strong>
-          </span>
+          <p className="lm-kicker">Prono Ligue 1 LM</p>
+          <h1>📝 Mes pronos</h1>
+          <p className="lm-subtitle">
+            3 matchs par ligne, Ligue 1 d’abord, puis les 3 bonus à la fin.
+          </p>
         </div>
 
-        <div className="pronos-header-right">
-          <div className="journee-points-card">
-            <span>Total journée</span>
-            <strong>{totalJournee} pts</strong>
-          </div>
+        <button className="lm-refresh" onClick={() => setRefresh((value) => value + 1)}>
+          Actualiser
+        </button>
+      </section>
 
-          <div className="journee-points-card">
-            <span>Pronos faits</span>
-            <strong>{pronosStats.done}/{pronosStats.totalToDo}</strong>
-          </div>
+      <section className="lm-prono-toolbar">
+        <label>
+          Journée
+          <select value={currentRound} onChange={(event) => setSelectedRound(event.target.value)}>
+            {rounds.map((round) => (
+              <option key={round} value={round}>
+                Journée {round}
+              </option>
+            ))}
+          </select>
+        </label>
 
-          <div className={`journee-status-card ${pronosStats.bonusSelected ? 'is-ok' : 'is-alert'}`}>
-            <span>Bonus</span>
-            <strong>{pronosStats.bonusSelected ? 'Choisi' : 'À choisir'}</strong>
-          </div>
+        <label>
+          Club favori
+          <select value={favoriteClub || ""} onChange={(event) => saveFavoriteClub(event.target.value)}>
+            <option value="">Choisir mon club</option>
+            {CLUB_OPTIONS.map((club) => (
+              <option key={club} value={club}>
+                {club}
+              </option>
+            ))}
+          </select>
+        </label>
 
-          <div className={`journee-status-card ${isJourneeValidated ? 'is-locked' : 'is-open'}`}>
-            <span>Statut</span>
-            <strong>{isJourneeValidated ? 'Validée' : 'Modifiable'}</strong>
-          </div>
-
-          <div className="pronos-actions">
-            <select value={selectedJournee} onChange={(e) => setSelectedJournee(e.target.value)}>
-              {journees.map((journee) => (
-                <option key={journee} value={journee}>
-                  Journée {journee}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="lm-toolbar-stat">
+          <strong>{matches.length}</strong>
+          <span>matchs importés</span>
         </div>
       </section>
 
-      {!favoriteTeam && (
-        <div className="prono-warning">
-          Choisis d’abord ton équipe favorite sur la page Accueil.
-        </div>
-      )}
+      {message && <p className="lm-prono-message">{message}</p>}
 
-      {matches.length === 0 ? (
-        <div className="prono-empty">
-          Aucun match chargé. Va dans Admin puis clique sur Synchroniser Ligue 1.
-        </div>
-      ) : (
-        <>
-          <div className="pronos-content-row">
-            <div className="l1-zone">
-              <div className="prono-section-title">
-                <h2>Matchs Ligue 1</h2>
-                <span>{l1Matches.length} match(s)</span>
-              </div>
-
-              <div className="prono-grid">
-                {l1Matches.map((match) => renderMatch(match))}
-              </div>
-            </div>
-
-            <section className="bonus-panel bonus-panel-side">
-              <div className="bonus-panel-header">
-                <div>
-                  <h2>Choix du match bonus</h2>
-                  <p>Choisis 1 seul match bonus parmi les 3 proposés.</p>
-                </div>
-
-                <div className="bonus-panel-badge">
-                  {selectedBonusId ? '1 bonus sélectionné' : '0 bonus sélectionné'}
-                </div>
-              </div>
-
-              {bonusMatches.length > 0 ? (
-                <div className="bonus-grid">
-                  {bonusMatches.map((match) => renderMatch(match, { isBonus: true }))}
-                </div>
-              ) : (
-                <div className="bonus-panel-empty">
-                  Aucun match bonus ajouté pour cette journée.
-                </div>
-              )}
-            </section>
+      <section className="lm-prono-section">
+        <div className="lm-section-head">
+          <div>
+            <p className="lm-kicker">Journée {currentRound}</p>
+            <h2>Matchs Ligue 1</h2>
           </div>
+          <span>{ligue1Matches.length} matchs</span>
+        </div>
 
-          <button
-            type="button"
-            className={`validate-pronos ${isJourneeValidated ? "is-unvalidate" : "is-validate"}`}
-            onClick={toggleValidationJournee}
-          >
-            {isJourneeValidated ? 'Dévalider pour modifier 🔓' : 'Valider ma journée 🔒'}
-          </button>
-        </>
-      )}
-    </div>
+        {ligue1Matches.length === 0 ? (
+          <div className="lm-empty-card">
+            Aucun match Ligue 1 trouvé pour cette journée.
+          </div>
+        ) : (
+          <div className="lm-prono-grid">
+            {ligue1Matches.map((match) => renderMatchCard(match, "ligue1"))}
+          </div>
+        )}
+      </section>
+
+      <section className="lm-prono-section bonus-section">
+        <div className="lm-section-head">
+          <div>
+            <p className="lm-kicker">Bonus admin</p>
+            <h2>Les 3 matchs bonus</h2>
+          </div>
+          <span>{bonusMatches.length}/3</span>
+        </div>
+
+        {bonusMatches.length === 0 ? (
+          <div className="lm-empty-card">
+            Aucun bonus trouvé pour cette journée.
+          </div>
+        ) : (
+          <div className="lm-prono-grid bonus-grid">
+            {bonusMatches.map((match) => renderMatchCard(match, "bonus"))}
+          </div>
+        )}
+      </section>
+    </main>
   );
 }
-
-
-
