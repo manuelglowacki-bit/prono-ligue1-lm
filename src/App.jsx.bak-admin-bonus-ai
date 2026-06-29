@@ -1,0 +1,30 @@
+﻿import React, { useState } from 'react';
+import Layout from './layouts/AppLayout';
+import HomePage from './pages/HomePage';
+import FavoriteTeamSelect from './components/FavoriteTeamSelect';
+import PronosPage from './pages/PronosPage';
+import RankingPage from './pages/RankingPage';
+import StatsPage from './pages/StatsPage';
+import TrophiesPage from './pages/TrophiesPage';
+import ProfilePage from './pages/ProfilePage';
+import AdminJournees from './AdminJournees';
+
+export default function App() {
+  const [page, setPage] = useState('Accueil');
+
+  const pages = {
+    Accueil: <><FavoriteTeamSelect /><HomePage setPage={setPage} /></>,
+    Pronos: <PronosPage />,
+    Classement: <RankingPage />,
+    Stats: <StatsPage />,
+    Trophées: <TrophiesPage />,
+    Profil: <ProfilePage />,
+    Admin: <AdminJournees />,
+  };
+
+  return (
+    <Layout page={page} setPage={setPage}>
+      {pages[page]}
+    </Layout>
+  );
+}

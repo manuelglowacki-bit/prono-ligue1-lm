@@ -1,0 +1,343 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import '../styles/pronos.css';
+
+const MATCHES_STORAGE_KEY = 'prono_ligue1_lm_matchs_admin';
+const PRONOS_STORAGE_KEY = 'prono_ligue1_lm_pronos_joueurs';
+
+function cleanText(value) {
+  return String(value || '').trim();
+}
+
+function isBlocked(match) {
+  if (!match.blocageDate || !match.blocageHeure) {
+    return false;
+  }
+
+  const limit = new Date(`${match.blocageDate}T${match.blocageHeure}`);
+
+  if (Number.isNaN(limit.getTime())) {
+    return false;
+  }
+
+  return new Date() >= limit;
+}
+
+function formatDateFr(value) {
+  if (!value) return 'Date à définir';
+
+  const date = new Date(`${value}T12:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString('fr-FR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function sortJournees(journees) {
+  return [...journees].sort((a, b) => {
+    const numberA = Number(a);
+    const numberB = Number(b);
+
+    if (!Number.isNaN(numberA) && !Number.isNaN(numberB)) {
+      return numberA - numberB;
+    }
+
+    return String(a).localeCompare(String(b));
+  });
+}
+
+export default function PronosPage() {
+  const [matches, setMatches] = useState([]);
+  const [pronos, setPronos] = useState({});
+  const [selectedJournee, setSelectedJournee] = useState('all');
+
+  useEffect(() => {
+    const savedMatches = localStorage.getItem(MATCHES_STORAGE_KEY);
+    const savedPronos = localStorage.getItem(PRONOS_STORAGE_KEY);
+
+    if (savedMatches) {
+      try {
+        setMatches(JSON.parse(savedMatches));
+      } catch {
+        setMatches([]);
+      }
+    }
+
+    if (savedPronos) {
+      try {
+        setPronos(JSON.parse(savedPronos));
+      } catch {
+        setPronos({});
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(PRONOS_STORAGE_KEY, JSON.stringify(pronos));
+  }, [pronos]);
+
+  const journees = useMemo(() => {
+    const list = new Set(matches.map((match) => cleanText(match.journee)).filter(Boolean));
+    return sortJournees(list);
+  }, [matches]);
+
+  const filteredMatches = useMemo(() => {
+    const list =
+      selectedJournee === 'all'
+        ? matches
+        : matches.filter((match) => cleanText(match.journee) === selectedJournee);
+
+    return [...list].sort((a, b) => {
+      const journeeA = Number(a.journee) || 0;
+      const journeeB = Number(b.journee) || 0;
+
+      if (journeeA !== journeeB) {
+        return journeeA - journeeB;
+      }
+
+      return `${a.date} ${a.heure}`.localeCompare(`${b.date} ${b.heure}`);
+    });
+  }, [matches, selectedJournee]);
+
+  const stats = useMemo(() => {
+    const total = filteredMatches.length;
+    const bloques = filteredMatches.filter(isBlocked).length;
+    const pronostiques = filteredMatches.filter((match) => {
+      const prono = pronos[match.id];
+      return prono?.resultat || prono?.scoreDom || prono?.scoreExt;
+    }).length;
+
+    return {
+      total,
+      bloques,
+      ouverts: total - bloques,
+      pronostiques,
+    };
+  }, [filteredMatches, pronos]);
+
+  function updateProno(match, field, value) {
+    if (isBlocked(match)) {
+      alert('Ce match est bloqué, tu ne peux plus modifier le prono.');
+      return;
+    }
+
+    setPronos((old) => ({
+      ...old,
+      [match.id]: {
+        ...(old[match.id] || {}),
+        [field]: value,
+      },
+    }));
+  }
+
+  function reloadMatches() {
+    const savedMatches = localStorage.getItem(MATCHES_STORAGE_KEY);
+
+    if (savedMatches) {
+      try {
+        setMatches(JSON.parse(savedMatches));
+      } catch {
+        setMatches([]);
+      }
+    }
+  }
+
+  function clearPronosJournee() {
+    if (!confirm('Effacer les pronos affichés ?')) return;
+
+    const idsAffiches = new Set(filteredMatches.map((match) => match.id));
+
+    setPronos((old) => {
+      const copy = { ...old };
+
+      idsAffiches.forEach((id) => {
+        delete copy[id];
+      });
+
+      return copy;
+    });
+  }
+
+  return (
+    <section className="pp-page">
+      <div className="pp-header">
+        <div>
+          <h1>Pronos</h1>
+          <p>Tous les matchs importés depuis l’admin apparaissent ici.</p>
+        </div>
+
+        <div className="pp-actions">
+          <button type="button" onClick={reloadMatches}>
+            Actualiser matchs
+          </button>
+
+          <button type="button" className="pp-danger" onClick={clearPronosJournee}>
+            Effacer pronos affichés
+          </button>
+        </div>
+      </div>
+
+      <div className="pp-stats">
+        <div>
+          <strong>{stats.total}</strong>
+          <span>Matchs affichés</span>
+        </div>
+
+        <div>
+          <strong>{stats.ouverts}</strong>
+          <span>Ouverts</span>
+        </div>
+
+        <div>
+          <strong>{stats.bloques}</strong>
+          <span>Bloqués</span>
+        </div>
+
+        <div>
+          <strong>{stats.pronostiques}</strong>
+          <span>Pronostiqués</span>
+        </div>
+      </div>
+
+      <div className="pp-filters">
+        <button
+          type="button"
+          className={selectedJournee === 'all' ? 'active' : ''}
+          onClick={() => setSelectedJournee('all')}
+        >
+          Toutes
+        </button>
+
+        {journees.map((journee) => (
+          <button
+            key={journee}
+            type="button"
+            className={selectedJournee === journee ? 'active' : ''}
+            onClick={() => setSelectedJournee(journee)}
+          >
+            J{journee}
+          </button>
+        ))}
+      </div>
+
+      {matches.length === 0 && (
+        <div className="pp-empty">
+          <h2>Aucun match importé</h2>
+          <p>
+            Va dans <strong>Admin</strong>, importe ton fichier Excel, puis reviens ici.
+          </p>
+        </div>
+      )}
+
+      {matches.length > 0 && filteredMatches.length === 0 && (
+        <div className="pp-empty">
+          <h2>Aucun match sur cette journée</h2>
+          <p>Choisis une autre journée ou ajoute des matchs dans l’admin.</p>
+        </div>
+      )}
+
+      <div className="pp-list">
+        {filteredMatches.map((match) => {
+          const blocked = isBlocked(match);
+          const prono = pronos[match.id] || {};
+
+          return (
+            <article key={match.id} className={blocked ? 'pp-card blocked' : 'pp-card'}>
+              <div className="pp-card-top">
+                <div>
+                  <span className="pp-journee">Journée {match.journee || '?'}</span>
+                  <span className={match.type === 'BONUS' ? 'pp-type bonus' : 'pp-type'}>
+                    {match.type || 'L1'}
+                  </span>
+                </div>
+
+                <span className={blocked ? 'pp-status red' : 'pp-status green'}>
+                  {blocked ? 'Bloqué' : 'Ouvert'}
+                </span>
+              </div>
+
+              <div className="pp-date">
+                {formatDateFr(match.date)} · {match.heure || 'Heure à définir'}
+              </div>
+
+              <div className="pp-match">
+                <div className="pp-team">
+                  <span>{match.domicile}</span>
+                </div>
+
+                <div className="pp-versus">VS</div>
+
+                <div className="pp-team right">
+                  <span>{match.exterieur}</span>
+                </div>
+              </div>
+
+              <div className="pp-prono-zone">
+                <div className="pp-result-buttons">
+                  <button
+                    type="button"
+                    disabled={blocked}
+                    className={prono.resultat === '1' ? 'active' : ''}
+                    onClick={() => updateProno(match, 'resultat', '1')}
+                  >
+                    1
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={blocked}
+                    className={prono.resultat === 'N' ? 'active' : ''}
+                    onClick={() => updateProno(match, 'resultat', 'N')}
+                  >
+                    N
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={blocked}
+                    className={prono.resultat === '2' ? 'active' : ''}
+                    onClick={() => updateProno(match, 'resultat', '2')}
+                  >
+                    2
+                  </button>
+                </div>
+
+                <div className="pp-score">
+                  <input
+                    type="number"
+                    min="0"
+                    disabled={blocked}
+                    value={prono.scoreDom || ''}
+                    onChange={(event) => updateProno(match, 'scoreDom', event.target.value)}
+                    placeholder="0"
+                  />
+
+                  <span>-</span>
+
+                  <input
+                    type="number"
+                    min="0"
+                    disabled={blocked}
+                    value={prono.scoreExt || ''}
+                    onChange={(event) => updateProno(match, 'scoreExt', event.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div className="pp-lock-info">
+                Blocage : {match.blocageDate || 'date ?'} à {match.blocageHeure || 'heure ?'}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}

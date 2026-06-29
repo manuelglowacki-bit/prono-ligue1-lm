@@ -1,0 +1,246 @@
+﻿.home-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.home-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #111827, #1f2937);
+  color: white;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.20);
+}
+
+.home-hero p {
+  margin: 0 0 5px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.home-hero h1 {
+  margin: 0 0 6px;
+  font-size: 30px;
+}
+
+.home-hero span {
+  color: rgba(255,255,255,0.68);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.home-season-status {
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.home-season-status.waiting {
+  background: rgba(34, 197, 94, 0.14);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.28);
+}
+
+.home-season-status.started {
+  background: rgba(250, 204, 21, 0.14);
+  color: #facc15;
+  border: 1px solid rgba(250, 204, 21, 0.28);
+}
+
+.home-dashboard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.home-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: white;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.home-card span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.home-card strong {
+  display: block;
+  margin-top: 5px;
+  color: #111827;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.home-card small {
+  display: block;
+  margin-top: 7px;
+  color: #22c55e;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.home-progress {
+  padding: 14px;
+  border-radius: 18px;
+  background: white;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.home-progress-top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.home-progress-bar {
+  height: 9px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.home-progress-bar div {
+  height: 100%;
+  border-radius: 999px;
+  background: #22c55e;
+}
+
+.home-main-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.9fr 0.9fr;
+  gap: 12px;
+}
+
+.home-panel {
+  padding: 16px;
+  border-radius: 18px;
+  background: white;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.home-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.home-panel-title h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 17px;
+}
+
+.home-panel-title span {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.home-next-match {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #111827;
+}
+
+.home-next-match strong {
+  font-size: 16px;
+}
+
+.home-next-match span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.home-next-match small {
+  margin-top: 4px;
+  color: #22c55e;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.home-empty-mini {
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.home-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.home-actions button {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px;
+  background: #111827;
+  color: white;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.home-actions button:first-child {
+  background: #22c55e;
+  color: #052e16;
+}
+
+.home-rules ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.home-rules li {
+  margin-bottom: 8px;
+}
+
+.home-rules strong {
+  color: #111827;
+}
+
+@media (max-width: 1000px) {
+  .home-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 750px) {
+  .home-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .home-dashboard {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,1081 @@
+﻿.pronos-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.pronos-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #111827, #1f2937);
+  color: white;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.20);
+}
+
+.pronos-header p {
+  margin: 0 0 4px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.pronos-header h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.pronos-header span {
+  color: rgba(255,255,255,0.72);
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.pronos-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.journee-points-card {
+  min-width: 120px;
+  padding: 10px 12px;
+  border-radius: 15px;
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.journee-points-card span {
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.62);
+}
+
+.journee-points-card strong {
+  display: block;
+  font-size: 22px;
+  color: #22c55e;
+  line-height: 1;
+  margin-top: 3px;
+}
+
+.pronos-actions select {
+  padding: 10px 12px;
+  border-radius: 13px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.10);
+  color: white;
+  font-weight: 900;
+  outline: none;
+}
+
+.pronos-actions option {
+  color: #111827;
+}
+
+.prono-warning,
+.prono-empty {
+  padding: 12px 14px;
+  border-radius: 15px;
+  background: #111827;
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.78);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.prono-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.prono-section-title h2 {
+  margin: 0;
+  font-size: 19px;
+  color: #111827;
+}
+
+.prono-section-title span {
+  font-weight: 900;
+  color: #64748b;
+  font-size: 12px;
+}
+
+/* Matchs Ligue 1 */
+.prono-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 300px);
+  gap: 14px;
+  justify-content: start;
+  align-items: start;
+  width: auto;
+  max-width: 100%;
+}
+
+.prono-card {
+  width: 300px;
+  padding: 11px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #111827, #1e293b);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.16);
+  color: white;
+  min-height: 145px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.prono-card.is-good {
+  border-color: #22c55e;
+}
+
+.prono-card.is-bad {
+  border-color: #ef4444;
+}
+
+.prono-card.is-partial {
+  border-color: #f59e0b;
+}
+
+.prono-card.is-selected-bonus {
+  border-color: #22c55e;
+  background: linear-gradient(145deg, #052e16, #111827);
+}
+
+.prono-card.is-disabled-bonus {
+  opacity: 0.72;
+}
+
+.prono-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 9px;
+}
+
+.prono-date {
+  color: rgba(255,255,255,0.55);
+  font-size: 9px;
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+
+.prono-teams {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.12;
+}
+
+.prono-teams strong {
+  font-size: 9px;
+  color: rgba(255,255,255,0.38);
+}
+
+.bonus-league {
+  margin-top: 5px;
+  color: #22c55e;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.prono-mode {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.10);
+  color: white;
+  font-size: 9px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.score-exact-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 13px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.score-exact-box input {
+  width: 46px;
+  height: 34px;
+  border-radius: 11px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.10);
+  color: white;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 950;
+  outline: none;
+}
+
+.score-exact-box input::placeholder {
+  color: rgba(255,255,255,0.40);
+}
+
+.score-exact-box span {
+  font-size: 16px;
+  font-weight: 950;
+  color: white;
+}
+
+.one-n-two {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.one-n-two button,
+.bonus-choice-button {
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  cursor: pointer;
+  transition: 0.16s ease;
+  font-weight: 950;
+}
+
+.one-n-two button {
+  min-height: 42px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: center;
+  justify-content: center;
+}
+
+.one-n-two button strong {
+  font-size: 15px;
+}
+
+.one-n-two button span {
+  font-size: 8px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.62);
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.one-n-two button.active,
+.bonus-choice-button:hover {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #052e16;
+}
+
+.one-n-two button.active span {
+  color: rgba(5, 46, 22, 0.75);
+}
+
+.bonus-choice-button {
+  width: 100%;
+  padding: 10px;
+  font-size: 12px;
+}
+
+.one-n-two button:disabled,
+.score-exact-box input:disabled,
+.bonus-choice-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.prono-result-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 9px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.58);
+}
+
+.result-label {
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.result-label.good {
+  background: #22c55e;
+  color: #052e16;
+}
+
+.result-label.bad {
+  background: #ef4444;
+  color: white;
+}
+
+.result-label.partial {
+  background: #f59e0b;
+  color: #451a03;
+}
+
+.prono-result-line em {
+  font-style: normal;
+  color: #22c55e;
+  font-size: 9px;
+}
+
+/* Bloc bonus intégré sous la Ligue 1 */
+.bonus-panel {
+  width: 928px;
+  max-width: 100%;
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #0f172a, #111827);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+  box-sizing: border-box;
+}
+
+.bonus-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.bonus-panel-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #22c55e;
+  font-weight: 950;
+}
+
+.bonus-panel-header p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: rgba(255,255,255,0.64);
+  font-weight: 800;
+}
+
+.bonus-panel-badge {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  color: #22c55e;
+  font-size: 11px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.bonus-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 300px);
+  gap: 14px;
+  justify-content: start;
+  align-items: start;
+}
+
+.bonus-grid .prono-card {
+  width: 300px;
+  min-height: 150px;
+}
+
+.bonus-panel-empty {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.72);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.validate-pronos {
+  align-self: flex-start;
+  border: 0;
+  border-radius: 14px;
+  padding: 11px 16px;
+  background: #22c55e;
+  color: #052e16;
+  font-weight: 950;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(34, 197, 94, 0.26);
+}
+
+.validate-pronos:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1050px) {
+  .prono-grid,
+  .bonus-grid {
+    grid-template-columns: repeat(2, 300px);
+  }
+
+  .bonus-panel {
+    width: 614px;
+  }
+}
+
+@media (max-width: 700px) {
+  .pronos-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pronos-header-right {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .prono-grid,
+  .bonus-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .prono-card,
+  .bonus-grid .prono-card,
+  .bonus-panel {
+    width: 100%;
+  }
+}
+
+/* === FIX FINAL BONUS SOUS LIGUE 1 === */
+
+.pronos-page {
+  display: block !important;
+  width: 100% !important;
+}
+
+.prono-section-title,
+.prono-grid,
+.bonus-panel,
+.validate-pronos {
+  clear: both !important;
+}
+
+.prono-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 300px) !important;
+  gap: 14px !important;
+  justify-content: start !important;
+  align-items: start !important;
+  width: 928px !important;
+  max-width: 100% !important;
+  margin-bottom: 22px !important;
+}
+
+.bonus-panel {
+  display: block !important;
+  width: 928px !important;
+  max-width: 100% !important;
+  margin-top: 24px !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+.bonus-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 300px) !important;
+  gap: 14px !important;
+  justify-content: start !important;
+  align-items: start !important;
+}
+
+.bonus-grid .prono-card {
+  width: 300px !important;
+}
+
+@media (max-width: 1050px) {
+  .prono-grid,
+  .bonus-panel {
+    width: 614px !important;
+  }
+
+  .prono-grid,
+  .bonus-grid {
+    grid-template-columns: repeat(2, 300px) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .prono-grid,
+  .bonus-panel {
+    width: 100% !important;
+  }
+
+  .prono-grid,
+  .bonus-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .bonus-grid .prono-card {
+    width: 100% !important;
+  }
+}
+
+
+/* === COULEURS VALIDATION / DÉVALIDATION === */
+
+.validate-pronos.is-validate {
+  background: #22c55e !important;
+  color: #052e16 !important;
+  box-shadow: 0 10px 24px rgba(34, 197, 94, 0.30) !important;
+}
+
+.validate-pronos.is-unvalidate {
+  background: #f97316 !important;
+  color: #431407 !important;
+  box-shadow: 0 10px 24px rgba(249, 115, 22, 0.32) !important;
+}
+
+.validate-pronos.is-unvalidate:hover {
+  background: #fb923c !important;
+}
+
+.validate-pronos.is-validate:hover {
+  background: #4ade80 !important;
+}
+
+
+/* === STATS HEADER PRONOS === */
+
+.pronos-header-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+}
+
+.journee-status-card {
+  min-width: 105px;
+  padding: 10px 12px;
+  border-radius: 15px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.09);
+}
+
+.journee-status-card span {
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.62);
+}
+
+.journee-status-card strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1;
+  margin-top: 5px;
+  font-weight: 950;
+}
+
+.journee-status-card.is-ok strong,
+.journee-status-card.is-open strong {
+  color: #22c55e;
+}
+
+.journee-status-card.is-alert strong {
+  color: #f97316;
+}
+
+.journee-status-card.is-locked strong {
+  color: #facc15;
+}
+
+@media (max-width: 900px) {
+  .pronos-header-right {
+    justify-content: flex-start !important;
+  }
+
+  .journee-points-card,
+  .journee-status-card {
+    flex: 1;
+    min-width: 130px;
+  }
+}
+
+
+/* === BONUS À CÔTÉ DES MATCHS LIGUE 1 === */
+
+.pronos-content-row {
+  display: grid !important;
+  grid-template-columns: 614px 320px !important;
+  gap: 18px !important;
+  align-items: start !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+}
+
+.l1-zone {
+  width: 614px !important;
+}
+
+.l1-zone .prono-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, 300px) !important;
+  gap: 14px !important;
+  width: 614px !important;
+  max-width: 100% !important;
+  margin-bottom: 0 !important;
+}
+
+.bonus-panel.bonus-panel-side {
+  width: 320px !important;
+  max-width: 320px !important;
+  margin-top: 0 !important;
+  margin-left: 0 !important;
+  padding: 14px !important;
+}
+
+.bonus-panel-side .bonus-panel-header {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+}
+
+.bonus-panel-side .bonus-panel-header h2 {
+  font-size: 18px !important;
+}
+
+.bonus-panel-side .bonus-panel-header p {
+  font-size: 11px !important;
+}
+
+.bonus-panel-side .bonus-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+}
+
+.bonus-panel-side .bonus-grid .prono-card {
+  width: 100% !important;
+  min-height: 140px !important;
+}
+
+/* Responsive */
+@media (max-width: 1150px) {
+  .pronos-content-row {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+  }
+
+  .l1-zone,
+  .l1-zone .prono-grid,
+  .bonus-panel.bonus-panel-side {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .l1-zone .prono-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .bonus-panel-side .bonus-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .l1-zone .prono-grid,
+  .bonus-panel-side .bonus-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* === 4 COLONNES DE 3 : 3 LIGUE 1 + 1 BONUS === */
+
+.pronos-content-row {
+  display: grid !important;
+  grid-template-columns: 928px 320px !important;
+  gap: 18px !important;
+  align-items: start !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+}
+
+.l1-zone {
+  width: 928px !important;
+  max-width: 928px !important;
+}
+
+.l1-zone .prono-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 300px) !important;
+  gap: 14px !important;
+  width: 928px !important;
+  max-width: 928px !important;
+}
+
+.bonus-panel.bonus-panel-side {
+  width: 320px !important;
+  max-width: 320px !important;
+  margin-top: 0 !important;
+}
+
+.bonus-panel-side .bonus-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 14px !important;
+}
+
+.bonus-panel-side .bonus-grid .prono-card {
+  width: 100% !important;
+  min-height: 145px !important;
+}
+
+/* Si écran trop petit, ça repasse proprement */
+@media (max-width: 1350px) {
+  .pronos-content-row {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+  }
+
+  .l1-zone,
+  .l1-zone .prono-grid,
+  .bonus-panel.bonus-panel-side {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .l1-zone .prono-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .bonus-panel-side .bonus-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .l1-zone .prono-grid,
+  .bonus-panel-side .bonus-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 650px) {
+  .l1-zone .prono-grid,
+  .bonus-panel-side .bonus-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* === CASES IDENTIQUES LIGUE 1 + BONUS === */
+
+.pronos-content-row {
+  display: grid !important;
+  grid-template-columns: 928px 300px !important;
+  gap: 14px !important;
+  align-items: start !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+}
+
+/* Zone Ligue 1 */
+.l1-zone {
+  width: 928px !important;
+  max-width: 928px !important;
+}
+
+.l1-zone .prono-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 300px) !important;
+  gap: 14px !important;
+  width: 928px !important;
+  max-width: 928px !important;
+}
+
+/* Zone bonus : on enlève l'effet grosse boîte différente */
+.bonus-panel.bonus-panel-side {
+  width: 300px !important;
+  max-width: 300px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+/* Titre bonus compact */
+.bonus-panel-side .bonus-panel-header {
+  height: 38px !important;
+  margin: 0 0 10px 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
+  gap: 2px !important;
+}
+
+.bonus-panel-side .bonus-panel-header h2 {
+  margin: 0 !important;
+  font-size: 19px !important;
+  color: #111827 !important;
+  font-weight: 950 !important;
+}
+
+.bonus-panel-side .bonus-panel-header p,
+.bonus-panel-side .bonus-panel-badge {
+  display: none !important;
+}
+
+/* Bonus en 1 colonne, mêmes cases que Ligue 1 */
+.bonus-panel-side .bonus-grid {
+  display: grid !important;
+  grid-template-columns: 300px !important;
+  gap: 14px !important;
+  width: 300px !important;
+  max-width: 300px !important;
+}
+
+/* Toutes les cartes identiques */
+.prono-card,
+.l1-zone .prono-card,
+.bonus-panel-side .prono-card,
+.bonus-panel-side .bonus-grid .prono-card {
+  width: 300px !important;
+  height: 155px !important;
+  min-height: 155px !important;
+  max-height: 155px !important;
+  padding: 11px !important;
+  border-radius: 16px !important;
+  background: linear-gradient(145deg, #111827, #1e293b) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.16) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* Bonus choisi garde juste une bordure verte */
+.prono-card.is-selected-bonus {
+  border-color: #22c55e !important;
+  background: linear-gradient(145deg, #111827, #1e293b) !important;
+}
+
+/* Bonus non choisi pas trop différent */
+.prono-card.is-disabled-bonus {
+  opacity: 1 !important;
+}
+
+/* Bouton bonus dans la case */
+.bonus-choice-button {
+  margin-top: auto !important;
+  height: 38px !important;
+}
+
+/* Responsive */
+@media (max-width: 1350px) {
+  .pronos-content-row {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+  }
+
+  .l1-zone,
+  .l1-zone .prono-grid,
+  .bonus-panel.bonus-panel-side,
+  .bonus-panel-side .bonus-grid {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .l1-zone .prono-grid,
+  .bonus-panel-side .bonus-grid {
+    grid-template-columns: repeat(3, 300px) !important;
+  }
+}
+
+@media (max-width: 950px) {
+  .l1-zone .prono-grid,
+  .bonus-panel-side .bonus-grid {
+    grid-template-columns: repeat(2, 300px) !important;
+  }
+}
+
+@media (max-width: 650px) {
+  .l1-zone .prono-grid,
+  .bonus-panel-side .bonus-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .prono-card,
+  .l1-zone .prono-card,
+  .bonus-panel-side .prono-card,
+  .bonus-panel-side .bonus-grid .prono-card {
+    width: 100% !important;
+  }
+}
+
+
+/* === RETOUR MODÈLE AVANT : BONUS À DROITE EN BLOC === */
+
+.pronos-content-row {
+  display: grid !important;
+  grid-template-columns: 928px 320px !important;
+  gap: 18px !important;
+  align-items: start !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+}
+
+.l1-zone {
+  width: 928px !important;
+  max-width: 928px !important;
+}
+
+.l1-zone .prono-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 300px) !important;
+  gap: 14px !important;
+  width: 928px !important;
+  max-width: 928px !important;
+}
+
+/* On remet le vrai bloc bonus */
+.bonus-panel.bonus-panel-side {
+  width: 320px !important;
+  max-width: 320px !important;
+  margin: 0 !important;
+  padding: 14px !important;
+  border-radius: 18px !important;
+  background: linear-gradient(145deg, #0f172a, #111827) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18) !important;
+}
+
+/* On remet le titre bonus visible */
+.bonus-panel-side .bonus-panel-header {
+  height: auto !important;
+  margin: 0 0 14px 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+}
+
+.bonus-panel-side .bonus-panel-header h2 {
+  margin: 0 !important;
+  font-size: 18px !important;
+  color: #22c55e !important;
+  font-weight: 950 !important;
+}
+
+.bonus-panel-side .bonus-panel-header p {
+  display: block !important;
+  margin: 0 !important;
+  font-size: 11px !important;
+  color: rgba(255,255,255,0.64) !important;
+  font-weight: 800 !important;
+}
+
+.bonus-panel-side .bonus-panel-badge {
+  display: block !important;
+  padding: 8px 12px !important;
+  border-radius: 999px !important;
+  background: rgba(34, 197, 94, 0.14) !important;
+  border: 1px solid rgba(34, 197, 94, 0.28) !important;
+  color: #22c55e !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+}
+
+/* Bonus en colonne dans le bloc */
+.bonus-panel-side .bonus-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.bonus-panel-side .bonus-grid .prono-card {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 145px !important;
+  max-height: none !important;
+}
+
+/* Matchs Ligue 1 normaux */
+.l1-zone .prono-card {
+  width: 300px !important;
+  height: auto !important;
+  min-height: 145px !important;
+  max-height: none !important;
+}
+
+/* On enlève l'effet forcé identique */
+.prono-card.is-selected-bonus {
+  border-color: #22c55e !important;
+  background: linear-gradient(145deg, #052e16, #111827) !important;
+}
+
+.prono-card.is-disabled-bonus {
+  opacity: 0.72 !important;
+}
+
+@media (max-width: 1350px) {
+  .pronos-content-row {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+  }
+
+  .l1-zone,
+  .l1-zone .prono-grid,
+  .bonus-panel.bonus-panel-side {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .l1-zone .prono-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .bonus-panel-side .bonus-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .l1-zone .prono-grid,
+  .bonus-panel-side .bonus-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 650px) {
+  .l1-zone .prono-grid,
+  .bonus-panel-side .bonus-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+

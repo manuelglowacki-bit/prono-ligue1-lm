@@ -1,0 +1,296 @@
+import { useState } from 'react';
+import { Crown, Target, Sparkles, Trophy, Heart, Flame, ListChecks, Lock } from 'lucide-react';
+
+// ---------- Données fictives locales ----------
+const SEASON = 'Saison 2026/2027';
+
+const TIER_META = {
+  bronze: { label: 'Bronze', medal: '🥉', color: '#c98a4a' },
+  silver: { label: 'Argent', medal: '🥈', color: '#cfd8e3' },
+  gold: { label: 'Or', medal: '🥇', color: '#ffd400' },
+  legend: { label: 'Légende', medal: '💎', color: '#7c5cff' },
+};
+
+const SUMMARY = [
+  { label: 'Trophées débloqués', value: 7, accent: 'gold' },
+  { label: 'Trophées restants', value: 2, accent: 'blue' },
+  { label: 'Joueur le plus récompensé', value: 'Laurent', accent: 'cyan' },
+];
+
+// current : index du niveau actuel (0..3). -1 = aucun niveau débloqué.
+// Si current === 3 (Légende) => prochain niveau = null.
+const TROPHY_FAMILIES = [
+  {
+    key: 'serial',
+    icon: 'list',
+    name: 'Serial pronostiqueur',
+    desc: 'Enchaîne des journées complètes de pronostics.',
+    levels: [
+      { need: 5, label: '5 journées complètes' },
+      { need: 10, label: '10 journées complètes' },
+      { need: 20, label: '20 journées complètes' },
+      { need: 34, label: '34 journées complètes' },
+    ],
+    current: 2,
+    progress: 16,
+  },
+  {
+    key: 'king1n2',
+    icon: 'trophy',
+    name: 'Roi du 1N2',
+    desc: 'Cumule de bons résultats sur les pronostics 1N2.',
+    levels: [
+      { need: 10, label: '10 bons résultats 1N2' },
+      { need: 20, label: '20 bons résultats 1N2' },
+      { need: 40, label: '40 bons résultats 1N2' },
+      { need: 70, label: '70 bons résultats 1N2' },
+    ],
+    current: 3,
+    progress: 70,
+  },
+  {
+    key: 'bonus',
+    icon: 'sparkles',
+    name: 'Expert bonus',
+    desc: 'Maîtrise les matchs bonus.',
+    levels: [
+      { need: 3, label: '3 bonus réussis' },
+      { need: 7, label: '7 bonus réussis' },
+      { need: 12, label: '12 bonus réussis' },
+      { need: 20, label: '20 bonus réussis' },
+    ],
+    current: 1,
+    progress: 7,
+  },
+  {
+    key: 'heart',
+    icon: 'heart',
+    name: 'Cœur fidèle',
+    desc: 'Bons pronos sur ton équipe de cœur.',
+    levels: [
+      { need: 3, label: '3 bons pronos équipe de cœur' },
+      { need: 7, label: '7 bons pronos équipe de cœur' },
+      { need: 15, label: '15 bons pronos équipe de cœur' },
+      { need: 25, label: '25 bons pronos équipe de cœur' },
+    ],
+    current: 2,
+    progress: 15,
+  },
+  {
+    key: 'perfect',
+    icon: 'target',
+    name: 'Score parfait',
+    desc: 'Trouve des scores exacts match après match.',
+    levels: [
+      { need: 1, label: '1 score exact' },
+      { need: 3, label: '3 scores exacts' },
+      { need: 7, label: '7 scores exacts' },
+      { need: 15, label: '15 scores exacts' },
+    ],
+    current: 1,
+    progress: 3,
+  },
+  {
+    key: 'invincible',
+    icon: 'flame',
+    name: 'Invincible',
+    desc: 'Journées sans aucun mauvais prono.',
+    levels: [
+      { need: 1, label: '1 journée sans mauvais prono' },
+      { need: 2, label: '2 journées sans mauvais prono' },
+      { need: 4, label: '4 journées sans mauvais prono' },
+      { need: 7, label: '7 journées sans mauvais prono' },
+    ],
+    current: -1,
+    progress: 0,
+  },
+  {
+    key: 'podium',
+    icon: 'crown',
+    name: 'Chasseur de podium',
+    desc: 'Grimpe et reste dans le haut du classement.',
+    levels: [
+      { need: 1, label: 'Entrer une fois dans le top 5' },
+      { need: 1, label: 'Entrer une fois dans le top 3' },
+      { need: 3, label: 'Rester 3 journées dans le top 3' },
+      { need: 1, label: 'Finir la saison sur le podium' },
+    ],
+    current: 2,
+    progress: 3,
+  },
+  {
+    key: 'machine',
+    icon: 'trophy',
+    name: 'Machine à points',
+    desc: 'Récompense les joueurs capables de réaliser une très grosse journée.',
+    levels: [
+      { need: 8, label: 'Faire 8 pts sur une journée' },
+      { need: 10, label: 'Faire 10 pts sur une journée' },
+      { need: 12, label: 'Faire 12 pts sur une journée' },
+      { need: 13, label: 'Faire 13 pts sur une journée parfaite' },
+    ],
+    current: 1,
+    progress: 10,
+  },
+  {
+    key: 'legend',
+    icon: 'crown',
+    name: 'Légende LM',
+    desc: 'Le graal : la couronne de la saison.',
+    levels: [
+      { need: 1, label: 'Top 5 final' },
+      { need: 1, label: 'Top 3 final' },
+      { need: 1, label: '2ᵉ final' },
+      { need: 1, label: 'Champion de la saison' },
+    ],
+    current: -1,
+    progress: 0,
+  },
+];
+// ---------- Icône trophée ----------
+function TrophyIcon({ name }) {
+  if (name === 'crown') return <Crown size={20} />;
+  if (name === 'target') return <Target size={20} />;
+  if (name === 'sparkles') return <Sparkles size={20} />;
+  if (name === 'trophy') return <Trophy size={20} />;
+  if (name === 'heart') return <Heart size={20} />;
+  if (name === 'flame') return <Flame size={20} />;
+  if (name === 'list') return <ListChecks size={20} />;
+  return <Trophy size={20} />;
+}
+
+// ---------- Helpers ----------
+const TIER_KEYS = ['bronze', 'silver', 'gold', 'legend'];
+
+function getCurrentTier(fam) {
+  if (fam.current < 0) return null;
+  return TIER_KEYS[fam.current];
+}
+
+function getProgressPct(fam) {
+  if (fam.current < 0) {
+    // locked : on prend le 1er palier comme cible
+    const target = fam.levels[0].need;
+    if (target <= 0) return 0;
+    return Math.max(0, Math.min(100, Math.round((fam.progress / target) * 100)));
+  }
+  if (fam.current >= 3) return 100;
+  const from = fam.current >= 0 ? fam.levels[fam.current].need : 0;
+  const to = fam.levels[fam.current + 1].need;
+  if (to <= from) return 100;
+  const pct = ((fam.progress - from) / (to - from)) * 100;
+  return Math.max(0, Math.min(100, Math.round(pct)));
+}
+
+// ---------- Carte trophée avec niveaux ----------
+function TrophyLevelCard({ fam }) {
+  const tier = getCurrentTier(fam);
+  const isLocked = !tier;
+  const tierKey = tier || 'bronze';
+  const tierMeta = TIER_META[tierKey];
+  const isMaxed = fam.current === 3;
+  const nextIndex = isLocked ? 0 : Math.min(3, fam.current + 1);
+  const nextLabel = isMaxed ? null : fam.levels[nextIndex].label;
+  const currentLabel = tier
+    ? `${tierMeta.medal} ${tierMeta.label}`
+    : 'Non débloqué';
+  const pct = getProgressPct(fam);
+  const ratio = isMaxed
+    ? 'Niveau max'
+    : `${fam.progress} / ${fam.levels[nextIndex].need}`;
+  const [openMobile, setOpenMobile] = useState(false);
+  return (
+    <div
+      className={`trophy-lcard tier-${tierKey} ${isLocked ? 'locked' : ''}`}
+      onClick={() => setOpenMobile((v) => !v)}
+    >
+      <div className="trophy-lcard-head">
+        <div className="trophy-lcard-icon">
+          {isLocked ? <Lock size={18} /> : <TrophyIcon name={fam.icon} />}
+        </div>
+        <div className="trophy-lcard-name">{fam.name}</div>
+        <div className={`trophy-lcard-tier ${isLocked ? 'tier-locked' : ''}`}>
+          <span className="trophy-lcard-medal" aria-hidden="true">
+            {isLocked ? '🔒' : tierMeta.medal}
+          </span>
+          <span className="trophy-lcard-tierlabel">
+            {tier ? tierMeta.label : 'Verrouillé'}
+          </span>
+        </div>
+      </div>
+      <div className="trophy-lcard-line">
+        <span className="trophy-lcard-line-k">Statut</span>
+        <span className={`trophy-lcard-line-v ${isLocked ? 'status-locked' : 'status-unlocked'}`}>
+          {isLocked ? 'Non débloqué' : 'Débloqué'}
+        </span>
+      </div>
+      <div className="trophy-lcard-line">
+        <span className="trophy-lcard-line-k">Niveau actuel</span>
+        <span className={`trophy-lcard-line-v ${isLocked ? 'muted' : `tier-tag-${tierKey}`}`}>
+          {currentLabel}
+        </span>
+      </div>
+      <div className="trophy-lcard-line">
+        <span className="trophy-lcard-line-k">Prochain niveau</span>
+        <span className="trophy-lcard-line-v muted">
+          {isMaxed ? '— Niveau maximum atteint' : nextLabel}
+        </span>
+      </div>
+      <div className="trophy-lcard-progress">
+        <div className="trophy-lcard-bar">
+          <div
+            className={`trophy-lcard-bar-fill ${isLocked ? 'bar-locked' : `bar-${tierKey}`}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className="trophy-lcard-ratio">{ratio}</span>
+      </div>
+
+      {/* Info-bulle — desktop : survol, mobile : tap (toggle) */}
+      <div
+        className={`trophy-tooltip ${openMobile ? 'mobile-open' : ''}`}
+        role="tooltip"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="trophy-tooltip-arrow" aria-hidden="true" />
+        <div className="trophy-tooltip-title">{fam.name}</div>
+        <p className="trophy-tooltip-text">{fam.desc}</p>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Page ----------
+export default function TrophiesPage() {
+  return (
+    <div className="premium-page trophies-page">
+      <header className="trophies-header">
+        <h1 className="premium-title">Trophées</h1>
+        <p className="trophies-subtitle">Récompenses de la {SEASON}</p>
+      </header>
+
+      {/* Résumé rapide */}
+      <div className="premium-grid three trophies-summary">
+        {SUMMARY.map((s) => (
+          <div key={s.label} className={`premium-kpi ${s.accent}`}>
+            <small>{s.label}</small>
+            <b>{s.value}</b>
+          </div>
+        ))}
+      </div>
+
+      {/* Tous les trophées, débloqués et verrouillés affichés ensemble */}
+      <div className="premium-card trophies-card">
+        <div className="premium-section-title">
+          <h2 style={{ margin: 0 }}>Tous les trophées</h2>
+          <span>{TROPHY_FAMILIES.filter((f) => f.current >= 0).length}/{TROPHY_FAMILIES.length} débloqués</span>
+        </div>
+        <div className="trophies-grid">
+          {TROPHY_FAMILIES.map((f) => (
+            <TrophyLevelCard key={f.key} fam={f} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

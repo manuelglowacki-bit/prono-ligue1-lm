@@ -1,0 +1,646 @@
+﻿.pronos-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pronos-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #111827, #1f2937);
+  color: white;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.20);
+}
+
+.pronos-header p {
+  margin: 0 0 4px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.pronos-header h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.pronos-header span {
+  color: rgba(255,255,255,0.72);
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.pronos-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.journee-points-card {
+  min-width: 120px;
+  padding: 10px 12px;
+  border-radius: 15px;
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.journee-points-card span {
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.62);
+}
+
+.journee-points-card strong {
+  display: block;
+  font-size: 22px;
+  color: #22c55e;
+  line-height: 1;
+  margin-top: 3px;
+}
+
+.pronos-actions select {
+  padding: 10px 12px;
+  border-radius: 13px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.10);
+  color: white;
+  font-weight: 900;
+  outline: none;
+}
+
+.pronos-actions option {
+  color: #111827;
+}
+
+.prono-warning,
+.prono-empty {
+  padding: 12px 14px;
+  border-radius: 15px;
+  background: #111827;
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.78);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.prono-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.prono-section-title h2 {
+  margin: 0;
+  font-size: 19px;
+  color: #111827;
+}
+
+.prono-section-title span {
+  font-weight: 900;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.bonus-title {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.10);
+}
+
+.bonus-title h2 {
+  color: #16a34a;
+}
+
+/* Comme avant : grille automatique, tout compact */
+.prono-grid,
+.bonus-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.prono-card {
+  padding: 11px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #111827, #1e293b);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.16);
+  color: white;
+  min-height: 145px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.prono-card.is-good {
+  border-color: #22c55e;
+}
+
+.prono-card.is-bad {
+  border-color: #ef4444;
+}
+
+.prono-card.is-partial {
+  border-color: #f59e0b;
+}
+
+.prono-card.is-selected-bonus {
+  border-color: #22c55e;
+  background: linear-gradient(145deg, #052e16, #111827);
+}
+
+.prono-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 9px;
+}
+
+.prono-date {
+  color: rgba(255,255,255,0.55);
+  font-size: 9px;
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+
+.prono-teams {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.12;
+}
+
+.prono-teams strong {
+  font-size: 9px;
+  color: rgba(255,255,255,0.38);
+}
+
+.prono-mode {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.10);
+  color: white;
+  font-size: 9px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.score-exact-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 13px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.score-exact-box input {
+  width: 46px;
+  height: 34px;
+  border-radius: 11px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.10);
+  color: white;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 950;
+  outline: none;
+}
+
+.score-exact-box span {
+  font-size: 16px;
+  font-weight: 950;
+  color: white;
+}
+
+.one-n-two {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.one-n-two button,
+.bonus-choice-button {
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  cursor: pointer;
+  transition: 0.16s ease;
+  font-weight: 950;
+}
+
+.one-n-two button {
+  min-height: 42px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: center;
+  justify-content: center;
+}
+
+.one-n-two button strong {
+  font-size: 15px;
+}
+
+.one-n-two button span {
+  font-size: 8px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.62);
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.one-n-two button.active,
+.bonus-choice-button:hover {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #052e16;
+}
+
+.one-n-two button.active span {
+  color: rgba(5, 46, 22, 0.75);
+}
+
+.bonus-choice-button {
+  width: 100%;
+  padding: 10px;
+  font-size: 12px;
+}
+
+.one-n-two button:disabled,
+.score-exact-box input:disabled,
+.bonus-choice-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.prono-result-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 9px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.58);
+}
+
+.result-label {
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.result-label.good {
+  background: #22c55e;
+  color: #052e16;
+}
+
+.result-label.bad {
+  background: #ef4444;
+  color: white;
+}
+
+.result-label.partial {
+  background: #f59e0b;
+  color: #451a03;
+}
+
+.prono-result-line em {
+  font-style: normal;
+  color: #22c55e;
+  font-size: 9px;
+}
+
+.validate-pronos {
+  align-self: flex-end;
+  border: 0;
+  border-radius: 14px;
+  padding: 11px 16px;
+  background: #22c55e;
+  color: #052e16;
+  font-weight: 950;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(34, 197, 94, 0.26);
+}
+
+.validate-pronos:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .pronos-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pronos-header-right {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .prono-grid,
+  .bonus-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* === VERSION FINALE : 3 COLONNES CENTRÉES DE GAUCHE À DROITE === */
+
+.pronos-page {
+  width: 100%;
+}
+
+.prono-section-title {
+  max-width: 1080px !important;
+  width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Grille Ligue 1 */
+.prono-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 12px !important;
+  max-width: 1080px !important;
+  width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  justify-content: center !important;
+}
+
+/* Grille bonus en dessous */
+.bonus-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 12px !important;
+  max-width: 1080px !important;
+  width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  justify-content: center !important;
+}
+
+/* Cases compactes pour tenir proprement */
+.prono-card {
+  width: 100% !important;
+  min-height: 145px !important;
+  padding: 11px !important;
+  box-sizing: border-box !important;
+}
+
+/* Texte plus compact */
+.prono-teams {
+  font-size: 12px !important;
+  line-height: 1.12 !important;
+}
+
+.prono-date {
+  font-size: 9px !important;
+}
+
+.prono-mode {
+  font-size: 9px !important;
+  padding: 5px 8px !important;
+}
+
+/* Boutons 1N2 compact */
+.one-n-two button {
+  min-height: 42px !important;
+}
+
+.one-n-two button strong {
+  font-size: 15px !important;
+}
+
+.one-n-two button span {
+  font-size: 8px !important;
+}
+
+/* Score exact compact */
+.score-exact-box input {
+  width: 46px !important;
+  height: 34px !important;
+  font-size: 16px !important;
+}
+
+/* Bonus bien séparés en dessous */
+.bonus-title {
+  max-width: 1080px !important;
+  margin-top: 18px !important;
+  padding-top: 14px !important;
+  border-top: 1px solid rgba(15, 23, 42, 0.12) !important;
+}
+
+/* Responsive */
+@media (max-width: 1050px) {
+  .prono-grid,
+  .bonus-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .prono-grid,
+  .bonus-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* === CORRECTION ALIGNEMENT : PAS DE DÉCALAGE VERS LA BARRE === */
+
+.pronos-page {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.prono-section-title {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.prono-grid,
+.bonus-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  justify-content: stretch !important;
+}
+
+.prono-card {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Responsive */
+@media (max-width: 1050px) {
+  .prono-grid,
+  .bonus-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .prono-grid,
+  .bonus-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* === ALIGNEMENT PROPRE À GAUCHE === */
+
+.pronos-page {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.prono-section-title {
+  width: 960px !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+.prono-grid,
+.bonus-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 300px) !important;
+  gap: 14px !important;
+  justify-content: start !important;
+  align-items: start !important;
+  width: auto !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+.prono-card {
+  width: 300px !important;
+  min-height: 150px !important;
+  box-sizing: border-box !important;
+}
+
+/* Bonus en dessous, même alignement */
+.bonus-title {
+  margin-top: 22px !important;
+  padding-top: 16px !important;
+  border-top: 1px solid rgba(15, 23, 42, 0.12) !important;
+}
+
+.bonus-grid {
+  grid-template-columns: repeat(3, 300px) !important;
+}
+
+/* Responsive */
+@media (max-width: 1050px) {
+  .prono-grid,
+  .bonus-grid {
+    grid-template-columns: repeat(2, 300px) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .prono-grid,
+  .bonus-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .prono-card {
+    width: 100% !important;
+  }
+}
+
+
+/* === BONUS BIEN EN DESSOUS DES MATCHS LIGUE 1 === */
+
+.bonus-title {
+  width: 928px !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  margin-top: 26px !important;
+  padding-top: 18px !important;
+  border-top: 1px solid rgba(15, 23, 42, 0.14) !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  clear: both !important;
+}
+
+.bonus-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 300px) !important;
+  gap: 14px !important;
+  justify-content: start !important;
+  align-items: start !important;
+  width: 928px !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  margin-top: 0 !important;
+}
+
+.bonus-grid .prono-card {
+  width: 300px !important;
+}
+
+/* Sur petit écran */
+@media (max-width: 1050px) {
+  .bonus-title,
+  .bonus-grid {
+    width: 614px !important;
+  }
+
+  .bonus-grid {
+    grid-template-columns: repeat(2, 300px) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .bonus-title,
+  .bonus-grid {
+    width: 100% !important;
+  }
+
+  .bonus-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .bonus-grid .prono-card {
+    width: 100% !important;
+  }
+}
+

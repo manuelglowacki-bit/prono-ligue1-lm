@@ -1,0 +1,259 @@
+﻿import React, { useState } from 'react';
+import '../styles/auth.css';
+
+const ACCOUNTS_KEY = 'prono_ligue1_lm_accounts';
+const SESSION_KEY = 'prono_ligue1_lm_session';
+const PLAYER_KEY = 'prono_ligue1_lm_current_player';
+const DISPLAY_NAMES_KEY = 'prono_ligue1_lm_display_names';
+
+const PLAYERS = [
+  'Laurent',
+  'Quentin',
+  'Jo B',
+  'Jonathan',
+  'Eric L',
+  'Yannis',
+  'Giovani',
+  'Manu',
+  'David J',
+  'Samuel',
+];
+
+function safeJson(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+  } catch {
+    return fallback;
+  }
+}
+
+function simpleHash(value) {
+  let hash = 0;
+  const text = String(value || '');
+
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash << 5) - hash + text.charCodeAt(i);
+    hash |= 0;
+  }
+
+  return String(hash);
+}
+
+function saveDisplayName(player, displayName) {
+  const names = safeJson(DISPLAY_NAMES_KEY, {});
+  const cleanName = String(displayName || '').trim();
+
+  if (cleanName && cleanName !== player) {
+    names[player] = cleanName;
+  }
+
+  localStorage.setItem(DISPLAY_NAMES_KEY, JSON.stringify(names));
+}
+
+export default function AuthPage({ onLogin }) {
+  const [mode, setMode] = useState('login');
+
+  const [player, setPlayer] = useState('Manu');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const [message, setMessage] = useState('');
+
+  function resetMessage() {
+    setMessage('');
+  }
+
+  function createAccount() {
+    resetMessage();
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+    const cleanDisplayName = displayName.trim();
+
+    if (!cleanEmail || !cleanPassword) {
+      setMessage('Mets une adresse mail et un mot de passe.');
+      return;
+    }
+
+    if (cleanPassword.length < 4) {
+      setMessage('Mot de passe trop court : minimum 4 caractères.');
+      return;
+    }
+
+    const accounts = safeJson(ACCOUNTS_KEY, []);
+
+    const emailAlreadyUsed = accounts.some((account) => account.email === cleanEmail);
+    if (emailAlreadyUsed) {
+      setMessage('Cette adresse mail est déjà utilisée.');
+      return;
+    }
+
+    const playerAlreadyUsed = accounts.some((account) => account.player === player);
+    if (playerAlreadyUsed) {
+      setMessage('Ce joueur a déjà un compte.');
+      return;
+    }
+
+    const nextAccount = {
+      player,
+      displayName: cleanDisplayName || player,
+      email: cleanEmail,
+      passwordHash: simpleHash(cleanPassword),
+      role: player === 'Manu' ? 'admin' : 'player',
+      createdAt: new Date().toISOString(),
+    };
+
+    const nextAccounts = [...accounts, nextAccount];
+
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(nextAccounts));
+    saveDisplayName(player, cleanDisplayName || player);
+
+    setMessage('Compte créé. Tu peux maintenant te connecter.');
+    setMode('login');
+    setPassword('');
+  }
+
+  function login() {
+    resetMessage();
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
+      setMessage('Mets ton adresse mail et ton mot de passe.');
+      return;
+    }
+
+    const accounts = safeJson(ACCOUNTS_KEY, []);
+
+    const account = accounts.find(
+      (item) =>
+        item.email === cleanEmail &&
+        item.passwordHash === simpleHash(cleanPassword)
+    );
+
+    if (!account) {
+      setMessage('Adresse mail ou mot de passe incorrect.');
+      return;
+    }
+
+    const session = {
+      player: account.player,
+      email: account.email,
+      displayName: account.displayName || account.player,
+      role: account.role || (account.player === 'Manu' ? 'admin' : 'player'),
+      loggedAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    localStorage.setItem(PLAYER_KEY, account.player);
+
+    saveDisplayName(account.player, account.displayName || account.player);
+
+    onLogin(session);
+  }
+
+  return (
+    <div className="auth-page">
+      <section className="auth-card">
+        <div className="auth-brand">
+          <div className="auth-logo">PL</div>
+
+          <div>
+            <p>PRONO LIGUE 1 LM</p>
+            <h1>{mode === 'login' ? 'Connexion joueur' : 'Créer un compte'}</h1>
+            <span>
+              {mode === 'login'
+                ? 'Connecte-toi pour accéder à ton espace.'
+                : 'Crée ton compte avant d’entrer sur le site.'}
+            </span>
+          </div>
+        </div>
+
+        <div className="auth-tabs">
+          <button
+            type="button"
+            className={mode === 'login' ? 'active' : ''}
+            onClick={() => {
+              setMode('login');
+              resetMessage();
+            }}
+          >
+            Connexion
+          </button>
+
+          <button
+            type="button"
+            className={mode === 'register' ? 'active' : ''}
+            onClick={() => {
+              setMode('register');
+              resetMessage();
+            }}
+          >
+            Inscription
+          </button>
+        </div>
+
+        <div className="auth-form">
+          {mode === 'register' && (
+            <>
+              <label>
+                Joueur
+                <select value={player} onChange={(event) => setPlayer(event.target.value)}>
+                  {PLAYERS.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Nom affiché
+                <input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder="Ex : Manu Manager"
+                />
+              </label>
+            </>
+          )}
+
+          <label>
+            Adresse mail
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="joueur@email.com"
+            />
+          </label>
+
+          <label>
+            Mot de passe
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Mot de passe"
+            />
+          </label>
+
+          {message && <div className="auth-message">{message}</div>}
+
+          {mode === 'login' ? (
+            <button type="button" className="auth-submit" onClick={login}>
+              Se connecter
+            </button>
+          ) : (
+            <button type="button" className="auth-submit" onClick={createAccount}>
+              Créer mon compte
+            </button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+

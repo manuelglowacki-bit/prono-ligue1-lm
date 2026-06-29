@@ -1,0 +1,179 @@
+﻿import React, { useEffect, useRef, useState } from 'react';
+
+const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
+
+const clubsLigue1 = [
+  'AJ Auxerre',
+  'Angers SCO',
+  'AS Monaco FC',
+  'FC Lorient',
+  'FC Metz',
+  'FC Nantes',
+  'Le Havre AC',
+  'Lille OSC',
+  'OGC Nice',
+  'Olympique de Marseille',
+  'Olympique Lyonnais',
+  'Paris FC',
+  'Paris Saint-Germain FC',
+  'Racing Club de Lens',
+  'RC Strasbourg Alsace',
+  'Stade Brestois 29',
+  'Stade Rennais FC 1901',
+  'Toulouse FC',
+];
+
+export default function FavoriteTeamSelect() {
+  const [favoriteTeam, setFavoriteTeam] = useState('');
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const savedTeam = localStorage.getItem(FAVORITE_TEAM_KEY);
+    if (savedTeam) setFavoriteTeam(savedTeam);
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function choisirEquipe(team) {
+    setFavoriteTeam(team);
+    localStorage.setItem(FAVORITE_TEAM_KEY, team);
+    setOpen(false);
+  }
+
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr minmax(240px, 360px)',
+        gap: '16px',
+        alignItems: 'center',
+        background: 'linear-gradient(135deg, #111827, #1f2937)',
+        border: '1px solid rgba(255,255,255,0.10)',
+        borderRadius: '22px',
+        padding: '18px 20px',
+        marginBottom: '20px',
+        boxShadow: '0 18px 45px rgba(15, 23, 42, 0.22)',
+        color: 'white',
+        position: 'relative',
+        zIndex: 20,
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontSize: '12px',
+            fontWeight: 900,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: '#22c55e',
+            marginBottom: '6px',
+          }}
+        >
+          Club favori
+        </div>
+
+        <div
+          style={{
+            fontSize: '22px',
+            fontWeight: 950,
+            lineHeight: 1.1,
+          }}
+        >
+          {favoriteTeam || 'Choisis ton équipe'}
+        </div>
+
+        <div
+          style={{
+            marginTop: '6px',
+            fontSize: '13px',
+            fontWeight: 700,
+            color: 'rgba(255,255,255,0.65)',
+          }}
+        >
+          Utilisé pour les points bonus de ton club.
+        </div>
+      </div>
+
+      <div ref={dropdownRef} style={{ position: 'relative' }}>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          style={{
+            width: '100%',
+            padding: '14px 16px',
+            borderRadius: '16px',
+            border: '1px solid rgba(255,255,255,0.14)',
+            background: 'rgba(255,255,255,0.08)',
+            color: 'white',
+            fontWeight: 900,
+            cursor: 'pointer',
+            textAlign: 'left',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04)',
+          }}
+        >
+          <span>{favoriteTeam || 'Choisir une équipe'}</span>
+          <span style={{ opacity: 0.8 }}>{open ? '▲' : '▼'}</span>
+        </button>
+
+        {open && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 8px)',
+              left: 0,
+              right: 0,
+              maxHeight: '280px',
+              overflowY: 'auto',
+              background: '#0f172a',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: '16px',
+              padding: '8px',
+              boxShadow: '0 20px 45px rgba(0,0,0,0.35)',
+              zIndex: 999,
+            }}
+          >
+            {clubsLigue1.map((team) => {
+              const active = favoriteTeam === team;
+
+              return (
+                <button
+                  key={team}
+                  type="button"
+                  onClick={() => choisirEquipe(team)}
+                  style={{
+                    width: '100%',
+                    padding: '11px 12px',
+                    borderRadius: '12px',
+                    border: '0',
+                    background: active ? '#22c55e' : 'transparent',
+                    color: active ? '#052e16' : 'white',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    marginBottom: '4px',
+                  }}
+                >
+                  {active ? '✅ ' : ''}
+                  {team}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

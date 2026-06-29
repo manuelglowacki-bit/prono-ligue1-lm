@@ -1,0 +1,640 @@
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { getRegisteredPlayers } from '../utils/players';
+import '../styles/stats.css';
+
+const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';
+const PRONOS_KEY = 'prono_ligue1_lm_pronos_joueurs';
+const BONUS_CHOICES_KEY = 'prono_ligue1_lm_bonus_choices';
+const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
+const PLAYER_KEY = 'prono_ligue1_lm_current_player';
+
+const DEFAULT_PLAYERS = getRegisteredPlayers();
+
+function clean(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function hasScore(match) {
+  return (
+    match.scoreDomicile !== null &&
+    match.scoreDomicile !== undefined &&
+    match.scoreExterieur !== null &&
+    match.scoreExterieur !== undefined
+  );
+}
+
+function hasScoreProno(prono) {
+  return (
+    prono &&
+    prono.home !== '' &&
+    prono.home !== undefined &&
+    prono.away !== '' &&
+    prono.away !== undefined
+  );
+}
+
+function getResult(match) {
+  if (!hasScore(match)) return null;
+
+  const h = Number(match.scoreDomicile);
+  const a = Number(match.scoreExterieur);
+
+  if (Number.isNaN(h) || Number.isNaN(a)) return null;
+  if (h > a) return '1';
+  if (h < a) return '2';
+  return 'N';
+}
+
+function getPoints(match, prono, scoreExactMode, isBonus) {
+  const result = getResult(match);
+  if (!result || !prono) return 0;
+
+  if (scoreExactMode) {
+    if (!hasScoreProno(prono)) return 0;
+
+    const homeProno = Number(prono.home);
+    const awayProno = Number(prono.away);
+    const homeScore = Number(match.scoreDomicile);
+    const awayScore = Number(match.scoreExterieur);
+
+    if (homeProno === homeScore && awayProno === awayScore) {
+      return isBonus ? 3 : 2;
+    }
+
+    const predictedResult =
+      homeProno > awayProno ? '1' : homeProno < awayProno ? '2' : 'N';
+
+    if (predictedResult === result) {
+      return isBonus ? 2 : 1;
+    }
+
+    return 0;
+  }
+
+  return prono.value === result ? 1 : 0;
+}
+
+function isExact(match, prono, scoreExactMode) {
+  if (!scoreExactMode || !hasScore(match) || !hasScoreProno(prono)) return false;
+
+  return (
+    Number(prono.home) === Number(match.scoreDomicile) &&
+    Number(prono.away) === Number(match.scoreExterieur)
+  );
+}
+
+function isCorrectResult(match, prono, scoreExactMode) {
+  const result = getResult(match);
+  if (!result || !prono) return false;
+
+  if (scoreExactMode) {
+    if (!hasScoreProno(prono)) return false;
+
+    const homeProno = Number(prono.home);
+    const awayProno = Number(prono.away);
+
+    const predictedResult =
+      homeProno > awayProno ? '1' : homeProno < awayProno ? '2' : 'N';
+
+    return predictedResult === result;
+  }
+
+  return prono.value === result;
+}
+
+function getPlayerFavorite(player, currentPlayer) {
+  const playerKey = `${FAVORITE_TEAM_KEY}_${player}`;
+  const savedPlayerTeam = localStorage.getItem(playerKey);
+
+  if (savedPlayerTeam) return savedPlayerTeam;
+
+  if (player === currentPlayer) {
+    return localStorage.getItem(FAVORITE_TEAM_KEY) || 'RC Lens';
+  }
+
+  return '';
+}
+
+function isFavoriteMatch(match, favoriteTeam) {
+  return (
+    favoriteTeam &&
+    (clean(match.domicile) === clean(favoriteTeam) ||
+      clean(match.exterieur) === clean(favoriteTeam))
+  );
+}
+
+export default function StatsPage() {
+  const [matches, setMatches] = useState([]);
+  const [pronos, setPronos] = useState({});
+  const [bonusChoices, setBonusChoices] = useState({});
+  const [currentPlayer, setCurrentPlayer] = useState('Manu');
+  const [selectedPlayer, setSelectedPlayer] = useState('Manu');
+
+  useEffect(() => {
+    const savedCurrentPlayer = localStorage.getItem(PLAYER_KEY) || 'Manu';
+
+    setMatches(JSON.parse(localStorage.getItem(MATCHS_KEY) || '[]'));
+    setPronos(JSON.parse(localStorage.getItem(PRONOS_KEY) || '{}'));
+    setBonusChoices(JSON.parse(localStorage.getItem(BONUS_CHOICES_KEY) || '{}'));
+    setCurrentPlayer(savedCurrentPlayer);
+    setSelectedPlayer(savedCurrentPlayer);
+  }, []);
+
+  const scoredMatches = useMemo(() => matches.filter(hasScore), [matches]);
+
+  const scoredJournees = useMemo(() => {
+    return [...new Set(scoredMatches.map((m) => String(m.journee || '').trim()).filter(Boolean))]
+      .sort((a, b) => Number(a) - Number(b));
+  }, [scoredMatches]);
+
+  function calculatePlayer(player) {
+    const favoriteTeam = getPlayerFavorite(player, currentPlayer);
+    const playerPronos = pronos[player] || {};
+
+    let total = 0;
+    let exacts = 0;
+    let attempts = 0;
+    let corrects = 0;
+
+    let normalPoints = 0;
+    let favoritePoints = 0;
+    let bonusPoints = 0;
+
+    let normalCorrect = 0;
+    let normalAttempts = 0;
+
+    let favoriteCorrect = 0;
+    let favoriteAttempts = 0;
+    let favoriteExacts = 0;
+
+    let bonusCorrect = 0;
+    let bonusAttempts = 0;
+    let bonusExacts = 0;
+
+    const byJournee = scoredJournees.map((journee) => {
+      let dayPoints = 0;
+
+      scoredMatches
+        .filter((match) => String(match.journee || '') === String(journee))
+        .forEach((match) => {
+          const isBonus = match.type === 'BONUS';
+          const bonusKey = `${player}-J${journee}`;
+          const selectedBonusId = bonusChoices[bonusKey];
+
+          if (isBonus && selectedBonusId !== match.id) return;
+
+          const favorite = isFavoriteMatch(match, favoriteTeam);
+          const scoreExactMode = favorite || isBonus;
+          const prono = playerPronos[match.id];
+
+          const attempted = scoreExactMode ? hasScoreProno(prono) : Boolean(prono?.value);
+          if (!attempted) return;
+
+          const pts = getPoints(match, prono, scoreExactMode, isBonus);
+          const correct = isCorrectResult(match, prono, scoreExactMode);
+          const exact = isExact(match, prono, scoreExactMode);
+
+          attempts += 1;
+          if (correct) corrects += 1;
+          if (exact) exacts += 1;
+
+          total += pts;
+          dayPoints += pts;
+
+          if (isBonus) {
+            bonusPoints += pts;
+            bonusAttempts += 1;
+            if (correct) bonusCorrect += 1;
+            if (exact) bonusExacts += 1;
+          } else if (favorite) {
+            favoritePoints += pts;
+            favoriteAttempts += 1;
+            if (correct) favoriteCorrect += 1;
+            if (exact) favoriteExacts += 1;
+          } else {
+            normalPoints += pts;
+            normalAttempts += 1;
+            if (correct) normalCorrect += 1;
+          }
+        });
+
+      return {
+        journee,
+        points: dayPoints,
+      };
+    });
+
+    const recentForm = byJournee.slice(-3);
+    const recentPoints = recentForm.reduce((sum, day) => sum + day.points, 0);
+
+    return {
+      player,
+      favoriteTeam,
+      total,
+      exacts,
+      attempts,
+      corrects,
+      successRate: attempts > 0 ? Math.round((corrects / attempts) * 100) : 0,
+      normalPoints,
+      favoritePoints,
+      bonusPoints,
+      normalCorrect,
+      normalAttempts,
+      favoriteCorrect,
+      favoriteAttempts,
+      favoriteExacts,
+      bonusCorrect,
+      bonusAttempts,
+      bonusExacts,
+      byJournee,
+      recentForm,
+      recentPoints,
+    };
+  }
+
+  const allStats = useMemo(() => {
+    return DEFAULT_PLAYERS.map(calculatePlayer).sort((a, b) => {
+      if (b.total !== a.total) return b.total - a.total;
+      return b.exacts - a.exacts;
+    });
+  }, [matches, pronos, bonusChoices, currentPlayer, scoredJournees]);
+
+  const selectedStats = allStats.find((item) => item.player === selectedPlayer) || allStats[0];
+
+  const selectedDays = selectedStats?.byJournee || [];
+
+  const bestDay = selectedDays.reduce((best, day) => {
+    if (!best || day.points > best.points) return day;
+    return best;
+  }, null);
+
+  const averageDayPoints =
+    selectedDays.length > 0
+      ? Math.round(
+          (selectedDays.reduce((sum, day) => sum + day.points, 0) / selectedDays.length) * 10
+        ) / 10
+      : 0;
+
+  const topPointsList = [...allStats]
+    .sort((a, b) => b.total - a.total || b.exacts - a.exacts)
+    .slice(0, 3);
+
+  const topBonusList = [...allStats]
+    .sort((a, b) => b.bonusPoints - a.bonusPoints || b.bonusExacts - a.bonusExacts)
+    .slice(0, 3);
+
+  const topExactList = [...allStats]
+    .sort((a, b) => b.exacts - a.exacts || b.total - a.total)
+    .slice(0, 3);
+
+  const top1N2List = [...allStats]
+    .sort((a, b) => b.normalPoints - a.normalPoints || b.normalCorrect - a.normalCorrect)
+    .slice(0, 3);
+
+  const repartitionTotal =
+    (selectedStats?.normalPoints || 0) +
+    (selectedStats?.favoritePoints || 0) +
+    (selectedStats?.bonusPoints || 0);
+
+  function barWidth(value) {
+    if (repartitionTotal <= 0) return 0;
+    return Math.round((value / repartitionTotal) * 100);
+  }
+
+  if (matches.length === 0) {
+    return (
+      <div className="stats-page">
+        <section className="stats-header">
+          <div>
+            <p>STATS</p>
+            <h1>Statistiques</h1>
+            <span>Aucun match chargé pour le moment.</span>
+          </div>
+        </section>
+
+        <div className="stats-empty">
+          Va dans Admin puis synchronise les matchs Ligue 1.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="stats-page">
+      <section className="stats-header">
+        <div>
+          <p>STATS</p>
+          <h1>Analyse des performances</h1>
+          <span>
+            {scoredJournees.length} journée(s) avec résultats · {DEFAULT_PLAYERS.length} joueurs
+          </span>
+        </div>
+
+        <div className="stats-player-select">
+          <span>Joueur analysé</span>
+          <select value={selectedPlayer} onChange={(e) => setSelectedPlayer(e.target.value)}>
+            {DEFAULT_PLAYERS.map((player) => (
+              <option key={player} value={player}>
+                {player}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+
+      <section className="stats-kpis">
+        <article>
+          <span>Total points</span>
+          <strong>{selectedStats?.total || 0}</strong>
+          <small>{selectedStats?.player}</small>
+        </article>
+
+        <article>
+          <span>Scores exacts</span>
+          <strong>{selectedStats?.exacts || 0}</strong>
+          <small>favori + bonus</small>
+        </article>
+
+        <article>
+          <span>Points bonus</span>
+          <strong>{selectedStats?.bonusPoints || 0}</strong>
+          <small>{selectedStats?.bonusCorrect || 0} bonus réussi(s)</small>
+        </article>
+
+        <article>
+          <span>Réussite</span>
+          <strong>{selectedStats?.successRate || 0}%</strong>
+          <small>{selectedStats?.corrects || 0}/{selectedStats?.attempts || 0} pronos</small>
+        </article>
+      </section>
+
+      <section className="stats-main-grid">
+        <article className="stats-panel stats-evolution-minimal">
+          <div className="stats-panel-title">
+            <h2>Évolution des points</h2>
+            <span>minimal</span>
+          </div>
+
+          <div className="stats-mini-evolution">
+            {selectedDays.map((day) => (
+              <div
+                key={day.journee}
+                className={`stats-mini-day ${
+                  day.points >= 8 ? 'hot' : day.points >= 5 ? 'ok' : 'low'
+                }`}
+              >
+                <span>J{day.journee}</span>
+                <strong>+{day.points}</strong>
+              </div>
+            ))}
+          </div>
+
+          <div className="stats-mini-summary">
+            <div>
+              <span>Meilleure journée</span>
+              <strong>{bestDay ? `J${bestDay.journee} · +${bestDay.points} pts` : '-'}</strong>
+            </div>
+
+            <div>
+              <span>Moyenne</span>
+              <strong>{averageDayPoints} pts/J</strong>
+            </div>
+          </div>
+        </article>
+
+        <article className="stats-panel">
+          <div className="stats-panel-title">
+            <h2>Répartition des points</h2>
+            <span>{selectedStats?.total || 0} pts</span>
+          </div>
+
+          <div className="stats-breakdown">
+            <div>
+              <div className="stats-breakdown-top">
+                <span>1N2 classique</span>
+                <strong>{selectedStats?.normalPoints || 0} pts</strong>
+              </div>
+              <div className="stats-breakdown-track">
+                <div style={{ width: `${barWidth(selectedStats?.normalPoints || 0)}%` }} />
+              </div>
+            </div>
+
+            <div>
+              <div className="stats-breakdown-top">
+                <span>Équipe favorite</span>
+                <strong>{selectedStats?.favoritePoints || 0} pts</strong>
+              </div>
+              <div className="stats-breakdown-track">
+                <div style={{ width: `${barWidth(selectedStats?.favoritePoints || 0)}%` }} />
+              </div>
+            </div>
+
+            <div>
+              <div className="stats-breakdown-top">
+                <span>Match bonus</span>
+                <strong>{selectedStats?.bonusPoints || 0} pts</strong>
+              </div>
+              <div className="stats-breakdown-track">
+                <div style={{ width: `${barWidth(selectedStats?.bonusPoints || 0)}%` }} />
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section className="stats-tops stats-badge-board">
+        <article className="stats-badge-ranking">
+          <div className="stats-badge-head">
+            <span>Machine à points</span>
+            <strong>🏆</strong>
+          </div>
+
+          <div className="mini-badge-list">
+            {topPointsList.map((player, index) => (
+              <div key={player.player} className="mini-badge-row">
+                <em>{index + 1}</em>
+                <strong>{player.player}</strong>
+                <span>{player.total} pts</span>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="stats-badge-ranking">
+          <div className="stats-badge-head">
+            <span>Roi du bonus</span>
+            <strong>🎯</strong>
+          </div>
+
+          <div className="mini-badge-list">
+            {topBonusList.map((player, index) => (
+              <div key={player.player} className="mini-badge-row">
+                <em>{index + 1}</em>
+                <strong>{player.player}</strong>
+                <span>{player.bonusPoints} pts</span>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="stats-badge-ranking">
+          <div className="stats-badge-head">
+            <span>Expert exact</span>
+            <strong>💎</strong>
+          </div>
+
+          <div className="mini-badge-list">
+            {topExactList.map((player, index) => (
+              <div key={player.player} className="mini-badge-row">
+                <em>{index + 1}</em>
+                <strong>{player.player}</strong>
+                <span>{player.exacts} exact</span>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="stats-badge-ranking">
+          <div className="stats-badge-head">
+            <span>Meilleur 1N2</span>
+            <strong>⚽</strong>
+          </div>
+
+          <div className="mini-badge-list">
+            {top1N2List.map((player, index) => (
+              <div key={player.player} className="mini-badge-row">
+                <em>{index + 1}</em>
+                <strong>{player.player}</strong>
+                <span>{player.normalPoints} pts</span>
+              </div>
+            ))}
+          </div>
+        </article>
+      </section>
+      <section className="stats-profile-section">
+        <article className="stats-profile-card">
+          <div className="stats-panel-title">
+            <h2>Profil stats</h2>
+            <span>{selectedStats?.player}</span>
+          </div>
+
+          <div className="stats-profile-main">
+            <div className="stats-profile-avatar">
+              {selectedStats?.player?.slice(0, 1)}
+            </div>
+
+            <div>
+              <h3>{selectedStats?.player}</h3>
+              <p>{selectedStats?.favoriteTeam || 'Club favori non renseigné'}</p>
+            </div>
+          </div>
+
+          <div className="stats-profile-lines">
+            <div>
+              <span>Total points</span>
+              <strong>{selectedStats?.total || 0} pts</strong>
+            </div>
+
+            <div>
+              <span>Réussite globale</span>
+              <strong>{selectedStats?.successRate || 0}%</strong>
+            </div>
+
+            <div>
+              <span>Scores exacts</span>
+              <strong>{selectedStats?.exacts || 0}</strong>
+            </div>
+
+            <div>
+              <span>Bonus réussis</span>
+              <strong>{selectedStats?.bonusCorrect || 0}</strong>
+            </div>
+          </div>
+        </article>
+
+        <article className="stats-profile-card">
+          <div className="stats-panel-title">
+            <h2>Efficacité par type</h2>
+            <span>réussite</span>
+          </div>
+
+          <div className="stats-profile-lines">
+            <div>
+              <span>1N2 classique</span>
+              <strong>
+                {selectedStats?.normalCorrect || 0}/{selectedStats?.normalAttempts || 0} ·{' '}
+                {selectedStats?.normalAttempts
+                  ? Math.round(((selectedStats?.normalCorrect || 0) / selectedStats.normalAttempts) * 100)
+                  : 0}%
+              </strong>
+            </div>
+
+            <div>
+              <span>Équipe favorite</span>
+              <strong>
+                {selectedStats?.favoriteCorrect || 0}/{selectedStats?.favoriteAttempts || 0} ·{' '}
+                {selectedStats?.favoriteAttempts
+                  ? Math.round(((selectedStats?.favoriteCorrect || 0) / selectedStats.favoriteAttempts) * 100)
+                  : 0}%
+              </strong>
+            </div>
+
+            <div>
+              <span>Match bonus</span>
+              <strong>
+                {selectedStats?.bonusCorrect || 0}/{selectedStats?.bonusAttempts || 0} ·{' '}
+                {selectedStats?.bonusAttempts
+                  ? Math.round(((selectedStats?.bonusCorrect || 0) / selectedStats.bonusAttempts) * 100)
+                  : 0}%
+              </strong>
+            </div>
+
+            <div className="highlight">
+              <span>Réussite globale</span>
+              <strong>{selectedStats?.successRate || 0}%</strong>
+            </div>
+          </div>
+        </article>
+
+        <article className="stats-profile-card">
+          <div className="stats-panel-title">
+            <h2>Repères</h2>
+            <span>forme</span>
+          </div>
+
+          <div className="stats-profile-lines">
+            <div>
+              <span>Pronos joués</span>
+              <strong>{selectedStats?.attempts || 0}</strong>
+            </div>
+
+            <div>
+              <span>Bons résultats</span>
+              <strong>{selectedStats?.corrects || 0}</strong>
+            </div>
+
+            <div>
+              <span>Bonus exacts</span>
+              <strong>{selectedStats?.bonusExacts || 0}</strong>
+            </div>
+
+            <div>
+              <span>Favori exacts</span>
+              <strong>{selectedStats?.favoriteExacts || 0}</strong>
+            </div>
+          </div>
+        </article>
+      </section>
+</div>
+  );
+}
+
+
+
+
+
+

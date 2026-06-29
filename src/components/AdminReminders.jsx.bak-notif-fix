@@ -1,0 +1,300 @@
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import '../styles/adminReminders.css';
+
+const ACCOUNTS_KEY = 'prono_ligue1_lm_accounts';
+const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';
+const PRONOS_KEY = 'prono_ligue1_lm_pronos_joueurs';
+const VALIDATIONS_KEY = 'prono_ligue1_lm_validations_journees';
+const NOTIFICATION_PREF_KEY = 'prono_ligue1_lm_notifications_enabled';
+
+function safeJson(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+  } catch {
+    return fallback;
+  }
+}
+
+function getMatchLabel(match) {
+  return `${match.domicile || 'Équipe A'} - ${match.exterieur || 'Équipe B'}`;
+}
+
+function getPlayerValidated(validations, player, journee) {
+  const possibleKeys = [
+    `${player}-J${journee}`,
+    `${player}_${journee}`,
+    `${player}-${journee}`,
+    `J${journee}-${player}`,
+  ];
+
+  return possibleKeys.some((key) => Boolean(validations?.[key]));
+}
+
+function getPlayerHasPronos(pronos, player, matches) {
+  const playerPronos = pronos?.[player] || {};
+
+  return matches.some((match) => {
+    const prono = playerPronos[match.id];
+
+    if (!prono) return false;
+
+    return (
+      prono.value ||
+      prono.home !== undefined ||
+      prono.away !== undefined
+    );
+  });
+}
+
+function buildReminderMessage(journee, playerName) {
+  return `Salut ${playerName}, petit rappel : tu n'as pas encore validé tes pronos pour la journée ${journee}. Pense à les faire avant le blocage des matchs. ⚽`;
+}
+
+export default function AdminReminders() {
+  const [accounts, setAccounts] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [pronos, setPronos] = useState({});
+  const [validations, setValidations] = useState({});
+  const [selectedJournee, setSelectedJournee] = useState('');
+  const [notice, setNotice] = useState('');
+  const [notificationsActive, setNotificationsActive] = useState(false);
+
+  function reloadData() {
+    const loadedAccounts = safeJson(ACCOUNTS_KEY, []);
+    const loadedMatches = safeJson(MATCHS_KEY, []);
+    const loadedPronos = safeJson(PRONOS_KEY, {});
+    const loadedValidations = safeJson(VALIDATIONS_KEY, {});
+
+    setAccounts(Array.isArray(loadedAccounts) ? loadedAccounts : []);
+    setMatches(Array.isArray(loadedMatches) ? loadedMatches : []);
+    setPronos(loadedPronos || {});
+    setValidations(loadedValidations || {});
+
+    const journées = [...new Set(
+      (Array.isArray(loadedMatches) ? loadedMatches : [])
+        .map((match) => Number(match.journee || 0))
+        .filter(Boolean)
+    )].sort((a, b) => a - b);
+
+    if (!selectedJournee && journées.length > 0) {
+      setSelectedJournee(String(journées[0]));
+    }
+  }
+
+  useEffect(() => {
+    reloadData();
+
+    if ('Notification' in window && Notification.permission === 'granted' && localStorage.getItem(NOTIFICATION_PREF_KEY) !== 'false') {
+      setNotificationsActive(true);
+    } else {
+      setNotificationsActive(false);
+    }
+  }, []);
+
+  const journees = useMemo(() => {
+    return [...new Set(
+      matches
+        .map((match) => Number(match.journee || 0))
+        .filter(Boolean)
+    )].sort((a, b) => a - b);
+  }, [matches]);
+
+  const matchesForDay = useMemo(() => {
+    return matches.filter((match) => String(match.journee) === String(selectedJournee));
+  }, [matches, selectedJournee]);
+
+  const missingPlayers = useMemo(() => {
+    if (!selectedJournee) return [];
+
+    return accounts.filter((account) => {
+      const player = account.player;
+
+      const validated = getPlayerValidated(validations, player, selectedJournee);
+      const hasPronos = getPlayerHasPronos(pronos, player, matchesForDay);
+
+      return !validated || !hasPronos;
+    });
+  }, [accounts, validations, pronos, selectedJournee, matchesForDay]);
+
+  async function askNotificationPermission() {
+    if (!notificationsActive) {
+      setNotice('Active d’abord le bouton Notifications.');
+      return;
+    }
+
+    if (!('Notification' in window)) {
+      setNotice('Les notifications ne sont pas disponibles sur ce navigateur.');
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission === 'granted') {
+      localStorage.setItem(NOTIFICATION_PREF_KEY, 'true');
+      setNotificationsActive(true);
+      setNotice('Notifications activées.');
+    } else {
+      localStorage.setItem(NOTIFICATION_PREF_KEY, 'false');
+      setNotificationsActive(false);
+      setNotice('Notifications refusées par le navigateur.');
+    }
+  }
+
+  function toggleNotifications() {
+    if (notificationsActive) {
+      localStorage.setItem(NOTIFICATION_PREF_KEY, 'false');
+      setNotificationsActive(false);
+      setNotice('Notifications désactivées.');
+      return;
+    }
+
+    askNotificationPermission();
+  }
+
+  function sendAdminNotification() {
+    if (!notificationsActive) {
+      setNotice('Active d’abord le bouton Notifications.');
+      return;
+    }
+
+    if (!('Notification' in window)) {
+      setNotice('Notifications non disponibles sur ce navigateur.');
+      return;
+    }
+
+    if (Notification.permission !== 'granted') {
+      setNotice('Clique d’abord sur “Activer notifications”.');
+      return;
+    }
+
+    if (missingPlayers.length === 0) {
+      new Notification('Prono Ligue 1 LM', {
+        body: `Tout le monde a validé la journée ${selectedJournee}.`,
+      });
+      return;
+    }
+
+    new Notification('Rappel pronos à envoyer', {
+      body: `${missingPlayers.length} joueur(s) n’ont pas encore validé la journée ${selectedJournee}.`,
+    });
+  }
+
+  async function copyAllMessages() {
+    const text = missingPlayers
+      .map((account) => buildReminderMessage(selectedJournee, account.displayName || account.player))
+      .join('\n\n');
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice('Messages de rappel copiés.');
+    } catch {
+      setNotice('Impossible de copier automatiquement. Sélectionne le texte manuellement.');
+    }
+  }
+
+  return (
+    <section className="admin-reminders-panel">
+      <div className="admin-reminders-header">
+        <div>
+          <p>RAPPELS ADMIN</p>
+          <h2>Joueurs non validés</h2>
+          <span>Détecte ceux qui n’ont pas encore validé leurs pronos.</span>
+        </div>
+
+        <div className="admin-reminders-actions">
+          <div className="notification-toggle-wrap">
+            <span>Notifications</span>
+
+            <button
+              type="button"
+              className={notificationsActive ? 'notification-toggle on' : 'notification-toggle off'}
+              onClick={toggleNotifications}
+            >
+              {notificationsActive ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className={notificationsActive ? 'notify-ready' : 'secondary'}
+            onClick={sendAdminNotification}
+          >
+            Envoyer rappel admin
+          </button>
+        </div>
+      </div>
+
+      <div className="admin-reminders-toolbar">
+        <label>
+          Journée
+          <select value={selectedJournee} onChange={(event) => setSelectedJournee(event.target.value)}>
+            {journees.length === 0 ? (
+              <option value="">Aucune journée</option>
+            ) : (
+              journees.map((journee) => (
+                <option key={journee} value={journee}>
+                  Journée {journee}
+                </option>
+              ))
+            )}
+          </select>
+        </label>
+
+        <div className="admin-reminders-count">
+          <strong>{missingPlayers.length}</strong>
+          <span>à relancer</span>
+        </div>
+      </div>
+
+      {notice && <div className="admin-reminders-notice">{notice}</div>}
+
+      {selectedJournee && (
+        <div className="admin-reminders-matches">
+          <strong>Matchs J{selectedJournee}</strong>
+          <span>
+            {matchesForDay.length > 0
+              ? matchesForDay.slice(0, 4).map(getMatchLabel).join(' · ')
+              : 'Aucun match trouvé pour cette journée.'}
+          </span>
+        </div>
+      )}
+
+      <div className="admin-reminders-list">
+        {missingPlayers.length === 0 ? (
+          <div className="admin-reminders-empty">
+            ✅ Tout le monde semble avoir validé cette journée.
+          </div>
+        ) : (
+          <>
+            <button type="button" className="admin-reminders-copy" onClick={copyAllMessages}>
+              Copier tous les messages
+            </button>
+
+            {missingPlayers.map((account) => {
+              const name = account.displayName || account.player;
+              const message = buildReminderMessage(selectedJournee, name);
+              const mailSubject = encodeURIComponent(`Rappel pronos Journée ${selectedJournee}`);
+              const mailBody = encodeURIComponent(message);
+
+              return (
+                <article key={account.player}>
+                  <div>
+                    <strong>{name}</strong>
+                    <span>{account.email || 'Aucun mail'}</span>
+                    <p>{message}</p>
+                  </div>
+
+                  <a href={`mailto:${account.email}?subject=${mailSubject}&body=${mailBody}`}>
+                    Envoyer mail
+                  </a>
+                </article>
+              );
+            })}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+

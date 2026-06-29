@@ -1,0 +1,254 @@
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import '../styles/adminAutoReminder.css';
+import { buildAIReminderText, shouldSendAIReminder } from '../utils/reminderAI';
+
+const ACCOUNTS_KEY = 'prono_ligue1_lm_accounts';
+const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';
+const PRONOS_KEY = 'prono_ligue1_lm_pronos_joueurs';
+const VALIDATIONS_KEY = 'prono_ligue1_lm_validations_journees';
+const AUTO_REMINDER_SENT_KEY = 'prono_ligue1_lm_auto_reminders_sent';
+
+function safeJson(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+  } catch {
+    return fallback;
+  }
+}
+
+function parseMatchDate(match) {
+  const date = String(match.date || '').trim();
+  const heure = String(match.heure || match.time || '').trim();
+
+  if (!date) return null;
+
+  const iso = heure ? `${date}T${heure}` : `${date}T00:00`;
+  const parsed = new Date(iso);
+
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return parsed;
+}
+
+function getPlayerValidated(validations, player, journee) {
+  const keys = [
+    `${player}-J${journee}`,
+    `${player}_${journee}`,
+    `${player}-${journee}`,
+    `J${journee}-${player}`,
+  ];
+
+  return keys.some((key) => Boolean(validations?.[key]));
+}
+
+function getPlayerHasPronos(pronos, player, matches) {
+  const playerPronos = pronos?.[player] || {};
+
+  return matches.some((match) => {
+    const prono = playerPronos[match.id];
+
+    if (!prono) return false;
+
+    return Boolean(
+      prono.value ||
+      prono.home !== undefined ||
+      prono.away !== undefined
+    );
+  });
+}
+
+function getFirstMatchByJournee(matches, journee) {
+  return matches
+    .filter((match) => String(match.journee) === String(journee))
+    .map((match) => ({
+      ...match,
+      startDate: parseMatchDate(match),
+    }))
+    .filter((match) => match.startDate)
+    .sort((a, b) => a.startDate - b.startDate)[0];
+}
+
+function buildMessage(journee, missingPlayers) {
+  const names = missingPlayers
+    .map((account) => account.displayName || account.player)
+    .join(', ');
+
+  return `Journée ${journee} : ${missingPlayers.length} joueur(s) n'ont pas encore validé leurs pronos. À relancer : ${names}.`;
+}
+
+export default function AdminAutoReminder() {
+  const [lastAlert, setLastAlert] = useState('');
+  const [nextCheck, setNextCheck] = useState('');
+  const [autoEnabled, setAutoEnabled] = useState(
+    localStorage.getItem('prono_ligue1_lm_auto_reminder_enabled') !== 'false'
+  );
+
+  function sendAlert(message) {
+    if ('vibrate' in navigator) {
+      navigator.vibrate([250, 100, 250]);
+    }
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Rappel pronos automatique', {
+        body: message,
+      });
+    }
+
+    setLastAlert(message);
+  }
+
+  async function activateNotifications() {
+    if (!('Notification' in window)) {
+      setLastAlert('Notifications non disponibles sur ce navigateur.');
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission === 'granted') {
+      setLastAlert('Notifications autorisées.');
+    } else {
+      setLastAlert('Notifications refusées par le navigateur.');
+    }
+  }
+
+  function toggleAuto() {
+    const next = !autoEnabled;
+
+    setAutoEnabled(next);
+    localStorage.setItem('prono_ligue1_lm_auto_reminder_enabled', String(next));
+  }
+
+  function checkReminders(force = false) {
+    if (!autoEnabled && !force) return;
+
+    const accounts = safeJson(ACCOUNTS_KEY, []);
+    const matches = safeJson(MATCHS_KEY, []);
+    const pronos = safeJson(PRONOS_KEY, {});
+    const validations = safeJson(VALIDATIONS_KEY, {});
+    const alreadySent = safeJson(AUTO_REMINDER_SENT_KEY, {});
+
+    const now = new Date();
+    const sixHoursMs = 6 * 60 * 60 * 1000;
+
+    const journees = [...new Set(
+      matches
+        .map((match) => Number(match.journee || 0))
+        .filter(Boolean)
+    )].sort((a, b) => a - b);
+
+    let found = false;
+
+    journees.forEach((journee) => {
+      const firstMatch = getFirstMatchByJournee(matches, journee);
+
+      if (!firstMatch) return;
+
+      const sentKey = J-;
+
+      const isInReminderWindow = shouldSendAIReminder({
+        firstMatchDate: firstMatch.startDate,
+        alreadySent: alreadySent[sentKey],
+        force,
+      });
+
+      if (!isInReminderWindow) return;
+
+      const sentKey = `J${journee}-${firstMatch.id || firstMatch.startDate.toISOString()}`;
+
+      if (alreadySent[sentKey] && !force) return;
+
+      const matchesForDay = matches.filter(
+        (match) => String(match.journee) === String(journee)
+      );
+
+      const missingPlayers = accounts.filter((account) => {
+        const validated = getPlayerValidated(validations, account.player, journee);
+        const hasPronos = getPlayerHasPronos(pronos, account.player, matchesForDay);
+
+        return !validated || !hasPronos;
+      });
+
+      if (missingPlayers.length === 0) return;
+
+      const message = buildAIReminderText({
+        journee,
+        firstMatch,
+        missingPlayers,
+      });
+
+      sendAlert(message);
+
+      alreadySent[sentKey] = {
+        journee,
+        sentAt: new Date().toISOString(),
+        missingPlayers: missingPlayers.map((account) => account.player),
+      };
+
+      localStorage.setItem(AUTO_REMINDER_SENT_KEY, JSON.stringify(alreadySent));
+      found = true;
+    });
+
+    if (!found && force) {
+      setLastAlert('Aucun rappel à envoyer maintenant.');
+    }
+
+    setNextCheck(new Date().toLocaleTimeString());
+  }
+
+  useEffect(() => {
+    checkReminders();
+
+    const interval = setInterval(() => {
+      checkReminders();
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [autoEnabled]);
+
+  const statusText = useMemo(() => {
+    if (!autoEnabled) return 'OFF';
+    return 'ON';
+  }, [autoEnabled]);
+
+  return (
+    <section className="admin-auto-reminder">
+      <div>
+        <p>IA RAPPEL AUTO</p>
+        <h2>IA automatique 6h avant match</h2>
+        <span>
+          L’IA contrôle les validations et prévient l’admin automatiquement.
+        </span>
+      </div>
+
+      <div className="admin-auto-reminder-actions">
+        <button
+          type="button"
+          className={autoEnabled ? 'auto-on' : 'auto-off'}
+          onClick={toggleAuto}
+        >
+          IA {statusText}
+        </button>
+
+        <button type="button" onClick={activateNotifications}>
+          Autoriser notifications
+        </button>
+
+        <button type="button" className="test" onClick={() => checkReminders(true)}>
+          Tester l’IA
+        </button>
+      </div>
+
+      {nextCheck && (
+        <small>Dernier contrôle : {nextCheck}</small>
+      )}
+
+      {lastAlert && (
+        <div className="admin-auto-reminder-alert">
+          {lastAlert}
+        </div>
+      )}
+    </section>
+  );
+}
+

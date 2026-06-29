@@ -1,0 +1,651 @@
+﻿.trophies-page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* =========================
+   BLOCS PRINCIPAUX
+========================= */
+
+.trophies-header,
+.trophies-summary article,
+.trophy-card,
+.trophies-filters,
+.trophies-lexicon {
+  background: linear-gradient(145deg, #111827, #1e293b);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.20);
+  color: white;
+}
+
+.trophies-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding: 20px;
+  border-radius: 24px;
+}
+
+.trophies-header p {
+  margin: 0 0 5px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.trophies-header h1 {
+  margin: 0 0 6px;
+  font-size: 30px;
+}
+
+.trophies-header span {
+  color: rgba(255,255,255,0.68);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.trophies-header-cards {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.trophies-big-card {
+  min-width: 135px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.trophies-big-card span {
+  display: block;
+  color: rgba(255,255,255,0.62);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.trophies-big-card strong {
+  display: block;
+  margin-top: 4px;
+  color: #22c55e;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.trophies-big-card small {
+  display: block;
+  margin-top: 5px;
+  color: rgba(255,255,255,0.62);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+/* =========================
+   RÉSUMÉ
+========================= */
+
+.trophies-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.trophies-summary article {
+  padding: 15px;
+  border-radius: 18px;
+}
+
+.trophies-summary span {
+  display: block;
+  color: rgba(255,255,255,0.58);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.trophies-summary strong {
+  display: block;
+  margin-top: 5px;
+  color: white;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.trophies-summary small {
+  display: block;
+  margin-top: 7px;
+  color: #22c55e;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+/* =========================
+   FILTRES
+========================= */
+
+.trophies-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border-radius: 18px;
+}
+
+.trophies-filters button {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.72);
+  border-radius: 999px;
+  padding: 9px 12px;
+  font-weight: 950;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.trophies-filters button.active {
+  background: #22c55e;
+  color: #052e16;
+  border-color: #22c55e;
+}
+
+/* =========================
+   GRILLE TROPHÉES
+========================= */
+
+.trophies-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.trophy-card {
+  position: relative;
+  min-height: 215px;
+  padding: 15px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: 0.16s ease;
+}
+
+.trophy-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(34, 197, 94, 0.36);
+  z-index: 10;
+}
+
+.trophy-card.locked {
+  opacity: 0.62;
+  filter: grayscale(0.35);
+}
+
+.trophy-card.progress {
+  border-color: rgba(250, 204, 21, 0.22);
+}
+
+.trophy-card.unlocked {
+  border-color: rgba(34, 197, 94, 0.30);
+}
+
+.trophy-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trophy-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  background: rgba(255,255,255,0.08);
+  font-size: 24px;
+}
+
+.trophy-level {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(34,197,94,0.12);
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.trophy-card.progress .trophy-level {
+  background: rgba(250,204,21,0.12);
+  color: #facc15;
+}
+
+.trophy-card.locked .trophy-level {
+  background: rgba(148,163,184,0.12);
+  color: #94a3b8;
+}
+
+.trophy-card h2 {
+  margin: 0;
+  color: white;
+  font-size: 17px;
+}
+
+.trophy-card p {
+  margin: 0;
+  color: rgba(255,255,255,0.58);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+/* =========================
+   NIVEAUX B / A / O / L
+========================= */
+
+.trophy-levels {
+  display: flex;
+  gap: 6px;
+}
+
+.trophy-levels span {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.42);
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.trophy-levels span.done {
+  background: rgba(34,197,94,0.16);
+  color: #22c55e;
+  border: 1px solid rgba(34,197,94,0.26);
+}
+
+/* =========================
+   PROGRESSION BADGE
+========================= */
+
+.trophy-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  font-size: 11px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.65);
+}
+
+.trophy-meta strong {
+  color: #22c55e;
+}
+
+.trophy-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.10);
+  overflow: hidden;
+}
+
+.trophy-bar div {
+  height: 100%;
+  border-radius: 999px;
+  background: #22c55e;
+}
+
+.trophy-card.progress .trophy-bar div {
+  background: #facc15;
+}
+
+.trophy-card.locked .trophy-bar div {
+  background: #94a3b8;
+}
+
+.trophy-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(255,255,255,0.54);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.trophy-footer strong {
+  color: white;
+}
+
+/* =========================
+   SURVOL EXPLICATION
+========================= */
+
+.trophy-tooltip {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(100% + 10px);
+  display: none;
+  padding: 12px;
+  border-radius: 15px;
+  background: #020617;
+  border: 1px solid rgba(34,197,94,0.28);
+  box-shadow: 0 16px 34px rgba(0,0,0,0.36);
+  z-index: 30;
+}
+
+.trophy-card:hover .trophy-tooltip {
+  display: grid;
+  gap: 5px;
+}
+
+.trophy-tooltip strong {
+  color: #22c55e;
+  font-size: 13px;
+}
+
+.trophy-tooltip span {
+  color: rgba(255,255,255,0.74);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.trophy-tooltip small {
+  color: rgba(255,255,255,0.52);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+/* =========================
+   LEXIQUE
+========================= */
+
+.trophies-lexicon {
+  border-radius: 20px;
+  padding: 14px;
+}
+
+.trophies-lexicon summary {
+  cursor: pointer;
+  color: #22c55e;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.trophies-lexicon-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 11px;
+  margin-top: 14px;
+}
+
+.trophies-lexicon-grid article {
+  padding: 12px;
+  border-radius: 15px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.trophies-lexicon-grid strong {
+  display: block;
+  color: white;
+  font-size: 13px;
+}
+
+.trophies-lexicon-grid span {
+  display: block;
+  margin-top: 4px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.trophies-lexicon-grid p {
+  margin: 8px 0;
+  color: rgba(255,255,255,0.62);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.trophies-lexicon-grid small {
+  color: rgba(255,255,255,0.48);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 1200px) {
+  .trophies-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .trophies-lexicon-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .trophies-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .trophies-summary,
+  .trophies-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .trophies-summary,
+  .trophies-grid,
+  .trophies-lexicon-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trophy-tooltip {
+    display: none !important;
+  }
+}
+
+/* === TROPHÉES GAGNÉS EN HAUT === */
+
+.trophies-header-left {
+  flex: 1;
+}
+
+.trophies-header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.header-trophy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  color: white;
+}
+
+.header-trophy-chip strong {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.header-trophy-chip span {
+  color: white;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.header-trophy-chip em {
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 950;
+}
+
+.header-trophy-chip.earned {
+  border: 1px solid rgba(34,197,94,0.28);
+  background: rgba(34,197,94,0.12);
+}
+
+.header-trophy-chip.earned em {
+  background: rgba(34,197,94,0.18);
+  color: #22c55e;
+}
+
+.header-trophy-empty {
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: rgba(255,255,255,0.62);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+@media (max-width: 700px) {
+  .header-trophy-chip {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+
+/* === TROPHÉES GAGNÉS EN HAUT === */
+
+.trophies-header-left {
+  flex: 1;
+}
+
+.trophies-header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.header-trophy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  color: white;
+}
+
+.header-trophy-chip strong {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.header-trophy-chip span {
+  color: white;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.header-trophy-chip em {
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 950;
+}
+
+.header-trophy-chip.earned {
+  border: 1px solid rgba(34,197,94,0.28);
+  background: rgba(34,197,94,0.12);
+}
+
+.header-trophy-chip.earned em {
+  background: rgba(34,197,94,0.18);
+  color: #22c55e;
+}
+
+.header-trophy-empty {
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: rgba(255,255,255,0.62);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+@media (max-width: 700px) {
+  .header-trophy-chip {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+
+/* === CLIC SUR NIVEAUX BRONZE / ARGENT / OR / LÉGENDE === */
+
+.trophy-levels button {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.42);
+  font-size: 10px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.trophy-levels button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(34,197,94,0.35);
+  color: white;
+}
+
+.trophy-levels button.done {
+  background: rgba(34,197,94,0.16);
+  color: #22c55e;
+  border-color: rgba(34,197,94,0.26);
+}
+
+.trophy-level-detail {
+  display: grid;
+  gap: 3px;
+  padding: 10px 11px;
+  border-radius: 14px;
+  background: rgba(34,197,94,0.10);
+  border: 1px solid rgba(34,197,94,0.20);
+}
+
+.trophy-level-detail strong {
+  color: #22c55e;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.trophy-level-detail span {
+  color: white;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.trophy-level-detail small {
+  color: rgba(255,255,255,0.58);
+  font-size: 10px;
+  font-weight: 850;
+}
+

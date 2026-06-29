@@ -1,0 +1,140 @@
+﻿import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+app.use(cors());
+app.use(express.json());
+
+const API_KEY = process.env.FOOTBALL_DATA_KEY;
+const COMPETITION = process.env.FOOTBALL_DATA_COMPETITION || 'FL1';
+const SEASON = process.env.FOOTBALL_DATA_SEASON || '';
+const API_BASE_URL = 'https://api.football-data.org/v4';
+
+async function footballDataFetch(endpoint) {
+  if (!API_KEY || API_KEY === 'COLLE_TA_CLE_FOOTBALL_DATA_ICI') {
+    throw new Error('Clé football-data manquante dans le fichier .env');
+  }
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: 'GET',
+    headers: {
+      'X-Auth-Token': API_KEY,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || `Erreur football-data : ${response.status}`);
+  }
+
+  return data;
+}
+
+function formatMatch(item) {
+  const utcDate = new Date(item.utcDate);
+
+  return {
+    id: `fd-${item.id}`,
+    apiFixtureId: item.id,
+    journee: String(item.matchday || ''),
+    date: utcDate.toISOString().slice(0, 10),
+    heure: utcDate.toTimeString().slice(0, 5),
+    domicile: item.homeTeam?.name || '',
+    exterieur: item.awayTeam?.name || '',
+    logoDomicile: item.homeTeam?.crest || '',
+    logoExterieur: item.awayTeam?.crest || '',
+    type: 'L1',
+    statut: item.status,
+    statutLong: item.status,
+    scoreDomicile: item.score?.fullTime?.home ?? null,
+    scoreExterieur: item.score?.fullTime?.away ?? null,
+    blocageDate: utcDate.toISOString().slice(0, 10),
+    blocageHeure: utcDate.toTimeString().slice(0, 5),
+  };
+}
+
+function seasonQuery() {
+  return SEASON ? `?season=${SEASON}` : '';
+}
+
+app.get('/api/test', (req, res) => {
+  res.json({
+    ok: true,
+    message: 'API locale football-data OK',
+  });
+});
+
+app.get('/api/ligue1/matchs', async (req, res) => {
+  try {
+    const data = await footballDataFetch(
+      `/competitions/${COMPETITION}/matches${seasonQuery()}`
+    );
+
+    const matchs = data.matches.map(formatMatch);
+
+    res.json({
+      ok: true,
+      competition: COMPETITION,
+      total: matchs.length,
+      matchs,
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      message: error.message,
+    });
+  }
+});
+
+app.get('/api/ligue1/scores', async (req, res) => {
+  try {
+    const data = await footballDataFetch(
+      `/competitions/${COMPETITION}/matches${seasonQuery()}`
+    );
+
+    const matchs = data.matches
+      .map(formatMatch)
+      .filter((match) => match.scoreDomicile !== null && match.scoreExterieur !== null);
+
+    res.json({
+      ok: true,
+      competition: COMPETITION,
+      total: matchs.length,
+      matchs,
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      message: error.message,
+    });
+  }
+});
+
+app.get('/api/ligue1/classement', async (req, res) => {
+  try {
+    const data = await footballDataFetch(
+      `/competitions/${COMPETITION}/standings`
+    );
+
+    res.json({
+      ok: true,
+      competition: COMPETITION,
+      classement: data.standings,
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      message: error.message,
+    });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`API locale football-data lancée : http://localhost:${PORT}`);
+});

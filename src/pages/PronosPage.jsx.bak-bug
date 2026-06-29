@@ -1,0 +1,486 @@
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import '../styles/pronos.css';
+
+const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';
+const PRONOS_KEY = 'prono_ligue1_lm_pronos_joueurs';
+const VALIDATIONS_KEY = 'prono_ligue1_lm_validations_journees';
+const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
+const PLAYER_KEY = 'prono_ligue1_lm_current_player';
+const BONUS_CHOICES_KEY = 'prono_ligue1_lm_bonus_choices';
+
+function clean(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function getResult(match) {
+  const home = match.scoreDomicile;
+  const away = match.scoreExterieur;
+
+  if (home === null || home === undefined || away === null || away === undefined) return null;
+
+  const h = Number(home);
+  const a = Number(away);
+
+  if (Number.isNaN(h) || Number.isNaN(a)) return null;
+  if (h > a) return '1';
+  if (h < a) return '2';
+  return 'N';
+}
+
+function getMatchDate(match) {
+  const date = match.blocageDate || match.date;
+  const heure = match.blocageHeure || match.heure || '00:00';
+
+  if (!date) return null;
+
+  const d = new Date(`${date}T${heure}`);
+  if (Number.isNaN(d.getTime())) return null;
+
+  return d;
+}
+
+function isLocked(match, isJourneeValidated) {
+  return isJourneeValidated;
+}
+
+function getEvaluation(match, prono, scoreExactMode) {
+  const result = getResult(match);
+
+  if (!result || !prono) {
+    return { status: 'neutral', label: '' };
+  }
+
+  if (scoreExactMode) {
+    const homeProno = Number(prono.home);
+    const awayProno = Number(prono.away);
+    const homeScore = Number(match.scoreDomicile);
+    const awayScore = Number(match.scoreExterieur);
+
+    if (Number.isNaN(homeProno) || Number.isNaN(awayProno)) {
+      return { status: 'neutral', label: '' };
+    }
+
+    if (homeProno === homeScore && awayProno === awayScore) {
+      return { status: 'good', label: 'Score exact' };
+    }
+
+    const predictedResult =
+      homeProno > awayProno ? '1' : homeProno < awayProno ? '2' : 'N';
+
+    if (predictedResult === result) {
+      return { status: 'partial', label: 'Résultat OK' };
+    }
+
+    return { status: 'bad', label: 'Faux' };
+  }
+
+  if (prono.value === result) {
+    return { status: 'good', label: 'Bon prono' };
+  }
+
+  return { status: 'bad', label: 'Faux' };
+}
+
+function getPoints(match, prono, scoreExactMode, isBonus) {
+  const result = getResult(match);
+  if (!result || !prono) return 0;
+
+  if (scoreExactMode) {
+    const homeProno = Number(prono.home);
+    const awayProno = Number(prono.away);
+    const homeScore = Number(match.scoreDomicile);
+    const awayScore = Number(match.scoreExterieur);
+
+    if (Number.isNaN(homeProno) || Number.isNaN(awayProno)) return 0;
+
+    if (homeProno === homeScore && awayProno === awayScore) {
+      return isBonus ? 3 : 2;
+    }
+
+    const predictedResult =
+      homeProno > awayProno ? '1' : homeProno < awayProno ? '2' : 'N';
+
+    if (predictedResult === result) {
+      return isBonus ? 2 : 1;
+    }
+
+    return 0;
+  }
+
+  return prono.value === result ? 1 : 0;
+}
+
+function cardClass(evaluation, isSelectedBonus, isDisabledBonus) {
+  let className = 'prono-card';
+
+  if (evaluation.status === 'good') className += ' is-good';
+  if (evaluation.status === 'bad') className += ' is-bad';
+  if (evaluation.status === 'partial') className += ' is-partial';
+  if (isSelectedBonus) className += ' is-selected-bonus';
+  if (isDisabledBonus) className += ' is-disabled-bonus';
+
+  return className;
+}
+
+export default function PronosPage() {
+  const [matches, setMatches] = useState([]);
+  const [selectedJournee, setSelectedJournee] = useState('');
+  const [currentPlayer, setCurrentPlayer] = useState('Manu');
+  const [favoriteTeam, setFavoriteTeam] = useState('');
+  const [pronos, setPronos] = useState({});
+  const [validations, setValidations] = useState({});
+  const [bonusChoices, setBonusChoices] = useState({});
+
+  useEffect(() => {
+    const savedMatches = JSON.parse(localStorage.getItem(MATCHS_KEY) || '[]');
+    const savedPronos = JSON.parse(localStorage.getItem(PRONOS_KEY) || '{}');
+    const savedValidations = JSON.parse(localStorage.getItem(VALIDATIONS_KEY) || '{}');
+    const savedBonusChoices = JSON.parse(localStorage.getItem(BONUS_CHOICES_KEY) || '{}');
+    const savedTeam = localStorage.getItem(FAVORITE_TEAM_KEY) || '';
+    const savedPlayer = localStorage.getItem(PLAYER_KEY) || 'Manu';
+
+    setMatches(savedMatches);
+    setPronos(savedPronos);
+    setValidations(savedValidations);
+    setBonusChoices(savedBonusChoices);
+    setFavoriteTeam(savedTeam);
+    setCurrentPlayer(savedPlayer);
+
+    const journees = [
+      ...new Set(savedMatches.map((m) => String(m.journee || '').trim()).filter(Boolean)),
+    ].sort((a, b) => Number(a) - Number(b));
+
+    if (journees.length > 0) {
+      setSelectedJournee(journees[0]);
+    }
+  }, []);
+
+  const journees = useMemo(() => {
+    return [...new Set(matches.map((m) => String(m.journee || '').trim()).filter(Boolean))]
+      .sort((a, b) => Number(a) - Number(b));
+  }, [matches]);
+
+  const matchesJournee = useMemo(() => {
+    return matches
+      .filter((match) => String(match.journee || '') === String(selectedJournee))
+      .sort((a, b) => {
+        const dateA = `${a.date || ''} ${a.heure || ''}`;
+        const dateB = `${b.date || ''} ${b.heure || ''}`;
+        return dateA.localeCompare(dateB);
+      });
+  }, [matches, selectedJournee]);
+
+  const l1Matches = matchesJournee.filter((match) => match.type !== 'BONUS');
+  const bonusMatches = matchesJournee.filter((match) => match.type === 'BONUS');
+
+  const playerPronos = pronos[currentPlayer] || {};
+  const validationKey = `${currentPlayer}-J${selectedJournee}`;
+  const bonusKey = `${currentPlayer}-J${selectedJournee}`;
+  const isJourneeValidated = Boolean(validations[validationKey]);
+  const selectedBonusId = bonusChoices[bonusKey];
+
+  const totalJournee = useMemo(() => {
+    return matchesJournee.reduce((total, match) => {
+      const isBonus = match.type === 'BONUS';
+      const isSelectedBonus = isBonus && selectedBonusId === match.id;
+
+      if (isBonus && !isSelectedBonus) return total;
+
+      const isFavoriteMatch =
+        favoriteTeam &&
+        (clean(match.domicile) === clean(favoriteTeam) ||
+          clean(match.exterieur) === clean(favoriteTeam));
+
+      const scoreExactMode = isFavoriteMatch || isSelectedBonus;
+      const prono = playerPronos[match.id];
+
+      return total + getPoints(match, prono, scoreExactMode, isBonus);
+    }, 0);
+  }, [matchesJournee, playerPronos, favoriteTeam, selectedBonusId]);
+
+  function savePronos(nextPronos) {
+    setPronos(nextPronos);
+    localStorage.setItem(PRONOS_KEY, JSON.stringify(nextPronos));
+  }
+
+  function updateProno(matchId, value) {
+    if (isJourneeValidated) return;
+
+    const next = {
+      ...pronos,
+      [currentPlayer]: {
+        ...(pronos[currentPlayer] || {}),
+        [matchId]: value,
+      },
+    };
+
+    savePronos(next);
+  }
+
+  function choisirBonus(matchId) {
+    if (isJourneeValidated) return;
+
+    const oldBonusId = selectedBonusId;
+
+    const nextChoices = {
+      ...bonusChoices,
+      [bonusKey]: matchId,
+    };
+
+    const nextPlayerPronos = { ...(pronos[currentPlayer] || {}) };
+
+    if (oldBonusId && oldBonusId !== matchId) {
+      delete nextPlayerPronos[oldBonusId];
+    }
+
+    const nextPronos = {
+      ...pronos,
+      [currentPlayer]: nextPlayerPronos,
+    };
+
+    setBonusChoices(nextChoices);
+    localStorage.setItem(BONUS_CHOICES_KEY, JSON.stringify(nextChoices));
+    savePronos(nextPronos);
+  }
+
+  function validerJournee() {
+    const next = {
+      ...validations,
+      [validationKey]: true,
+    };
+
+    setValidations(next);
+    localStorage.setItem(VALIDATIONS_KEY, JSON.stringify(next));
+
+    alert(`Journée ${selectedJournee} validée.`);
+  }
+
+  function renderMatch(match, options = {}) {
+    const isBonus = Boolean(options.isBonus);
+    const isSelectedBonus = isBonus && selectedBonusId === match.id;
+    const isDisabledBonus = isBonus && selectedBonusId && selectedBonusId !== match.id;
+
+    const prono = playerPronos[match.id];
+
+    const isFavoriteMatch =
+      favoriteTeam &&
+      (clean(match.domicile) === clean(favoriteTeam) ||
+        clean(match.exterieur) === clean(favoriteTeam));
+
+    const scoreExactMode = isFavoriteMatch || isSelectedBonus;
+    const result = getResult(match);
+    const locked = isLocked(match, isJourneeValidated);
+    const evaluation = getEvaluation(match, prono, scoreExactMode);
+    const points = getPoints(match, prono, scoreExactMode, isBonus);
+
+    return (
+      <article key={match.id} className={cardClass(evaluation, isSelectedBonus, isDisabledBonus)}>
+        <div className="prono-card-top">
+          <div>
+            <div className="prono-date">
+              {match.date || 'Date à définir'} · {match.heure || '--:--'}
+            </div>
+
+            <div className="prono-teams">
+              <span>{match.domicile}</span>
+              <strong>VS</strong>
+              <span>{match.exterieur}</span>
+            </div>
+
+            {isBonus && match.championnat && (
+              <div className="bonus-league">{match.championnat}</div>
+            )}
+          </div>
+
+          <div className="prono-mode">
+            {isBonus ? 'Bonus' : isFavoriteMatch ? 'Score exact' : '1N2'}
+          </div>
+        </div>
+
+        {isBonus && !isSelectedBonus && (
+          <button
+            type="button"
+            className="bonus-choice-button"
+            onClick={() => choisirBonus(match.id)}
+            disabled={locked}
+          >
+            {selectedBonusId ? 'Changer pour ce bonus' : 'Choisir ce bonus'}
+          </button>
+        )}
+
+        {scoreExactMode && (!isBonus || isSelectedBonus) && (
+          <div className="score-exact-box">
+            <input
+              type="number"
+              min="0"
+              disabled={locked}
+              value={prono?.home ?? ''}
+              onChange={(e) =>
+                updateProno(match.id, {
+                  mode: 'SCORE',
+                  home: e.target.value,
+                  away: prono?.away ?? '',
+                })
+              }
+              placeholder="0"
+            />
+
+            <span>-</span>
+
+            <input
+              type="number"
+              min="0"
+              disabled={locked}
+              value={prono?.away ?? ''}
+              onChange={(e) =>
+                updateProno(match.id, {
+                  mode: 'SCORE',
+                  home: prono?.home ?? '',
+                  away: e.target.value,
+                })
+              }
+              placeholder="0"
+            />
+          </div>
+        )}
+
+        {!scoreExactMode && !isBonus && (
+          <div className="one-n-two">
+            {[
+              ['1', match.domicile],
+              ['N', 'Nul'],
+              ['2', match.exterieur],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                disabled={locked}
+                onClick={() =>
+                  updateProno(match.id, {
+                    mode: '1N2',
+                    value,
+                  })
+                }
+                className={prono?.value === value ? 'active' : ''}
+              >
+                <strong>{value}</strong>
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="prono-result-line">
+          {result ? (
+            <>
+              <span>
+                Résultat : {match.scoreDomicile} - {match.scoreExterieur}
+              </span>
+
+              {evaluation.label && (
+                <strong className={`result-label ${evaluation.status}`}>
+                  {evaluation.label} · +{points} pt{points > 1 ? 's' : ''}
+                </strong>
+              )}
+            </>
+          ) : (
+            <span>Résultat non disponible</span>
+          )}
+
+          {isSelectedBonus && <em>Bonus choisi</em>}
+          {locked && <em>🔒</em>}
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <div className="pronos-page">
+      <section className="pronos-header">
+        <div>
+          <p>PRONOS</p>
+          <h1>Mes pronostics</h1>
+          <span>
+            Club favori : <strong>{favoriteTeam || 'aucun club choisi'}</strong>
+          </span>
+        </div>
+
+        <div className="pronos-header-right">
+          <div className="journee-points-card">
+            <span>Total journée</span>
+            <strong>{totalJournee} pts</strong>
+          </div>
+
+          <div className="pronos-actions">
+            <select value={selectedJournee} onChange={(e) => setSelectedJournee(e.target.value)}>
+              {journees.map((journee) => (
+                <option key={journee} value={journee}>
+                  Journée {journee}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      {!favoriteTeam && (
+        <div className="prono-warning">
+          Choisis d’abord ton équipe favorite sur la page Accueil.
+        </div>
+      )}
+
+      {matches.length === 0 ? (
+        <div className="prono-empty">
+          Aucun match chargé. Va dans Admin puis clique sur Synchroniser Ligue 1.
+        </div>
+      ) : (
+        <>
+          <div className="prono-section-title">
+            <h2>Matchs Ligue 1</h2>
+            <span>{l1Matches.length} match(s)</span>
+          </div>
+
+          <div className="prono-grid">
+            {l1Matches.map((match) => renderMatch(match))}
+          </div>
+
+          <section className="bonus-panel">
+            <div className="bonus-panel-header">
+              <div>
+                <h2>Choix du match bonus</h2>
+                <p>Choisis 1 seul match bonus parmi les 3 proposés.</p>
+              </div>
+
+              <div className="bonus-panel-badge">
+                {selectedBonusId ? '1 bonus sélectionné' : '0 bonus sélectionné'}
+              </div>
+            </div>
+
+            {bonusMatches.length > 0 ? (
+              <div className="bonus-grid">
+                {bonusMatches.map((match) => renderMatch(match, { isBonus: true }))}
+              </div>
+            ) : (
+              <div className="bonus-panel-empty">
+                Aucun match bonus ajouté pour cette journée.
+              </div>
+            )}
+          </section>
+
+          <button
+            type="button"
+            className="validate-pronos"
+            onClick={toggleValidationJournee}
+          >
+            {isJourneeValidated ? 'Dévalider pour modifier 🔓' : 'Valider ma journée 🔒'}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+

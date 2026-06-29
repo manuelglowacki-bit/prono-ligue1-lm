@@ -1,0 +1,130 @@
+﻿import React, { useEffect, useState } from 'react';
+
+const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
+const PLAYER_KEY = 'prono_ligue1_lm_current_player';
+const SESSION_KEY = 'prono_ligue1_lm_session';
+const DEFAULT_FAVORITE_TEAM = 'RC Lens';
+
+const TEAMS = [
+  'RC Lens',
+  'PSG',
+  'OM',
+  'LOSC',
+  'OL',
+  'Monaco',
+  'Rennes',
+  'Nice',
+  'Strasbourg',
+  'Nantes',
+  'Toulouse',
+  'Lille',
+  'Brest',
+  'Reims',
+  'Angers',
+  'Auxerre',
+  'Lorient',
+  'Metz',
+  'Paris FC',
+];
+
+function safeJson(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+  } catch {
+    return fallback;
+  }
+}
+
+function getCurrentPlayer() {
+  const session = safeJson(SESSION_KEY, null);
+  return session?.player || localStorage.getItem(PLAYER_KEY) || 'Manu';
+}
+
+function getPlayerFavoriteKey(player) {
+  return `${FAVORITE_TEAM_KEY}_${player}`;
+}
+
+function forceDefaultFavorite(player) {
+  const playerKey = getPlayerFavoriteKey(player);
+  const playerFavorite = localStorage.getItem(playerKey);
+  const globalFavorite = localStorage.getItem(FAVORITE_TEAM_KEY);
+
+  const favorite = playerFavorite || globalFavorite || DEFAULT_FAVORITE_TEAM;
+
+  if (!playerFavorite) {
+    localStorage.setItem(playerKey, favorite);
+  }
+
+  if (!globalFavorite) {
+    localStorage.setItem(FAVORITE_TEAM_KEY, favorite);
+  }
+
+  return favorite;
+}
+
+export default function FavoriteTeamSelect() {
+  const [player, setPlayer] = useState('');
+  const [selectedTeam, setSelectedTeam] = useState(DEFAULT_FAVORITE_TEAM);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const currentPlayer = getCurrentPlayer();
+    const favorite = forceDefaultFavorite(currentPlayer);
+
+    setPlayer(currentPlayer);
+    setSelectedTeam(favorite);
+  }, []);
+
+  function saveTeam(team = selectedTeam) {
+    const currentPlayer = player || getCurrentPlayer();
+    const cleanTeam = team || DEFAULT_FAVORITE_TEAM;
+
+    localStorage.setItem(getPlayerFavoriteKey(currentPlayer), cleanTeam);
+    localStorage.setItem(FAVORITE_TEAM_KEY, cleanTeam);
+
+    setSelectedTeam(cleanTeam);
+    setSaved(true);
+
+    setTimeout(() => {
+      setSaved(false);
+    }, 2000);
+  }
+
+  return (
+    <section className="favorite-team-card">
+      <div className="favorite-team-header">
+        <div>
+          <p>CLUB FAVORI</p>
+          <h2>{selectedTeam || DEFAULT_FAVORITE_TEAM}</h2>
+          <span>
+            Si aucun club n’est choisi, RC Lens est mis automatiquement par défaut.
+          </span>
+        </div>
+
+        <strong>{player}</strong>
+      </div>
+
+      <div className="favorite-team-grid">
+        {TEAMS.map((team) => (
+          <button
+            key={team}
+            type="button"
+            className={selectedTeam === team ? 'active' : ''}
+            onClick={() => {
+              setSelectedTeam(team);
+              saveTeam(team);
+            }}
+          >
+            {team}
+          </button>
+        ))}
+      </div>
+
+      {saved && (
+        <div className="favorite-team-saved">
+          ✅ Club favori enregistré : {selectedTeam}
+        </div>
+      )}
+    </section>
+  );
+}

@@ -1,0 +1,139 @@
+﻿.favorite-team-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #111827, #1f2937);
+  color: white;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.20);
+}
+
+.favorite-team-left p {
+  margin: 0 0 4px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.favorite-team-left h2 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.favorite-team-left span {
+  display: block;
+  color: rgba(255,255,255,0.72);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.favorite-team-left small {
+  display: block;
+  margin-top: 6px;
+  color: rgba(255,255,255,0.48);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.favorite-team-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.favorite-team-right select {
+  min-width: 250px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.10);
+  color: white;
+  font-weight: 900;
+  outline: none;
+}
+
+.favorite-team-right select option {
+  color: #111827;
+}
+
+.favorite-team-right select:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.favorite-team-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.favorite-btn {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-weight: 950;
+  cursor: pointer;
+  transition: 0.16s ease;
+}
+
+.favorite-btn.validate {
+  background: #22c55e;
+  color: #052e16;
+  box-shadow: 0 10px 24px rgba(34, 197, 94, 0.30);
+}
+
+.favorite-btn.unvalidate {
+  background: #f97316;
+  color: #431407;
+  box-shadow: 0 10px 24px rgba(249, 115, 22, 0.32);
+}
+
+.favorite-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.favorite-status {
+  padding: 10px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 950;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.favorite-status.open {
+  background: rgba(34, 197, 94, 0.14);
+  color: #22c55e;
+}
+
+.favorite-status.valid {
+  background: rgba(250, 204, 21, 0.14);
+  color: #facc15;
+}
+
+.favorite-status.locked {
+  background: rgba(239, 68, 68, 0.14);
+  color: #ef4444;
+}
+
+@media (max-width: 850px) {
+  .favorite-team-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .favorite-team-right {
+    align-items: stretch;
+  }
+
+  .favorite-team-right select,
+  .favorite-btn,
+  .favorite-status {
+    width: 100%;
+    text-align: center;
+  }
+}

@@ -1,0 +1,183 @@
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import '../styles/favoriteTeam.css';
+
+const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
+const FAVORITE_TEAM_VALIDATED_KEY = 'prono_ligue1_lm_favorite_team_validated';
+const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';
+
+const CLUBS = [
+  'AJ Auxerre',
+  'Angers SCO',
+  'AS Monaco FC',
+  'FC Lorient',
+  'FC Metz',
+  'FC Nantes',
+  'Le Havre AC',
+  'Lille OSC',
+  'OGC Nice',
+  'Olympique de Marseille',
+  'Olympique Lyonnais',
+  'Paris FC',
+  'Paris Saint-Germain FC',
+  'Racing Club de Lens',
+  'RC Strasbourg Alsace',
+  'Stade Brestois 29',
+  'Stade Rennais FC 1901',
+  'Toulouse FC',
+];
+
+function getMatchDate(match) {
+  const date = match.date || match.blocageDate;
+  const heure = match.heure || match.blocageHeure || '00:00';
+
+  if (!date) return null;
+
+  const d = new Date(`${date}T${heure}`);
+  if (Number.isNaN(d.getTime())) return null;
+
+  return d;
+}
+
+function getSeasonStartDate() {
+  const matchs = JSON.parse(localStorage.getItem(MATCHS_KEY) || '[]');
+
+  const l1Dates = matchs
+    .filter((match) => match.type !== 'BONUS')
+    .map(getMatchDate)
+    .filter(Boolean)
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  return l1Dates[0] || null;
+}
+
+export default function FavoriteTeamSelect() {
+  const [favoriteTeam, setFavoriteTeam] = useState('');
+  const [isValidated, setIsValidated] = useState(false);
+  const [seasonStartDate, setSeasonStartDate] = useState(null);
+
+  useEffect(() => {
+    const savedTeam = localStorage.getItem(FAVORITE_TEAM_KEY) || '';
+    const savedValidated = localStorage.getItem(FAVORITE_TEAM_VALIDATED_KEY) === 'true';
+
+    setFavoriteTeam(savedTeam);
+    setIsValidated(savedValidated);
+    setSeasonStartDate(getSeasonStartDate());
+  }, []);
+
+  const seasonStarted = useMemo(() => {
+    if (!seasonStartDate) return false;
+    return new Date() >= seasonStartDate;
+  }, [seasonStartDate]);
+
+  const isLocked = seasonStarted || isValidated;
+
+  function saveTeam(value) {
+    if (seasonStarted || isValidated) return;
+
+    setFavoriteTeam(value);
+    localStorage.setItem(FAVORITE_TEAM_KEY, value);
+  }
+
+  function validateTeam() {
+    if (!favoriteTeam) {
+      alert('Choisis ton club favori avant de valider.');
+      return;
+    }
+
+    if (seasonStarted) {
+      alert('La saison a commencé, tu ne peux plus changer ton club favori.');
+      return;
+    }
+
+    setIsValidated(true);
+    localStorage.setItem(FAVORITE_TEAM_VALIDATED_KEY, 'true');
+    localStorage.setItem(FAVORITE_TEAM_KEY, favoriteTeam);
+
+    alert(`Club favori validé : ${favoriteTeam}`);
+  }
+
+  function unvalidateTeam() {
+    if (seasonStarted) {
+      alert('La saison a commencé, ton club favori est verrouillé.');
+      return;
+    }
+
+    setIsValidated(false);
+    localStorage.setItem(FAVORITE_TEAM_VALIDATED_KEY, 'false');
+
+    alert('Club favori dévalidé. Tu peux le modifier.');
+  }
+
+  return (
+    <section className="favorite-team-card">
+      <div className="favorite-team-left">
+        <p>CLUB FAVORI</p>
+        <h2>Choix du club favori</h2>
+
+        <span>
+          {seasonStarted
+            ? 'Saison commencée : choix verrouillé définitivement.'
+            : isValidated
+              ? 'Choix validé. Tu peux encore dévalider avant le début de saison.'
+              : 'Choisis ton club puis valide avant le début de saison.'}
+        </span>
+
+        {seasonStartDate && (
+          <small>
+            Début saison : {seasonStartDate.toLocaleDateString('fr-FR')} à{' '}
+            {seasonStartDate.toLocaleTimeString('fr-FR', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </small>
+        )}
+      </div>
+
+      <div className="favorite-team-right">
+        <select
+          value={favoriteTeam}
+          onChange={(e) => saveTeam(e.target.value)}
+          disabled={isLocked}
+        >
+          <option value="">Choisir un club</option>
+
+          {CLUBS.map((club) => (
+            <option key={club} value={club}>
+              {club}
+            </option>
+          ))}
+        </select>
+
+        <div className="favorite-team-buttons">
+          {!isValidated ? (
+            <button
+              type="button"
+              className="favorite-btn validate"
+              onClick={validateTeam}
+              disabled={seasonStarted}
+            >
+              Valider 🔒
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="favorite-btn unvalidate"
+              onClick={unvalidateTeam}
+              disabled={seasonStarted}
+            >
+              Dévalider 🔓
+            </button>
+          )}
+        </div>
+
+        <div className={`favorite-status ${seasonStarted ? 'locked' : isValidated ? 'valid' : 'open'}`}>
+          {seasonStarted
+            ? 'Verrouillé'
+            : isValidated
+              ? 'Validé'
+              : 'Modifiable'}
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -1,0 +1,94 @@
+﻿.player-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.player-badges.compact {
+  gap: 4px;
+}
+
+.player-badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.player-badge-chip strong {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.player-badges.compact .player-badge-chip {
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.player-badges.compact .player-badge-chip span {
+  display: none;
+}
+
+.rank-player {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+.rank-player-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-badge-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 16px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #111827, #1e293b);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.20);
+  color: white;
+}
+
+.profile-badge-panel p {
+  margin: 0 0 4px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.profile-badge-panel h2 {
+  margin: 0 0 5px;
+  font-size: 22px;
+}
+
+.profile-badge-panel span {
+  color: rgba(255,255,255,0.65);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+@media (max-width: 700px) {
+  .profile-badge-panel {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

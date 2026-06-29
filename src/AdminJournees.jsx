@@ -1,0 +1,855 @@
+﻿import { getApiUrl } from './utils/apiUrl';
+import React, { useEffect, useMemo, useState } from 'react';
+import * as XLSX from 'xlsx';
+import './AdminJournees.css';
+const STORAGE_KEY = 'prono_ligue1_lm_matchs_admin';
+
+function makeId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+}
+
+function normalize(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '')
+    .replace(/_/g, '')
+    .replace(/-/g, '');
+}
+
+function cleanText(value) {
+  return String(value || '').trim();
+}
+
+function splitMatchText(value) {
+  const text = cleanText(value);
+
+  if (!text) return { domicile: '', exterieur: '' };
+
+  const separators = [
+    /\s+vs\s+/i,
+    /\s+v\s+/i,
+    /\s+contre\s+/i,
+    /\s+-\s+/,
+    /\s+–\s+/,
+    /\s+—\s+/,
+  ];
+
+  for (const separator of separators) {
+    const parts = text.split(separator);
+
+    if (parts.length >= 2) {
+      return {
+        domicile: cleanText(parts[0]),
+        exterieur: cleanText(parts.slice(1).join(' ')),
+      };
+    }
+  }
+
+  return { domicile: '', exterieur: '' };
+}
+
+function formatDate(value) {
+  if (!value) return '';
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  const text = cleanText(value);
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text)) {
+    const [day, month, year] = text.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(text)) {
+    const [day, month, year] = text.split('-');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  return text;
+}
+
+function formatTime(value) {
+  if (!value && value !== 0) return '';
+
+  if (value instanceof Date) {
+    const h = String(value.getHours()).padStart(2, '0');
+    const m = String(value.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+
+  const text = cleanText(value);
+
+  if (/^\d{2}:\d{2}$/.test(text)) return text;
+  if (/^\d{1}:\d{2}$/.test(text)) return `0${text}`;
+
+  if (/^\d{1,2}h\d{2}$/i.test(text)) {
+    const [h, m] = text.toLowerCase().split('h');
+    return `${h.padStart(2, '0')}:${m}`;
+  }
+
+  if (/^\d{1,2}h$/i.test(text)) {
+    const h = text.toLowerCase().replace('h', '');
+    return `${h.padStart(2, '0')}:00`;
+  }
+
+  return text;
+}
+
+function isBlocked(match) {
+  if (!match.blocageDate || !match.blocageHeure) return false;
+
+  const limit = new Date(`${match.blocageDate}T${match.blocageHeure}`);
+
+  if (Number.isNaN(limit.getTime())) return false;
+
+  return new Date() >= limit;
+}
+
+function getIndex(headers, possibleNames) {
+  const normalizedHeaders = headers.map(normalize);
+
+  for (const name of possibleNames) {
+    const wanted = normalize(name);
+    const index = normalizedHeaders.findIndex((header) => header === wanted);
+
+    if (index !== -1) return index;
+  }
+
+  return -1;
+}
+
+function findHeaderRow(rows) {
+  let bestIndex = -1;
+  let bestScore = 0;
+
+  rows.slice(0, 15).forEach((row, index) => {
+    const text = row.map(normalize).join(' ');
+    let score = 0;
+
+    if (text.includes('journee')) score += 1;
+    if (text.includes('date')) score += 1;
+    if (text.includes('heure') || text.includes('horaire')) score += 1;
+    if (text.includes('domicile') || text.includes('home') || text.includes('equipe1')) score += 2;
+    if (text.includes('exterieur') || text.includes('away') || text.includes('equipe2')) score += 2;
+    if (text.includes('match') || text.includes('rencontre') || text.includes('affiche')) score += 2;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  });
+
+  return bestScore >= 2 ? bestIndex : -1;
+}
+
+function rowIsEmpty(row) {
+  return row.every((cell) => cleanText(cell) === '');
+}
+
+function createMatchFromHeader(row, headers, fileName, sheetName, index) {
+  const iJournee = getIndex(headers, [
+    'journee',
+    'journée',
+    'j',
+    'numero journee',
+    'numéro journée',
+  ]);
+
+  const iDate = getIndex(headers, [
+    'date',
+    'date match',
+    'jour',
+    'date rencontre',
+  ]);
+
+  const iHeure = getIndex(headers, [
+    'heure',
+    'horaire',
+    'time',
+    'heure match',
+  ]);
+
+  const iDomicile = getIndex(headers, [
+    'domicile',
+    'equipe domicile',
+    'équipe domicile',
+    'home',
+    'recevant',
+    'equipe 1',
+    'équipe 1',
+    'club 1',
+  ]);
+
+  const iExterieur = getIndex(headers, [
+    'exterieur',
+    'extérieur',
+    'equipe exterieur',
+    'équipe extérieur',
+    'away',
+    'visiteur',
+    'equipe 2',
+    'équipe 2',
+    'club 2',
+  ]);
+
+  const iMatch = getIndex(headers, [
+    'match',
+    'matchs',
+    'rencontre',
+    'affiche',
+    'opposition',
+  ]);
+
+  const iType = getIndex(headers, [
+    'type',
+    'competition',
+    'compétition',
+    'categorie',
+    'catégorie',
+  ]);
+
+  const iBlocageDate = getIndex(headers, [
+    'blocageDate',
+    'date blocage',
+    'dateblocage',
+    'date limite',
+  ]);
+
+  const iBlocageHeure = getIndex(headers, [
+    'blocageHeure',
+    'heure blocage',
+    'heureblocage',
+    'heure limite',
+  ]);
+
+  const split = splitMatchText(iMatch !== -1 ? row[iMatch] : '');
+
+  const domicile = cleanText(iDomicile !== -1 ? row[iDomicile] : split.domicile);
+  const exterieur = cleanText(iExterieur !== -1 ? row[iExterieur] : split.exterieur);
+
+  if (!domicile || !exterieur) return null;
+
+  const date = iDate !== -1 ? row[iDate] : '';
+  const heure = iHeure !== -1 ? row[iHeure] : '';
+
+  return {
+    id: `${fileName}-${sheetName}-${index}-${makeId()}`,
+    journee: cleanText(iJournee !== -1 ? row[iJournee] : ''),
+    date: formatDate(date),
+    heure: formatTime(heure),
+    domicile,
+    exterieur,
+    type: cleanText(iType !== -1 ? row[iType] : 'L1').toUpperCase() || 'L1',
+    blocageDate: formatDate(iBlocageDate !== -1 ? row[iBlocageDate] : date),
+    blocageHeure: formatTime(iBlocageHeure !== -1 ? row[iBlocageHeure] : heure),
+  };
+}
+
+function createMatchFromPosition(row, fileName, sheetName, index) {
+  const cells = row.map(cleanText);
+
+  if (!cells.join(' ')) return null;
+
+  let journee = cells[0] || '';
+  let date = cells[1] || '';
+  let heure = cells[2] || '';
+  let domicile = cells[3] || '';
+  let exterieur = cells[4] || '';
+  let type = cells[5] || 'L1';
+  let blocageDate = cells[6] || date;
+  let blocageHeure = cells[7] || heure;
+
+  if (!domicile || !exterieur) {
+    for (const cell of cells) {
+      const split = splitMatchText(cell);
+
+      if (split.domicile && split.exterieur) {
+        domicile = split.domicile;
+        exterieur = split.exterieur;
+        break;
+      }
+    }
+  }
+
+  if (!domicile || !exterieur) return null;
+
+  return {
+    id: `${fileName}-${sheetName}-${index}-${makeId()}`,
+    journee,
+    date: formatDate(date),
+    heure: formatTime(heure),
+    domicile,
+    exterieur,
+    type: cleanText(type).toUpperCase() || 'L1',
+    blocageDate: formatDate(blocageDate),
+    blocageHeure: formatTime(blocageHeure),
+  };
+}
+
+export default function AdminJournees() {
+  const [matches, setMatches] = useState([]);
+  const [selectedJournee, setSelectedJournee] = useState('all');
+  const [blocageJourneeDate, setBlocageJourneeDate] = useState('');
+  const [blocageJourneeHeure, setBlocageJourneeHeure] = useState('');
+  const [apiLoading, setApiLoading] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+
+    if (saved) {
+      try {
+        setMatches(JSON.parse(saved));
+      } catch {
+        setMatches([]);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(matches));
+  }, [matches]);
+
+  const journees = useMemo(() => {
+    const list = [...new Set(matches.map((match) => cleanText(match.journee)).filter(Boolean))];
+
+    return list.sort((a, b) => {
+      const numberA = Number(a);
+      const numberB = Number(b);
+
+      if (!Number.isNaN(numberA) && !Number.isNaN(numberB)) {
+        return numberA - numberB;
+      }
+
+      return a.localeCompare(b);
+    });
+  }, [matches]);
+
+  const filteredMatches = useMemo(() => {
+    if (selectedJournee === 'all') return matches;
+
+    return matches.filter((match) => cleanText(match.journee) === selectedJournee);
+  }, [matches, selectedJournee]);
+
+  const stats = useMemo(() => {
+    return {
+      total: matches.length,
+      journees: journees.length,
+      bloques: matches.filter(isBlocked).length,
+      totalJournee: filteredMatches.length,
+      bloquesJournee: filteredMatches.filter(isBlocked).length,
+    };
+  }, [matches, journees, filteredMatches]);
+
+  async function synchroniserLigue1() {
+    setApiLoading(true);
+
+    try {
+      const response = await fetch(getApiUrl('/api/ligue1/matchs'));
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.message || 'Impossible de récupérer les matchs Ligue 1.');
+      }
+
+      const apiMatches = (data.matchs || []).map((match) => ({
+        ...match,
+        type: 'L1',
+        blocageDate: '2099-12-31',
+        blocageHeure: '23:59',
+      }));
+
+      setMatches((old) => {
+        const sansAncienneSynchro = old.filter(
+          (match) => !String(match.id || '').startsWith('fd-')
+        );
+
+        return [...sansAncienneSynchro, ...apiMatches];
+      });
+
+      const premiereJournee = cleanText(apiMatches[0]?.journee);
+      if (premiereJournee) {
+        setSelectedJournee(premiereJournee);
+      }
+
+      alert(`${apiMatches.length} match(s) Ligue 1 synchronisé(s).`);
+    } catch (error) {
+      alert(`Erreur synchronisation API : ${error.message}`);
+    } finally {
+      setApiLoading(false);
+    }
+  }
+  async function importerExcel(event) {
+    const files = Array.from(event.target.files || []);
+if (files.length === 0) return;
+
+    const excelFiles = files.filter((file) =>
+      /\.(xlsx|xls|csv)$/i.test(file.name)
+    );
+
+    if (excelFiles.length === 0) {
+      alert('Aucun fichier Excel trouvé.');
+      event.target.value = '';
+      return;
+    }
+
+    const nouveauxMatchs = [];
+    let totalLignesLues = 0;
+
+    for (const file of excelFiles) {
+      const buffer = await file.arrayBuffer();
+
+      const workbook = XLSX.read(buffer, {
+        type: 'array',
+        cellDates: true,
+      });
+
+      workbook.SheetNames.forEach((sheetName) => {
+        const sheet = workbook.Sheets[sheetName];
+
+        const rows = XLSX.utils.sheet_to_json(sheet, {
+          header: 1,
+          defval: '',
+          raw: false,
+        });
+
+        const cleanRows = rows.filter((row) => Array.isArray(row) && !rowIsEmpty(row));
+
+        totalLignesLues += cleanRows.length;
+
+        if (cleanRows.length === 0) return;
+
+        const headerRowIndex = findHeaderRow(cleanRows);
+
+        if (headerRowIndex !== -1) {
+          const headers = cleanRows[headerRowIndex];
+
+          cleanRows.slice(headerRowIndex + 1).forEach((row, index) => {
+            const match = createMatchFromHeader(row, headers, file.name, sheetName, index);
+            if (match) nouveauxMatchs.push(match);
+          });
+        } else {
+          cleanRows.forEach((row, index) => {
+            const match = createMatchFromPosition(row, file.name, sheetName, index);
+            if (match) nouveauxMatchs.push(match);
+          });
+        }
+      });
+    }
+
+    setMatches((old) => [...old, ...nouveauxMatchs]);
+
+    const premiereJourneeImportee = cleanText(nouveauxMatchs[0]?.journee);
+if (premiereJourneeImportee) {
+      setSelectedJournee(premiereJourneeImportee);
+}
+
+    event.target.value = '';
+
+    alert(`${nouveauxMatchs.length} match(s) importé(s). Lignes lues : ${totalLignesLues}`);
+}
+
+  function ajouterMatch() {
+    const journeeAAjouter =
+      selectedJournee !== 'all'
+        ? selectedJournee
+        : journees.length > 0
+          ? journees[0]
+          : '1';
+
+    setMatches((old) => [
+      ...old,
+      {
+        id: makeId(),
+        journee: journeeAAjouter,
+        date: '',
+        heure: '',
+        domicile: '',
+        exterieur: '',
+        type: 'L1',
+        blocageDate: '',
+        blocageHeure: '',
+      },
+    ]);
+
+    setSelectedJournee(journeeAAjouter);
+  }
+
+  function creerJournee() {
+    const next =
+      journees.length === 0
+        ? 1
+        : Math.max(...journees.map((journee) => Number(journee)).filter((n) => !Number.isNaN(n)), 0) + 1;
+
+    const nouvelleJournee = String(next);
+
+    setSelectedJournee(nouvelleJournee);
+
+    setMatches((old) => [
+      ...old,
+      {
+        id: makeId(),
+        journee: nouvelleJournee,
+        date: '',
+        heure: '',
+        domicile: '',
+        exterieur: '',
+        type: 'L1',
+        blocageDate: '',
+        blocageHeure: '',
+      },
+    ]);
+  }
+
+  function modifierMatch(id, champ, valeur) {
+    setMatches((old) =>
+      old.map((match) =>
+        match.id === id ? { ...match, [champ]: valeur } : match
+      )
+    );
+  }
+
+  function supprimerMatch(id) {
+    setMatches((old) => old.filter((match) => match.id !== id));
+  }
+
+  function supprimerJournee() {
+    if (selectedJournee === 'all') {
+      alert('Choisis une journée avant de supprimer.');
+      return;
+    }
+
+    if (!confirm(`Supprimer tous les matchs de la journée ${selectedJournee} ?`)) return;
+
+    setMatches((old) => old.filter((match) => cleanText(match.journee) !== selectedJournee));
+    setSelectedJournee('all');
+  }
+
+  function appliquerBlocageJournee() {
+    if (selectedJournee === 'all') {
+      alert('Choisis une journée avant d’appliquer un blocage.');
+      return;
+    }
+
+    if (!blocageJourneeDate || !blocageJourneeHeure) {
+      alert('Mets une date et une heure de blocage.');
+      return;
+    }
+
+    setMatches((old) =>
+      old.map((match) =>
+        cleanText(match.journee) === selectedJournee
+          ? {
+              ...match,
+              blocageDate: blocageJourneeDate,
+              blocageHeure: blocageJourneeHeure,
+            }
+          : match
+      )
+    );
+  }
+
+  function toutSupprimer() {
+    if (!confirm('Supprimer tous les matchs importés ?')) return;
+setMatches([]);
+    setSelectedJournee('all');
+  }
+
+  const matchesTries = [...filteredMatches].sort((a, b) => {
+    const journeeA = Number(a.journee) || 0;
+    const journeeB = Number(b.journee) || 0;
+
+    if (journeeA !== journeeB) return journeeA - journeeB;
+
+    return `${a.date} ${a.heure}`.localeCompare(`${b.date} ${b.heure}`);
+  });
+
+  return (
+    <section className="aj-page">
+      <div className="aj-card">
+        <div className="aj-header">
+          <div>
+            <h1>Gestion des journées</h1>
+            <p>Import Excel, modification des horaires et blocage des matchs journée par journée.</p>
+          </div>
+
+          <div className="aj-actions">
+            <button
+              type="button"
+              className="aj-button aj-button-dark"
+              onClick={synchroniserLigue1}
+              disabled={apiLoading}
+            >
+              {apiLoading ? 'Synchro...' : 'Synchroniser Ligue 1'}
+            </button>
+            <label className="aj-button">
+              Importer Excel
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                multiple
+                hidden
+                onChange={importerExcel}
+              />
+            </label>
+
+            <label className="aj-button aj-button-dark">
+              Importer dossier
+              <input
+                type="file"
+                multiple
+                hidden
+                webkitdirectory="true"
+                directory=""
+                onChange={importerExcel}
+              />
+            </label>
+
+            <button type="button" className="aj-button" onClick={creerJournee}>
+              + Journée
+            </button>
+
+            <button type="button" className="aj-button" onClick={ajouterMatch}>
+              + Match
+            </button>
+
+            <button type="button" className="aj-button aj-danger" onClick={toutSupprimer}>
+              Tout supprimer
+            </button>
+          </div>
+        </div>
+
+        <div className="aj-stats">
+          <div>
+            <strong>{stats.total}</strong>
+            <span>Matchs total</span>
+          </div>
+
+          <div>
+            <strong>{stats.journees}</strong>
+            <span>Journées</span>
+          </div>
+
+          <div>
+            <strong>{stats.bloques}</strong>
+            <span>Bloqués total</span>
+          </div>
+
+          <div>
+            <strong>{stats.totalJournee}</strong>
+            <span>Matchs affichés</span>
+          </div>
+        </div>
+
+        <div className="aj-control-card">
+          <div>
+            <label>Voir la journée</label>
+            <select
+              value={selectedJournee}
+              onChange={(event) => setSelectedJournee(event.target.value)}
+            >
+              <option value="all">Toutes les journées</option>
+              {journees.map((journee) => (
+                <option key={journee} value={journee}>
+                  Journée {journee}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label>Date blocage journée</label>
+            <input
+              type="date"
+              value={blocageJourneeDate}
+              onChange={(event) => setBlocageJourneeDate(event.target.value)}
+            />
+          </div>
+
+          <div>
+            <label>Heure blocage journée</label>
+            <input
+              type="time"
+              value={blocageJourneeHeure}
+              onChange={(event) => setBlocageJourneeHeure(event.target.value)}
+            />
+          </div>
+
+          <button type="button" className="aj-small-button" onClick={appliquerBlocageJournee}>
+            Appliquer à la journée
+          </button>
+
+          <button type="button" className="aj-small-danger" onClick={supprimerJournee}>
+            Supprimer journée
+          </button>
+        </div>
+
+        <div className="aj-tabs">
+          <button
+            type="button"
+            className={selectedJournee === 'all' ? 'active' : ''}
+            onClick={() => setSelectedJournee('all')}
+          >
+            Toutes
+          </button>
+
+          {journees.map((journee) => (
+            <button
+              key={journee}
+              type="button"
+              className={selectedJournee === journee ? 'active' : ''}
+              onClick={() => setSelectedJournee(journee)}
+            >
+              J{journee}
+            </button>
+          ))}
+        </div>
+
+        <div className="aj-table-title">
+          {selectedJournee === 'all'
+            ? 'Toutes les journées'
+            : `Journée ${selectedJournee}`}
+        </div>
+
+        <div className="aj-table-wrap">
+          <table className="aj-table">
+            <thead>
+              <tr>
+                <th>J</th>
+                <th>Date</th>
+                <th>Heure</th>
+                <th>Domicile</th>
+                <th>Extérieur</th>
+                <th>Type</th>
+                <th>Date blocage</th>
+                <th>Heure blocage</th>
+                <th>Statut</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {matchesTries.length === 0 && (
+                <tr>
+                  <td colSpan="10" className="aj-empty">
+                    Aucun match pour cette journée.
+                  </td>
+                </tr>
+              )}
+
+              {matchesTries.map((match) => {
+                const blocked = isBlocked(match);
+return (
+                  <tr key={match.id}>
+                    <td>
+                      <input
+                        value={match.journee}
+                        onChange={(event) =>
+                          modifierMatch(match.id, 'journee', event.target.value)
+                        }
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        type="date"
+                        value={match.date}
+                        onChange={(event) =>
+                          modifierMatch(match.id, 'date', event.target.value)
+                        }
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        type="time"
+                        value={match.heure}
+                        onChange={(event) =>
+                          modifierMatch(match.id, 'heure', event.target.value)
+                        }
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        value={match.domicile}
+                        onChange={(event) =>
+                          modifierMatch(match.id, 'domicile', event.target.value)
+                        }
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        value={match.exterieur}
+                        onChange={(event) =>
+                          modifierMatch(match.id, 'exterieur', event.target.value)
+                        }
+                      />
+                    </td>
+
+                    <td>
+                      <select
+                        value={match.type}
+                        onChange={(event) =>
+                          modifierMatch(match.id, 'type', event.target.value)
+                        }
+                      >
+                        <option value="L1">L1</option>
+                        <option value="BONUS">BONUS</option>
+                      </select>
+                    </td>
+
+                    <td>
+                      <input
+                        type="date"
+                        value={match.blocageDate}
+                        onChange={(event) =>
+                          modifierMatch(match.id, 'blocageDate', event.target.value)
+                        }
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        type="time"
+                        value={match.blocageHeure}
+                        onChange={(event) =>
+                          modifierMatch(match.id, 'blocageHeure', event.target.value)
+                        }
+                      />
+                    </td>
+
+                    <td>
+                      <span className={blocked ? 'aj-badge aj-red' : 'aj-badge aj-green'}>
+                        {blocked ? 'Bloqué' : 'Ouvert'}
+                      </span>
+                    </td>
+
+                    <td>
+                      <button
+                        type="button"
+                        className="aj-mini-danger"
+                        onClick={() => supprimerMatch(match.id)}
+                      >
+                        X
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+

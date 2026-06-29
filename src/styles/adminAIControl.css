@@ -1,0 +1,137 @@
+﻿.admin-ai-panel {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 24px;
+  background: linear-gradient(145deg, #111827, #1e293b);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.20);
+  color: white;
+}
+
+.admin-ai-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+}
+
+.admin-ai-header p {
+  margin: 0 0 5px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.admin-ai-header h2 {
+  margin: 0 0 5px;
+  font-size: 24px;
+}
+
+.admin-ai-header span {
+  color: rgba(255,255,255,0.65);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.admin-ai-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-ai-actions button {
+  border: 0;
+  border-radius: 14px;
+  padding: 11px 13px;
+  background: #22c55e;
+  color: #052e16;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.admin-ai-actions button.secondary {
+  background: rgba(255,255,255,0.08);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.admin-ai-report {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.admin-ai-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.admin-ai-kpis article,
+.admin-ai-grid article {
+  padding: 13px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.admin-ai-kpis span {
+  color: rgba(255,255,255,0.58);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.admin-ai-kpis strong {
+  display: block;
+  margin-top: 5px;
+  color: #22c55e;
+  font-size: 24px;
+}
+
+.admin-ai-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 11px;
+}
+
+.admin-ai-grid h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.admin-ai-grid p {
+  margin: 0 0 7px;
+  color: rgba(255,255,255,0.70);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-ai-grid p.ok {
+  color: #22c55e;
+}
+
+@media (max-width: 900px) {
+  .admin-ai-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-ai-kpis,
+  .admin-ai-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-ai-mobile-warning {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(250, 204, 21, 0.12);
+  border: 1px solid rgba(250, 204, 21, 0.24);
+  color: #facc15;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.4;
+}
+

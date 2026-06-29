@@ -1,0 +1,644 @@
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import '../styles/trophies.css';
+
+/* =========================
+   CLÉS LOCALSTORAGE
+========================= */
+
+const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';
+const PRONOS_KEY = 'prono_ligue1_lm_pronos_joueurs';
+const BONUS_CHOICES_KEY = 'prono_ligue1_lm_bonus_choices';
+const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
+const PLAYER_KEY = 'prono_ligue1_lm_current_player';
+
+const MAX_POINTS_SAISON = 442;
+
+/* =========================
+   OUTILS SIMPLES
+========================= */
+
+function clean(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function hasScore(match) {
+  return (
+    match.scoreDomicile !== null &&
+    match.scoreDomicile !== undefined &&
+    match.scoreExterieur !== null &&
+    match.scoreExterieur !== undefined
+  );
+}
+
+function hasScoreProno(prono) {
+  return (
+    prono &&
+    prono.home !== '' &&
+    prono.home !== undefined &&
+    prono.away !== '' &&
+    prono.away !== undefined
+  );
+}
+
+function getResult(match) {
+  if (!hasScore(match)) return null;
+
+  const home = Number(match.scoreDomicile);
+  const away = Number(match.scoreExterieur);
+
+  if (home > away) return '1';
+  if (home < away) return '2';
+  return 'N';
+}
+
+function isFavoriteMatch(match, favoriteTeam) {
+  return (
+    favoriteTeam &&
+    (clean(match.domicile) === clean(favoriteTeam) ||
+      clean(match.exterieur) === clean(favoriteTeam))
+  );
+}
+
+/* =========================
+   CALCUL POINTS
+========================= */
+
+function getPoints(match, prono, scoreExactMode, isBonus) {
+  const result = getResult(match);
+
+  if (!result || !prono) return 0;
+
+  // Mode score exact : équipe favorite ou bonus
+  if (scoreExactMode) {
+    if (!hasScoreProno(prono)) return 0;
+
+    const pronoHome = Number(prono.home);
+    const pronoAway = Number(prono.away);
+    const realHome = Number(match.scoreDomicile);
+    const realAway = Number(match.scoreExterieur);
+
+    const exact = pronoHome === realHome && pronoAway === realAway;
+
+    const predictedResult =
+      pronoHome > pronoAway ? '1' : pronoHome < pronoAway ? '2' : 'N';
+
+    if (exact) return isBonus ? 3 : 2;
+    if (predictedResult === result) return isBonus ? 2 : 1;
+
+    return 0;
+  }
+
+  // Mode classique 1N2
+  return prono.value === result ? 1 : 0;
+}
+
+function isExactScore(match, prono, scoreExactMode) {
+  if (!scoreExactMode || !hasScore(match) || !hasScoreProno(prono)) return false;
+
+  return (
+    Number(prono.home) === Number(match.scoreDomicile) &&
+    Number(prono.away) === Number(match.scoreExterieur)
+  );
+}
+
+function isCorrectResult(match, prono, scoreExactMode) {
+  const result = getResult(match);
+
+  if (!result || !prono) return false;
+
+  if (scoreExactMode) {
+    if (!hasScoreProno(prono)) return false;
+
+    const pronoHome = Number(prono.home);
+    const pronoAway = Number(prono.away);
+
+    const predictedResult =
+      pronoHome > pronoAway ? '1' : pronoHome < pronoAway ? '2' : 'N';
+
+    return predictedResult === result;
+  }
+
+  return prono.value === result;
+}
+
+/* =========================
+   BADGES / NIVEAUX
+========================= */
+
+function getCurrentLevel(value, levels) {
+  return [...levels].reverse().find((level) => value >= level.value) || null;
+}
+
+function getNextLevel(value, levels) {
+  return levels.find((level) => value < level.value) || null;
+}
+
+function buildTrophy(trophy) {
+  const currentLevel = getCurrentLevel(trophy.value, trophy.levels);
+  const nextLevel = getNextLevel(trophy.value, trophy.levels);
+
+  const target = nextLevel
+    ? nextLevel.value
+    : trophy.levels[trophy.levels.length - 1].value;
+
+  const progress = target > 0
+    ? Math.min(100, Math.round((trophy.value / target) * 100))
+    : 0;
+
+  const status = currentLevel ? 'unlocked' : trophy.value > 0 ? 'progress' : 'locked';
+
+  return {
+    ...trophy,
+    currentLevel,
+    nextLevel,
+    target,
+    progress,
+    status,
+  };
+}
+
+function levelsText(levels, unit) {
+  return levels.map((level) => `${level.name} ${level.value} ${unit}`).join(' · ');
+}
+
+/* =========================
+   PAGE TROPHÉES
+========================= */
+
+export default function TrophiesPage() {
+  const [matches, setMatches] = useState([]);
+  const [pronos, setPronos] = useState({});
+  const [bonusChoices, setBonusChoices] = useState({});
+  const [currentPlayer, setCurrentPlayer] = useState('Manu');
+  const [favoriteTeam, setFavoriteTeam] = useState('');
+  const [filter, setFilter] = useState('Tous');
+
+  useEffect(() => {
+    setMatches(JSON.parse(localStorage.getItem(MATCHS_KEY) || '[]'));
+    setPronos(JSON.parse(localStorage.getItem(PRONOS_KEY) || '{}'));
+    setBonusChoices(JSON.parse(localStorage.getItem(BONUS_CHOICES_KEY) || '{}'));
+    setCurrentPlayer(localStorage.getItem(PLAYER_KEY) || 'Manu');
+    setFavoriteTeam(localStorage.getItem(FAVORITE_TEAM_KEY) || '');
+  }, []);
+
+  const stats = useMemo(() => {
+    const playerPronos = pronos[currentPlayer] || {};
+    const dayStats = {};
+
+    const result = {
+      totalPoints: 0,
+      scoresExacts: 0,
+      bonsResultats: 0,
+      pronosJoues: 0,
+
+      pointsBonus: 0,
+      bonusCorrects: 0,
+      bonusExacts: 0,
+
+      scoreExactFavori: 0,
+      bons1N2: 0,
+
+      journeesJouees: 0,
+      journeesCompletes: 0,
+      journeesParfaites: 0,
+      meilleureJournee: 0,
+      meilleureSerie: 0,
+    };
+
+    matches.filter(hasScore).forEach((match) => {
+      const journee = String(match.journee || '');
+      const isBonus = match.type === 'BONUS';
+      const favorite = isFavoriteMatch(match, favoriteTeam);
+
+      const bonusKey = `${currentPlayer}-J${journee}`;
+      const selectedBonusId = bonusChoices[bonusKey];
+
+      // On ne compte que le bonus choisi
+      if (isBonus && selectedBonusId !== match.id) return;
+
+      const prono = playerPronos[match.id];
+      const scoreExactMode = favorite || isBonus;
+
+      const attempted = scoreExactMode ? hasScoreProno(prono) : Boolean(prono?.value);
+      if (!attempted) return;
+
+      if (!dayStats[journee]) {
+        dayStats[journee] = {
+          points: 0,
+          pronos: 0,
+        };
+      }
+
+      const points = getPoints(match, prono, scoreExactMode, isBonus);
+      const exact = isExactScore(match, prono, scoreExactMode);
+      const correct = isCorrectResult(match, prono, scoreExactMode);
+
+      result.totalPoints += points;
+      result.pronosJoues += 1;
+
+      dayStats[journee].points += points;
+      dayStats[journee].pronos += 1;
+
+      if (correct) result.bonsResultats += 1;
+      if (exact) result.scoresExacts += 1;
+
+      if (isBonus) {
+        result.pointsBonus += points;
+        if (correct) result.bonusCorrects += 1;
+        if (exact) result.bonusExacts += 1;
+      } else if (favorite) {
+        if (exact) result.scoreExactFavori += 1;
+      } else {
+        if (correct) result.bons1N2 += 1;
+      }
+    });
+
+    const days = Object.values(dayStats);
+
+    result.journeesJouees = days.filter((day) => day.pronos > 0).length;
+    result.journeesCompletes = days.filter((day) => day.pronos >= 10).length;
+    result.journeesParfaites = days.filter((day) => day.points >= 13).length;
+    result.meilleureJournee = Math.max(0, ...days.map((day) => day.points));
+
+    let serie = 0;
+
+    Object.keys(dayStats)
+      .sort((a, b) => Number(a) - Number(b))
+      .forEach((journee) => {
+        if (dayStats[journee].points >= 5) {
+          serie += 1;
+          result.meilleureSerie = Math.max(result.meilleureSerie, serie);
+        } else {
+          serie = 0;
+        }
+      });
+
+    return result;
+  }, [matches, pronos, bonusChoices, currentPlayer, favoriteTeam]);
+
+  const trophies = useMemo(() => {
+    const list = [
+      {
+        icon: '🏆',
+        title: 'Machine à points',
+        category: 'Points',
+        description: 'Accumuler des points sur la saison.',
+        value: stats.totalPoints,
+        unit: 'pts',
+        levels: [
+          { name: 'Bronze', value: 50 },
+          { name: 'Argent', value: 150 },
+          { name: 'Or', value: 300 },
+          { name: 'Légende', value: 442 },
+        ],
+      },
+      {
+        icon: '🔥',
+        title: 'Grosse journée',
+        category: 'Points',
+        description: 'Faire une grosse performance sur une journée.',
+        value: stats.meilleureJournee,
+        unit: 'pts',
+        levels: [
+          { name: 'Bronze', value: 8 },
+          { name: 'Argent', value: 10 },
+          { name: 'Or', value: 12 },
+          { name: 'Légende', value: 13 },
+        ],
+      },
+      {
+        icon: '💯',
+        title: 'Journée parfaite',
+        category: 'Points',
+        description: 'Atteindre 13 points sur une journée.',
+        value: stats.journeesParfaites,
+        unit: 'J',
+        levels: [
+          { name: 'Bronze', value: 1 },
+          { name: 'Argent', value: 2 },
+          { name: 'Or', value: 5 },
+          { name: 'Légende', value: 10 },
+        ],
+      },
+      {
+        icon: '💎',
+        title: 'Œil de lynx',
+        category: 'Scores exacts',
+        description: 'Trouver des scores exacts sur favori et bonus.',
+        value: stats.scoresExacts,
+        unit: 'exact',
+        levels: [
+          { name: 'Bronze', value: 1 },
+          { name: 'Argent', value: 5 },
+          { name: 'Or', value: 10 },
+          { name: 'Légende', value: 25 },
+        ],
+      },
+      {
+        icon: '🎯',
+        title: 'Sniper favori',
+        category: 'Scores exacts',
+        description: 'Trouver le score exact de ton équipe favorite.',
+        value: stats.scoreExactFavori,
+        unit: 'exact',
+        levels: [
+          { name: 'Bronze', value: 1 },
+          { name: 'Argent', value: 3 },
+          { name: 'Or', value: 7 },
+          { name: 'Légende', value: 15 },
+        ],
+      },
+      {
+        icon: '👑',
+        title: 'Roi du bonus',
+        category: 'Bonus',
+        description: 'Marquer des points sur les matchs bonus.',
+        value: stats.pointsBonus,
+        unit: 'pts',
+        levels: [
+          { name: 'Bronze', value: 3 },
+          { name: 'Argent', value: 12 },
+          { name: 'Or', value: 30 },
+          { name: 'Légende', value: 80 },
+        ],
+      },
+      {
+        icon: '⭐',
+        title: 'Bonus parfait',
+        category: 'Bonus',
+        description: 'Trouver le score exact sur un match bonus.',
+        value: stats.bonusExacts,
+        unit: 'exact',
+        levels: [
+          { name: 'Bronze', value: 1 },
+          { name: 'Argent', value: 3 },
+          { name: 'Or', value: 8 },
+          { name: 'Légende', value: 20 },
+        ],
+      },
+      {
+        icon: '🧠',
+        title: 'Choix gagnant',
+        category: 'Bonus',
+        description: 'Choisir un bonus et trouver le bon résultat.',
+        value: stats.bonusCorrects,
+        unit: 'OK',
+        levels: [
+          { name: 'Bronze', value: 1 },
+          { name: 'Argent', value: 5 },
+          { name: 'Or', value: 15 },
+          { name: 'Légende', value: 30 },
+        ],
+      },
+      {
+        icon: '⚽',
+        title: 'Maître du 1N2',
+        category: '1N2',
+        description: 'Trouver les bons résultats sur les matchs classiques.',
+        value: stats.bons1N2,
+        unit: 'OK',
+        levels: [
+          { name: 'Bronze', value: 5 },
+          { name: 'Argent', value: 30 },
+          { name: 'Or', value: 100 },
+          { name: 'Légende', value: 200 },
+        ],
+      },
+      {
+        icon: '✅',
+        title: 'Toujours présent',
+        category: 'Régularité',
+        description: 'Participer régulièrement aux journées.',
+        value: stats.journeesJouees,
+        unit: 'J',
+        levels: [
+          { name: 'Bronze', value: 1 },
+          { name: 'Argent', value: 5 },
+          { name: 'Or', value: 17 },
+          { name: 'Légende', value: 34 },
+        ],
+      },
+      {
+        icon: '📋',
+        title: 'Feuille complète',
+        category: 'Régularité',
+        description: 'Remplir tous les pronos d’une journée.',
+        value: stats.journeesCompletes,
+        unit: 'J',
+        levels: [
+          { name: 'Bronze', value: 1 },
+          { name: 'Argent', value: 5 },
+          { name: 'Or', value: 17 },
+          { name: 'Légende', value: 34 },
+        ],
+      },
+      {
+        icon: '🚀',
+        title: 'Série verte',
+        category: 'Régularité',
+        description: 'Enchaîner les journées à au moins 5 points.',
+        value: stats.meilleureSerie,
+        unit: 'J',
+        levels: [
+          { name: 'Bronze', value: 2 },
+          { name: 'Argent', value: 4 },
+          { name: 'Or', value: 8 },
+          { name: 'Légende', value: 12 },
+        ],
+      },
+    ];
+
+    return list.map(buildTrophy);
+  }, [stats]);
+
+  const filteredTrophies = trophies.filter((trophy) => {
+    if (filter === 'Tous') return true;
+    if (filter === 'Débloqués') return trophy.currentLevel;
+    if (filter === 'En cours') return trophy.status === 'progress';
+    if (filter === 'Verrouillés') return trophy.status === 'locked';
+    return trophy.category === filter;
+  });
+
+  const unlockedLevels = trophies.reduce((total, trophy) => {
+    return total + trophy.levels.filter((level) => trophy.value >= level.value).length;
+  }, 0);
+
+  const totalLevels = trophies.length * 4;
+  const globalProgress = Math.round((unlockedLevels / totalLevels) * 100);
+
+  const nextTrophy = trophies
+    .filter((trophy) => trophy.nextLevel)
+    .sort((a, b) => b.progress - a.progress)[0];
+
+  const headerTrophies = trophies
+    .filter((trophy) => trophy.currentLevel)
+    .sort((a, b) => b.progress - a.progress)
+    .slice(0, 8);
+
+  const filters = [
+    'Tous',
+    'Points',
+    'Scores exacts',
+    'Bonus',
+    '1N2',
+    'Régularité',
+    'Débloqués',
+    'En cours',
+    'Verrouillés',
+  ];
+
+  return (
+    <div className="trophies-page">
+      <section className="trophies-header">
+        <div className="trophies-header-left">
+          <p>TROPHÉES</p>
+          <h1>Collection de {currentPlayer}</h1>
+          <span>Badges évolutifs : Bronze / Argent / Or / Légende</span>
+
+          <div className="trophies-header-badges">
+            {headerTrophies.length > 0 ? (
+              headerTrophies.map((trophy) => (
+                <div
+                  key={trophy.title}
+                  className="header-trophy-chip earned"
+                  title={`${trophy.title} : ${trophy.description}`}
+                >
+                  <strong>{trophy.icon}</strong>
+                  <span>{trophy.title}</span>
+                  <em>{trophy.currentLevel.name}</em>
+                </div>
+              ))
+            ) : (
+              <div className="header-trophy-empty">
+                Aucun trophée gagné pour le moment.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="trophies-header-cards">
+          <div className="trophies-big-card">
+            <span>Progression</span>
+            <strong>{globalProgress}%</strong>
+            <small>{unlockedLevels}/{totalLevels} niveaux</small>
+          </div>
+        </div>
+      </section>
+
+      <section className="trophies-summary">
+        <article>
+          <span>Points actuels</span>
+          <strong>{stats.totalPoints} pts</strong>
+          <small>Points gagnés sur la saison</small>
+        </article>
+
+        <article>
+          <span>Scores exacts</span>
+          <strong>{stats.scoresExacts}</strong>
+          <small>Favori + bonus</small>
+        </article>
+
+        <article>
+          <span>Prochain objectif</span>
+          <strong>{nextTrophy ? nextTrophy.title : 'Complet'}</strong>
+          <small>
+            {nextTrophy
+              ? `Encore ${nextTrophy.nextLevel.value - nextTrophy.value} ${nextTrophy.unit}`
+              : 'Tout est débloqué'}
+          </small>
+        </article>
+      </section>
+
+      <section className="trophies-filters">
+        {filters.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={filter === item ? 'active' : ''}
+            onClick={() => setFilter(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </section>
+
+      <section className="trophies-grid">
+        {filteredTrophies.map((trophy) => (
+          <article
+            key={trophy.title}
+            className={`trophy-card ${trophy.status}`}
+            title={`${trophy.description} | ${levelsText(trophy.levels, trophy.unit)}`}
+          >
+            <div className="trophy-tooltip">
+              <strong>{trophy.title}</strong>
+              <span>{trophy.description}</span>
+              <small>{levelsText(trophy.levels, trophy.unit)}</small>
+            </div>
+
+            <div className="trophy-top">
+              <div className="trophy-icon">{trophy.icon}</div>
+              <div className="trophy-level">
+                {trophy.currentLevel ? trophy.currentLevel.name : 'Verrouillé'}
+              </div>
+            </div>
+
+            <h2>{trophy.title}</h2>
+            <p>{trophy.description}</p>
+
+            <div className="trophy-levels">
+              {trophy.levels.map((level) => (
+                <span
+                  key={level.name}
+                  className={trophy.value >= level.value ? 'done' : ''}
+                >
+                  {level.name[0]}
+                </span>
+              ))}
+            </div>
+
+            <div className="trophy-meta">
+              <span>{trophy.category}</span>
+              <strong>{trophy.value}/{trophy.target} {trophy.unit}</strong>
+            </div>
+
+            <div className="trophy-bar">
+              <div style={{ width: `${trophy.progress}%` }} />
+            </div>
+
+            <div className="trophy-footer">
+              {trophy.nextLevel ? (
+                <span>Prochain : {trophy.nextLevel.name}</span>
+              ) : (
+                <span>Niveau max atteint</span>
+              )}
+
+              <strong>{trophy.progress}%</strong>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section className="trophies-lexicon">
+        <details>
+          <summary>Lexique complet des trophées</summary>
+
+          <div className="trophies-lexicon-grid">
+            {trophies.map((trophy) => (
+              <article key={trophy.title}>
+                <strong>{trophy.icon} {trophy.title}</strong>
+                <span>{trophy.category}</span>
+                <p>{trophy.description}</p>
+                <small>{levelsText(trophy.levels, trophy.unit)}</small>
+              </article>
+            ))}
+          </div>
+        </details>
+      </section>
+    </div>
+  );
+}
+

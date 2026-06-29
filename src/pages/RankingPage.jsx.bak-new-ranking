@@ -1,0 +1,276 @@
+import { ranking } from '../data/mockData';
+
+const avatarUrl = (name) => {
+  // Fictif local : pas de dépendance à des fichiers image. Identifiants via lettres.
+  // On utilise une data URL SVG légère pour un rendu “photo/avatar”.
+  const initials = name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0].toUpperCase())
+    .join('');
+
+  const palette = {
+    Laurent: { a: '#ffd400', b: '#2d7cff' },
+    Quentin: { a: '#2d7cff', b: '#ffd400' },
+    'Jo B': { a: '#4cd7de', b: '#2d7cff' },
+    Jonathan: { a: '#ffd400', b: '#4cd7de' },
+  };
+  const p = palette[name] ?? { a: '#2d7cff', b: '#ffd400' };
+
+  const svg = encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="${p.a}" stop-opacity="0.95"/>
+        <stop offset="1" stop-color="${p.b}" stop-opacity="0.95"/>
+      </linearGradient>
+      <filter id="gl" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="10" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+    <rect width="256" height="256" rx="56" fill="url(#g)"/>
+    <circle cx="128" cy="118" r="96" fill="rgba(255,255,255,0.10)"/>
+    <circle cx="128" cy="132" r="90" fill="rgba(0,0,0,0.06)"/>
+    <text x="128" y="140" text-anchor="middle" font-family="Inter, Arial" font-size="84" font-weight="900" fill="#05111f" filter="url(#gl)">${initials}</text>
+  </svg>`);
+
+  return `data:image/svg+xml;charset=utf-8,${svg}`;
+};
+
+function PlayerLine({ club, pts, exact }) {
+  return (
+    <div className="podium-meta">
+      <div className="podium-meta-item">
+        <span className="podium-meta-label">Club</span>
+        <b className="podium-meta-value">{club}</b>
+      </div>
+      <div className="podium-meta-item">
+        <span className="podium-meta-label">Pts</span>
+        <b className="podium-meta-value podium-pts">{pts}</b>
+      </div>
+      <div className="podium-meta-item">
+        <span className="podium-meta-label">Exact</span>
+        <b className="podium-meta-value podium-exact">{exact}</b>
+      </div>
+    </div>
+  );
+}
+
+export default function RankingPage() {
+  const fake = {
+    season: 'Saison 2026/2027',
+    podium: {
+      1: {
+        name: 'Laurent',
+        side: 'center',
+        club: 'PSG',
+        pts: 52,
+        exact: '3',
+      },
+      2: {
+        name: 'Quentin',
+        side: 'left',
+        club: 'Monaco',
+        pts: 50,
+        exact: '2',
+      },
+      3: {
+        name: 'Jo B',
+        side: 'right',
+        club: 'Lyon',
+        pts: 48,
+        exact: '1',
+      },
+    },
+    playerOfWeek: {
+      name: 'Jonathan',
+      avatar: avatarUrl('Jonathan'),
+      deltaPts: '+8',
+      exactCount: '2',
+      goodResults: '4',
+      club: 'Marseille',
+      pts: 46,
+    },
+    analysis: {
+      headline: 'Analyse IA de la journée',
+      text: 'Le trio de tête se resserre : Laurent garde l’avantage avec une gestion précise des matchs serrés. Quentin progresse grâce à un bon tempo sur ses choix 1N2. Jonathan monte dans la zone chaude (+4 places) et profite d’une lecture “bonus” plus propre sur le dernier tiers.',
+    },
+    keyStats: [
+      { label: 'Laurent', value: '3 scores exacts', icon: '🎯' },
+      { label: 'Jonathan', value: '2 exacts cette semaine', icon: '✨' },
+    ],
+    table: ranking,
+  };
+
+  const podium = [fake.podium[2], fake.podium[1], fake.podium[3]];
+
+  return (
+    <div className="premium-page">
+      <div className="premium-hero">
+        <div>
+          <div className="premium-badge">
+            <i /> Ligue 1 LM • Classement
+          </div>
+          <h1 className="premium-title">Classement général</h1>
+          <p className="premium-subtitle">{fake.season} • Top performers & écarts IA</p>
+        </div>
+
+      </div>
+
+      <div className="premium-podium-stadium" aria-label="Podium du classement">
+        <div className="podium-stage">
+          <div className="podium-glow" aria-hidden="true" />
+          <div className="podium-lights" aria-hidden="true">
+            <span className="light light-yellow" />
+            <span className="light light-blue" />
+            <span className="light light-yellow" />
+          </div>
+
+          <div className="podium-marches">
+            <div className="podium-step podium-step-2">
+              <div className="podium-card">
+                <div className="podium-medal">🥈</div>
+                <div className="podium-avatarwrap">
+                  <img className="podium-avatar" src={avatarUrl(podium[0].name)} alt={podium[0].name} />
+                </div>
+                <b className="podium-name podium-name-left">{podium[0].name}</b>
+                <PlayerLine club={podium[0].club} pts={podium[0].pts} exact={podium[0].exact} />
+              </div>
+            </div>
+
+            <div className="podium-step podium-step-1">
+              <div className="podium-card podium-card-center">
+                <div className="podium-medal">👑</div>
+                <div className="podium-avatarwrap">
+                  <img className="podium-avatar" src={avatarUrl(podium[1].name)} alt={podium[1].name} />
+                </div>
+                <b className="podium-name">{podium[1].name}</b>
+                <PlayerLine club={podium[1].club} pts={podium[1].pts} exact={podium[1].exact} />
+              </div>
+            </div>
+
+            <div className="podium-step podium-step-3">
+              <div className="podium-card">
+                <div className="podium-medal">🥉</div>
+                <div className="podium-avatarwrap">
+                  <img className="podium-avatar" src={avatarUrl(podium[2].name)} alt={podium[2].name} />
+                </div>
+                <b className="podium-name podium-name-right">{podium[2].name}</b>
+                <PlayerLine club={podium[2].club} pts={podium[2].pts} exact={podium[2].exact} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="premium-grid admin">
+        <div className="premium-card">
+          <table className="premium-table" aria-label="Classement">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Évo.</th>
+                <th>Joueur</th>
+                <th>Club</th>
+                <th>Pts</th>
+                <th>Exact</th>
+                <th>Écart</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fake.table.map((r, i) => (
+                <tr key={r.p}>
+                  <td>
+                    <div className="rank-pill">{i + 1}</div>
+                  </td>
+                  <td>
+                    <span className={`evo ${r.evo > 0 ? 'up' : r.evo < 0 ? 'down' : 'flat'}`}>
+                      {r.evo > 0 ? `▲ ${r.evo}` : r.evo < 0 ? `▼ ${Math.abs(r.evo)}` : '—'}
+                    </span>
+                  </td>
+                  <td><b>{r.p}</b></td>
+                  <td>{r.club}</td>
+                  <td><b style={{ color: '#ffd400' }}>{r.pts}</b></td>
+                  <td>{r.exact}</td>
+                  <td>{i ? `-${52 - r.pts}` : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="premium-rightcol">
+          <div className="premium-card flat">
+            <div className="premium-section-title">
+              <h2 style={{ margin: 0 }}>{fake.analysis.headline}</h2>
+              <span>Live insight</span>
+            </div>
+            <p className="premium-right-text">{fake.analysis.text}</p>
+          </div>
+
+          <div style={{ height: 14 }} />
+
+          <div className="premium-card flat">
+            <div className="premium-section-title">
+              <h2 style={{ margin: 0 }}>Joueur de la semaine</h2>
+              <span>Hot streak</span>
+            </div>
+
+            <div className="playerweek">
+              <div className="playerweek-left">
+                <img className="playerweek-avatar" src={fake.playerOfWeek.avatar} alt={fake.playerOfWeek.name} />
+                <div>
+                  <b style={{ fontSize: 18 }}>{fake.playerOfWeek.name}</b>
+                  <div className="playerweek-club">Club favori : <b>{fake.playerOfWeek.club}</b></div>
+                </div>
+              </div>
+              <div className="playerweek-delta">{fake.playerOfWeek.deltaPts} pts</div>
+            </div>
+
+            <div className="playerweek-metrics">
+              <div className="playerweek-metric">
+                <div className="pm-label">Scores exacts</div>
+                <div className="pm-value">{fake.playerOfWeek.exactCount}</div>
+              </div>
+              <div className="playerweek-metric">
+                <div className="pm-label">Bons résultats</div>
+                <div className="pm-value">{fake.playerOfWeek.goodResults}</div>
+              </div>
+              <div className="playerweek-metric wide">
+                <div className="pm-label">Points totaux</div>
+                <div className="pm-value pm-value-gold">{fake.playerOfWeek.pts} pts</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: 14 }} />
+
+          <div className="premium-card flat">
+            <div className="premium-section-title">
+              <h2 style={{ margin: 0 }}>Chiffres clés</h2>
+              <span>Momentum</span>
+            </div>
+            <div className="premium-list">
+              {fake.keyStats.map((k) => (
+                <div key={k.label} className="premium-rowline">
+                  <b style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>{k.icon}</span>
+                    {k.label}
+                  </b>
+                  <span>{k.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+

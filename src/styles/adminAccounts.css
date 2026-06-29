@@ -1,0 +1,144 @@
+﻿.admin-accounts-panel {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 24px;
+  background: linear-gradient(145deg, #111827, #1e293b);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.20);
+  color: white;
+}
+
+.admin-accounts-header p {
+  margin: 0 0 5px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.admin-accounts-header h2 {
+  margin: 0 0 5px;
+  font-size: 24px;
+}
+
+.admin-accounts-header span {
+  color: rgba(255,255,255,0.65);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.admin-account-form {
+  display: grid;
+  grid-template-columns: 170px 1fr 1fr auto;
+  gap: 10px;
+  margin-top: 14px;
+  align-items: end;
+}
+
+.admin-account-form label {
+  display: grid;
+  gap: 6px;
+  color: rgba(255,255,255,0.62);
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.admin-account-form input,
+.admin-account-form select {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 13px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  font-weight: 900;
+  outline: none;
+}
+
+.admin-account-form option {
+  color: #111827;
+}
+
+.admin-account-form button {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #22c55e;
+  color: #052e16;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.admin-accounts-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.admin-accounts-list article,
+.admin-account-empty {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.admin-accounts-list strong {
+  display: block;
+  color: white;
+  font-size: 14px;
+}
+
+.admin-accounts-list span,
+.admin-account-empty {
+  color: rgba(255,255,255,0.62);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.admin-accounts-list button {
+  border: 0;
+  border-radius: 12px;
+  padding: 9px 11px;
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  font-weight: 950;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .admin-account-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-account-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-account-actions button.admin {
+  background: rgba(34,197,94,0.16);
+  color: #22c55e;
+  border: 1px solid rgba(34,197,94,0.25);
+}
+
+
+.admin-account-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-account-actions button.admin {
+  background: rgba(34,197,94,0.16);
+  color: #22c55e;
+  border: 1px solid rgba(34,197,94,0.25);
+}
+

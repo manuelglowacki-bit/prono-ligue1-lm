@@ -1,0 +1,231 @@
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import '../styles/home.css';
+
+const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';
+const PRONOS_KEY = 'prono_ligue1_lm_pronos_joueurs';
+const VALIDATIONS_KEY = 'prono_ligue1_lm_validations_journees';
+const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
+const PLAYER_KEY = 'prono_ligue1_lm_current_player';
+const BONUS_CHOICES_KEY = 'prono_ligue1_lm_bonus_choices';
+
+function clean(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function hasScoreProno(prono) {
+  return prono && prono.home !== '' && prono.home !== undefined && prono.away !== '' && prono.away !== undefined;
+}
+
+function getMatchDate(match) {
+  const date = match.date || match.blocageDate;
+  const heure = match.heure || match.blocageHeure || '00:00';
+
+  if (!date) return null;
+
+  const d = new Date(`${date}T${heure}`);
+  if (Number.isNaN(d.getTime())) return null;
+
+  return d;
+}
+
+export default function HomePage({ setPage }) {
+  const [matches, setMatches] = useState([]);
+  const [pronos, setPronos] = useState({});
+  const [validations, setValidations] = useState({});
+  const [bonusChoices, setBonusChoices] = useState({});
+  const [favoriteTeam, setFavoriteTeam] = useState('');
+  const [currentPlayer, setCurrentPlayer] = useState('Manu');
+
+  useEffect(() => {
+    setMatches(JSON.parse(localStorage.getItem(MATCHS_KEY) || '[]'));
+    setPronos(JSON.parse(localStorage.getItem(PRONOS_KEY) || '{}'));
+    setValidations(JSON.parse(localStorage.getItem(VALIDATIONS_KEY) || '{}'));
+    setBonusChoices(JSON.parse(localStorage.getItem(BONUS_CHOICES_KEY) || '{}'));
+    setFavoriteTeam(localStorage.getItem(FAVORITE_TEAM_KEY) || '');
+    setCurrentPlayer(localStorage.getItem(PLAYER_KEY) || 'Manu');
+  }, []);
+
+  const l1MatchesAll = matches.filter((match) => match.type !== 'BONUS');
+
+  const journees = useMemo(() => {
+    return [...new Set(matches.map((m) => String(m.journee || '').trim()).filter(Boolean))]
+      .sort((a, b) => Number(a) - Number(b));
+  }, [matches]);
+
+  const currentJournee = journees[0] || '1';
+
+  const matchesJournee = matches.filter(
+    (match) => String(match.journee || '') === String(currentJournee)
+  );
+
+  const l1Matches = matchesJournee.filter((match) => match.type !== 'BONUS');
+  const bonusMatches = matchesJournee.filter((match) => match.type === 'BONUS');
+
+  const playerPronos = pronos[currentPlayer] || {};
+  const validationKey = `${currentPlayer}-J${currentJournee}`;
+  const bonusKey = `${currentPlayer}-J${currentJournee}`;
+  const selectedBonusId = bonusChoices[bonusKey];
+  const isValidated = Boolean(validations[validationKey]);
+
+  const seasonStart = useMemo(() => {
+    const dates = l1MatchesAll.map(getMatchDate).filter(Boolean).sort((a, b) => a - b);
+    return dates[0] || null;
+  }, [l1MatchesAll]);
+
+  const seasonStarted = seasonStart ? new Date() >= seasonStart : false;
+
+  const pronosStats = useMemo(() => {
+    const l1Done = l1Matches.filter((match) => {
+      const prono = playerPronos[match.id];
+
+      const isFavoriteMatch =
+        favoriteTeam &&
+        (clean(match.domicile) === clean(favoriteTeam) ||
+          clean(match.exterieur) === clean(favoriteTeam));
+
+      if (isFavoriteMatch) return hasScoreProno(prono);
+
+      return Boolean(prono?.value);
+    }).length;
+
+    const selectedBonusProno = selectedBonusId ? playerPronos[selectedBonusId] : null;
+    const bonusDone = selectedBonusId && hasScoreProno(selectedBonusProno) ? 1 : 0;
+
+    const total = l1Matches.length + (bonusMatches.length > 0 ? 1 : 0);
+    const done = l1Done + bonusDone;
+
+    return {
+      done,
+      total,
+      remaining: Math.max(total - done, 0),
+      percent: total > 0 ? Math.round((done / total) * 100) : 0,
+    };
+  }, [l1Matches, bonusMatches, playerPronos, favoriteTeam, selectedBonusId]);
+
+  const nextFavoriteMatch = useMemo(() => {
+    if (!favoriteTeam) return null;
+
+    return l1MatchesAll
+      .filter(
+        (match) =>
+          clean(match.domicile) === clean(favoriteTeam) ||
+          clean(match.exterieur) === clean(favoriteTeam)
+      )
+      .sort((a, b) => {
+        const da = getMatchDate(a);
+        const db = getMatchDate(b);
+        return (da?.getTime() || 0) - (db?.getTime() || 0);
+      })[0] || null;
+  }, [l1MatchesAll, favoriteTeam]);
+
+  return (
+    <div className="home-page">
+      <section className="home-hero">
+        <div>
+          <p>PRONO LIGUE 1 LM</p>
+          <h1>Saison 2026/2027</h1>
+          <span>
+            {matches.length > 0
+              ? `${journees.length} journée(s) chargée(s)`
+              : 'Aucun match chargé pour le moment'}
+          </span>
+        </div>
+
+        <div className={`home-season-status ${seasonStarted ? 'started' : 'waiting'}`}>
+          {seasonStarted ? 'Saison en cours' : 'Avant saison'}
+        </div>
+      </section>
+
+      <section className="home-dashboard">
+        <article className="home-card">
+          <span>Journée actuelle</span>
+          <strong>J{currentJournee}</strong>
+          <small>{isValidated ? 'Validée 🔒' : 'Modifiable 🔓'}</small>
+        </article>
+
+        <article className="home-card">
+          <span>Mes pronos</span>
+          <strong>{pronosStats.done}/{pronosStats.total}</strong>
+          <small>{pronosStats.remaining} restant(s)</small>
+        </article>
+
+        <article className="home-card">
+          <span>Bonus</span>
+          <strong>{selectedBonusId ? 'Choisi' : 'À choisir'}</strong>
+          <small>{bonusMatches.length} proposé(s)</small>
+        </article>
+      </section>
+
+      <div className="home-progress">
+        <div className="home-progress-top">
+          <span>Progression J{currentJournee}</span>
+          <strong>{pronosStats.percent}%</strong>
+        </div>
+
+        <div className="home-progress-bar">
+          <div style={{ width: `${pronosStats.percent}%` }} />
+        </div>
+      </div>
+
+      <section className="home-main-grid">
+        <article className="home-panel">
+          <div className="home-panel-title">
+            <h2>Prochain match favori</h2>
+            <span>Score exact</span>
+          </div>
+
+          {nextFavoriteMatch ? (
+            <div className="home-next-match">
+              <strong>{nextFavoriteMatch.domicile}</strong>
+              <span>vs</span>
+              <strong>{nextFavoriteMatch.exterieur}</strong>
+              <small>
+                {nextFavoriteMatch.date || 'Date à définir'} · {nextFavoriteMatch.heure || '--:--'}
+              </small>
+            </div>
+          ) : (
+            <div className="home-empty-mini">
+              Choisis ton club favori pour afficher son prochain match.
+            </div>
+          )}
+        </article>
+
+        <article className="home-panel">
+          <div className="home-panel-title">
+            <h2>Accès rapide</h2>
+          </div>
+
+          <div className="home-actions">
+            <button type="button" onClick={() => setPage('Pronos')}>
+              Faire mes pronos
+            </button>
+
+            <button type="button" onClick={() => setPage('Classement')}>
+              Classement
+            </button>
+
+            <button type="button" onClick={() => setPage('Admin')}>
+              Admin
+            </button>
+          </div>
+        </article>
+
+        <article className="home-panel home-rules">
+          <div className="home-panel-title">
+            <h2>Règlement rapide</h2>
+          </div>
+
+          <ul>
+            <li>Ligue 1 : <strong>1 pt</strong></li>
+            <li>Club favori score exact : <strong>2 pts</strong></li>
+            <li>Bonus exact : <strong>3 pts</strong></li>
+          </ul>
+        </article>
+      </section>
+    </div>
+  );
+}
