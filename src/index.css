@@ -460,3 +460,274 @@
     flex-direction: column;
   }
 }
+
+.admin-clean-page {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-clean-card {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.22);
+}
+
+.admin-clean-card h2,
+.admin-clean-card h3 {
+  margin: 0 0 6px;
+  color: #fff;
+}
+
+.admin-clean-card p {
+  margin: 0 0 12px;
+  color: rgba(255,255,255,0.68);
+}
+
+.admin-clean-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.admin-clean-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.admin-clean-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: rgba(255,255,255,0.75);
+  font-weight: 800;
+}
+
+.admin-clean-controls input,
+.admin-clean-controls select {
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.28);
+  color: white;
+  padding: 11px 12px;
+  outline: none;
+}
+
+.admin-clean-file {
+  display: inline-flex !important;
+  justify-content: center;
+  border-radius: 14px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 900;
+  color: #07111f !important;
+  background: linear-gradient(135deg, #a3e635, #22c55e);
+  box-shadow: 0 10px 24px rgba(34,197,94,0.25);
+}
+
+.admin-clean-file input {
+  display: none;
+}
+
+.admin-clean-message {
+  margin-top: 12px !important;
+  color: #86efac !important;
+  font-weight: 800;
+}
+
+.admin-clean-preview {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-clean-preview div {
+  display: grid;
+  grid-template-columns: 55px 110px 70px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.24);
+  color: rgba(255,255,255,0.86);
+}
+
+.admin-clean-match-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-clean-empty {
+  color: rgba(255,255,255,0.7);
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.22);
+}
+
+.admin-clean-match {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.24);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.admin-clean-match strong {
+  display: block;
+  color: white;
+  margin-top: 5px;
+}
+
+.admin-clean-match small {
+  display: block;
+  color: rgba(255,255,255,0.58);
+  margin-top: 4px;
+}
+
+.admin-clean-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-clean-tags span {
+  font-size: 11px;
+  font-weight: 900;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: rgba(255,255,255,0.84);
+  background: rgba(255,255,255,0.08);
+}
+
+.admin-clean-tags .tag-bonus {
+  color: #111827;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+}
+
+.admin-clean-tags .tag-ligue1 {
+  color: #07111f;
+  background: linear-gradient(135deg, #a3e635, #22c55e);
+}
+
+.admin-clean-score-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-weight: 900;
+}
+
+.admin-clean-score-inputs input {
+  width: 62px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  padding: 10px;
+  text-align: center;
+  font-weight: 900;
+  outline: none;
+}
+
+.admin-clean-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: end;
+}
+
+.admin-clean-actions button,
+.admin-clean-primary,
+.admin-clean-secondary {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 900;
+  color: #07111f;
+  background: linear-gradient(135deg, #38bdf8, #22c55e);
+}
+
+.admin-clean-secondary {
+  color: white;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.08);
+}
+
+.admin-clean-actions .danger {
+  color: white;
+  background: rgba(239,68,68,0.76);
+}
+
+.admin-clean-ranking {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-clean-ranking div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.24);
+  color: rgba(255,255,255,0.86);
+}
+
+.admin-clean-ranking strong {
+  color: white;
+}
+
+.admin-clean-gazette {
+  margin-top: 14px;
+  width: 100%;
+  min-height: 220px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.28);
+  color: white;
+  padding: 14px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+@media (max-width: 900px) {
+  .admin-clean-match {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-clean-actions {
+    justify-content: stretch;
+  }
+
+  .admin-clean-actions button {
+    flex: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-clean-head,
+  .admin-clean-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-clean-primary,
+  .admin-clean-secondary {
+    width: 100%;
+  }
+
+  .admin-clean-preview div,
+  .admin-clean-ranking div {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+}

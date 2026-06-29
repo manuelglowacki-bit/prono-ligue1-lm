@@ -1,5 +1,4 @@
-﻿import AdminRankingGazetteEngine from "./components/AdminRankingGazetteEngine.jsx";
-import AdminExcelImportMatches from "./components/AdminExcelImportMatches.jsx";
+﻿import AdminCleanPage from "./components/AdminCleanPage.jsx";
 import React, { useState } from 'react';
 import AuthGate from './components/AuthGate';
 import Layout from './layouts/AppLayout';
@@ -81,6 +80,7 @@ export default function App() {
     </AuthGate>
   );
 }
+
 
 
 
