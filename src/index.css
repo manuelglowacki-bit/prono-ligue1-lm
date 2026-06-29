@@ -121,3 +121,159 @@
     flex-direction: column;
   }
 }
+
+.admin-football-ai-card {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.22);
+}
+
+.admin-football-ai-card h3 {
+  margin: 0 0 6px;
+  color: #fff;
+}
+
+.admin-football-ai-card p {
+  margin: 0 0 12px;
+  color: rgba(255,255,255,0.68);
+}
+
+.football-ai-controls {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.football-ai-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: rgba(255,255,255,0.75);
+  font-weight: 700;
+}
+
+.football-ai-controls input {
+  width: 120px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.24);
+  color: white;
+  padding: 11px 12px;
+  outline: none;
+}
+
+.football-ai-controls button {
+  border: none;
+  border-radius: 14px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 900;
+  color: #07111f;
+  background: linear-gradient(135deg, #38bdf8, #22c55e);
+  box-shadow: 0 10px 24px rgba(34,197,94,0.25);
+}
+
+.football-ai-controls button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.football-ai-message {
+  margin-top: 12px !important;
+  color: #86efac !important;
+  font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  .football-ai-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .football-ai-controls input,
+  .football-ai-controls button {
+    width: 100%;
+  }
+}
+
+.admin-football-ai-card {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.22);
+}
+
+.admin-football-ai-card h3 {
+  margin: 0 0 6px;
+  color: #fff;
+}
+
+.admin-football-ai-card p {
+  margin: 0 0 12px;
+  color: rgba(255,255,255,0.68);
+}
+
+.football-ai-controls {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.football-ai-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: rgba(255,255,255,0.75);
+  font-weight: 700;
+}
+
+.football-ai-controls input {
+  width: 120px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.24);
+  color: white;
+  padding: 11px 12px;
+  outline: none;
+}
+
+.football-ai-controls button {
+  border: none;
+  border-radius: 14px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 900;
+  color: #07111f;
+  background: linear-gradient(135deg, #38bdf8, #22c55e);
+  box-shadow: 0 10px 24px rgba(34,197,94,0.25);
+}
+
+.football-ai-controls button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.football-ai-message {
+  margin-top: 12px !important;
+  color: #86efac !important;
+  font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  .football-ai-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .football-ai-controls input,
+  .football-ai-controls button {
+    width: 100%;
+  }
+}
