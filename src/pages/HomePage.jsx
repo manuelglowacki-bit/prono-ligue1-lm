@@ -29,7 +29,7 @@ function loadJson(key, fallback) {
   }
 }
 
-function getText(value) {
+function cleanText(value) {
   return String(value || "")
     .toLowerCase()
     .normalize("NFD")
@@ -88,7 +88,7 @@ function getAway(match) {
   return (
     match?.away ||
     match?.exterieur ||
-    match?.extÃ©rieur ||
+    match?.exterieurTeam ||
     match?.equipeExterieur ||
     match?.teamAway ||
     match?.awayTeam ||
@@ -101,7 +101,6 @@ function getLeague(match) {
     match?.league ||
     match?.championnat ||
     match?.competition ||
-    match?.compÃ©tition ||
     "Ligue 1"
   );
 }
@@ -109,7 +108,6 @@ function getLeague(match) {
 function getJournee(match) {
   return Number(
     match?.journee ||
-    match?.journÃ©e ||
     match?.round ||
     match?.matchday ||
     1
@@ -127,8 +125,8 @@ function getMatchId(match) {
 }
 
 function isBonus(match) {
-  const type = getText(match?.type || match?.categorie || match?.catÃ©gorie || "");
-  const league = getText(getLeague(match));
+  const type = cleanText(match?.type || match?.categorie || "");
+  const league = cleanText(getLeague(match));
 
   return (
     type.includes("bonus") ||
@@ -143,7 +141,7 @@ function buildJournees() {
     return adminJournees.map((j, index) => ({
       id: String(j.id || j.journee || j.numero || index + 1),
       number: Number(j.journee || j.numero || index + 1),
-      title: j.title || j.nom || `JournÃ©e ${j.journee || j.numero || index + 1}`,
+      title: j.title || j.nom || `Journée ${j.journee || j.numero || index + 1}`,
       matches: Array.isArray(j.matches) ? j.matches : [],
       bonus: Array.isArray(j.bonus) ? j.bonus : []
     }));
@@ -160,7 +158,7 @@ function buildJournees() {
         byRound[round] = {
           id: String(round),
           number: round,
-          title: `JournÃ©e ${round}`,
+          title: `Journée ${round}`,
           matches: [],
           bonus: []
         };
@@ -309,8 +307,6 @@ export default function HomePage() {
       ? getSelectedBonus(player, selectedJournee.number, bonusList)
       : null;
 
-    const podium = buildPodium();
-
     return {
       player,
       club,
@@ -318,7 +314,7 @@ export default function HomePage() {
       selectedBonus,
       matchesCount: selectedJournee?.matches?.length || 0,
       bonusCount: bonusList.length,
-      podium
+      podium: buildPodium()
     };
   }, [refresh]);
 
@@ -553,7 +549,7 @@ export default function HomePage() {
 
       <div className="home-grid-clean">
         <div className="home-card-clean">
-          <span>JournÃ©e active</span>
+          <span>Journée active</span>
           <strong>{data.selectedJournee?.title || "Aucune"}</strong>
           <small>{data.matchesCount} match(s) Ligue 1</small>
         </div>
@@ -563,19 +559,19 @@ export default function HomePage() {
           <strong>
             {data.selectedBonus
               ? `${getHome(data.selectedBonus)} vs ${getAway(data.selectedBonus)}`
-              : "Ã€ choisir"}
+              : "À choisir"}
           </strong>
           <small>
             {data.selectedBonus
               ? getLeague(data.selectedBonus)
-              : `${data.bonusCount} proposÃ©(s)`}
+              : `${data.bonusCount} proposé(s)`}
           </small>
         </div>
 
         <div className="home-card-clean">
           <span>Club favori</span>
           <strong>{data.club || "Aucun club"}</strong>
-          <small>Ã‰quipe favorite</small>
+          <small>Équipe favorite</small>
         </div>
       </div>
 
@@ -589,12 +585,12 @@ export default function HomePage() {
           </div>
 
           <div className="home-line-clean">
-            <span>Ã‰quipe favorite</span>
+            <span>Équipe favorite</span>
             <strong>{data.club || "Non choisie"}</strong>
           </div>
 
           <div className="home-line-clean">
-            <span>JournÃ©e</span>
+            <span>Journée</span>
             <strong>{data.selectedJournee?.title || "Aucune"}</strong>
           </div>
         </section>
@@ -607,7 +603,7 @@ export default function HomePage() {
               {data.podium.map((player, index) => (
                 <div className="home-podium-row" key={`${player.name}-${index}`}>
                   <div className="home-podium-rank">
-                    {index === 0 ? "ðŸ¥‡" : index === 1 ? "ðŸ¥ˆ" : "ðŸ¥‰"}
+                    {index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}
                   </div>
 
                   <div>
@@ -625,11 +621,12 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="home-empty">
-              Le podium apparaÃ®tra quand le classement sera enregistrÃ©.
+              Le podium apparaîtra quand le classement sera enregistré.
             </div>
           )}
         </section>
       </div>
+
       <div className="home-wide-clean">
         <section className="home-panel-clean">
           <h2>Match bonus</h2>
@@ -649,9 +646,7 @@ export default function HomePage() {
           </div>
 
           <div className={data.selectedBonus ? "home-pill-clean" : "home-pill-clean gold"}>
-            {data.selectedBonus
-              ? "Bonus choisi"
-              : "Bonus pas encore choisi"}
+            {data.selectedBonus ? "Bonus choisi" : "Bonus pas encore choisi"}
           </div>
         </section>
 
@@ -674,7 +669,6 @@ export default function HomePage() {
           </div>
         </section>
       </div>
-
     </div>
   );
 }
