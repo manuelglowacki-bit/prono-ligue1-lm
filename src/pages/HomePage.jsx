@@ -9,6 +9,14 @@ const BONUS_CHOICES_KEY = "prono_ligue1_lm_bonus_choices";
 const SELECTED_JOURNEE_KEY = "selected_prono_journee";
 const BONUS_SELECTED_KEY = "prono_lm_bonus_selected";
 
+const RANKING_KEYS = [
+  "prono_ligue1_lm_classement",
+  "prono_ligue1_lm_ranking",
+  "classement",
+  "ranking",
+  "playersRanking"
+];
+
 function loadJson(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -176,48 +184,80 @@ function getSelectedBonus(player, journee, bonusList) {
   return bonusList.find((b) => getMatchId(b) === String(choiceId)) || null;
 }
 
-function goToPage(page) {
-  const aliases = {
-    pronos: ["pronos", "pronostics", "prono"],
-    classement: ["classement", "ranking"],
-    stats: ["stats", "statistiques"],
-    profil: ["profil", "profile"],
-    admin: ["admin"]
-  };
-
-  const wanted = aliases[page] || [page];
-
-  localStorage.setItem("prono_ligue1_lm_active_page", page);
-
-  window.dispatchEvent(new CustomEvent("prono:navigate", { detail: page }));
-  window.dispatchEvent(new CustomEvent("navigate", { detail: page }));
-
-  window.location.hash = page;
-
-  const buttons = Array.from(
-    document.querySelectorAll("button, a, [role='button']")
+function getPlayerName(item) {
+  return (
+    item?.player ||
+    item?.joueur ||
+    item?.name ||
+    item?.nom ||
+    item?.p ||
+    item?.pseudo ||
+    "Joueur"
   );
+}
 
-  const found = buttons.find((element) => {
-    const content = getText([
-      element.textContent,
-      element.getAttribute("aria-label"),
-      element.getAttribute("title"),
-      element.getAttribute("href"),
-      element.dataset?.page,
-      element.dataset?.tab,
-      element.dataset?.view
-    ].join(" "));
+function getPlayerPoints(item) {
+  return Number(
+    item?.points ||
+    item?.pts ||
+    item?.total ||
+    item?.score ||
+    0
+  );
+}
 
-    return wanted.some((name) => content.includes(getText(name)));
-  });
+function getPlayerExact(item) {
+  return Number(
+    item?.exact ||
+    item?.exacts ||
+    item?.scoresExact ||
+    item?.scoresExacts ||
+    item?.scoreExact ||
+    0
+  );
+}
 
-  if (found) {
-    found.click();
-    return;
+function normalizeRankingData(raw) {
+  if (Array.isArray(raw)) return raw;
+
+  if (raw && typeof raw === "object") {
+    if (Array.isArray(raw.players)) return raw.players;
+    if (Array.isArray(raw.ranking)) return raw.ranking;
+    if (Array.isArray(raw.classement)) return raw.classement;
+    if (Array.isArray(raw.data)) return raw.data;
+
+    return Object.entries(raw).map(([name, value]) => ({
+      player: name,
+      ...(typeof value === "object" ? value : { points: value })
+    }));
   }
 
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  return [];
+}
+
+function buildPodium() {
+  let ranking = [];
+
+  for (const key of RANKING_KEYS) {
+    const data = normalizeRankingData(loadJson(key, []));
+    if (Array.isArray(data) && data.length > 0) {
+      ranking = data;
+      break;
+    }
+  }
+
+  return ranking
+    .map((item) => ({
+      name: getPlayerName(item),
+      points: getPlayerPoints(item),
+      exact: getPlayerExact(item)
+    }))
+    .filter((item) => item.name && item.name !== "Joueur")
+    .sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      return b.exact - a.exact;
+    })
+    .slice(0, 3);
 }
 
 export default function HomePage() {
@@ -268,13 +308,31 @@ export default function HomePage() {
       ? getSelectedBonus(player, selectedJournee.number, bonusList)
       : null;
 
+    const podium = buildPodium();
+
+    const todo = [];
+
+    if (!club) {
+      todo.push("Choisir ton équipe favorite");
+    }
+
+    if (!selectedBonus) {
+      todo.push("Choisir ton match bonus");
+    }
+
+    if (selectedJournee && selectedJournee.matches?.length > 0) {
+      todo.push("Faire tes pronos Ligue 1");
+    }
+
     return {
       player,
       club,
       selectedJournee,
       selectedBonus,
       matchesCount: selectedJournee?.matches?.length || 0,
-      bonusCount: bonusList.length
+      bonusCount: bonusList.length,
+      podium,
+      todo
     };
   }, [refresh]);
 
@@ -314,7 +372,14 @@ export default function HomePage() {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 16px;
-          margin-bottom: 20px;
+          margin-bottom: 18px;
+        }
+
+        .home-wide-clean {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+          margin-bottom: 18px;
         }
 
         .home-card-clean,
@@ -359,13 +424,6 @@ export default function HomePage() {
           color: #fecaca;
         }
 
-        .home-wide-clean {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 16px;
-          margin-bottom: 18px;
-        }
-
         .home-panel-clean {
           padding: 22px;
           border-radius: 24px;
@@ -373,7 +431,7 @@ export default function HomePage() {
         }
 
         .home-panel-clean h2 {
-          margin: 0 0 12px;
+          margin: 0 0 14px;
           font-size: 26px;
           font-weight: 950;
         }
@@ -414,46 +472,97 @@ export default function HomePage() {
           color: #fde68a;
         }
 
-        .home-quick-grid {
+        .home-todo-list {
           display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
-          gap: 12px;
+          gap: 10px;
         }
 
-        .home-quick-btn {
-          cursor: pointer;
-          border: 1px solid rgba(255,255,255,.13);
-          border-radius: 20px;
-          padding: 16px;
-          background: linear-gradient(180deg, rgba(30,41,59,.96), rgba(15,23,42,.98));
-          color: #f8fafc;
-          text-align: left;
-          transition: transform .16s ease, border-color .16s ease, background .16s ease;
+        .home-todo-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 13px 14px;
+          border-radius: 16px;
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.10);
+          color: #e2e8f0;
+          font-weight: 900;
         }
 
-        .home-quick-btn:hover {
-          transform: translateY(-2px);
-          border-color: rgba(186,255,0,.55);
-          background: linear-gradient(180deg, rgba(51,65,85,.98), rgba(15,23,42,.98));
+        .home-todo-dot {
+          width: 11px;
+          height: 11px;
+          border-radius: 999px;
+          background: #facc15;
+          box-shadow: 0 0 18px rgba(250,204,21,.50);
+          flex: 0 0 auto;
         }
 
-        .home-quick-btn span {
-          display: block;
-          font-size: 24px;
-          margin-bottom: 8px;
-        }
-
-        .home-quick-btn strong {
-          display: block;
-          font-size: 15px;
+        .home-todo-ok {
+          padding: 18px;
+          border-radius: 18px;
+          background: rgba(34,197,94,.12);
+          border: 1px solid rgba(34,197,94,.28);
+          color: #bbf7d0;
           font-weight: 950;
         }
 
-        .home-quick-btn small {
+        .home-podium {
+          display: grid;
+          gap: 10px;
+        }
+
+        .home-podium-row {
+          display: grid;
+          grid-template-columns: 48px 1fr auto;
+          align-items: center;
+          gap: 12px;
+          padding: 14px;
+          border-radius: 18px;
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.10);
+        }
+
+        .home-podium-rank {
+          width: 38px;
+          height: 38px;
+          border-radius: 14px;
+          display: grid;
+          place-items: center;
+          background: rgba(255,255,255,.10);
+          font-size: 20px;
+          font-weight: 950;
+        }
+
+        .home-podium-name {
           display: block;
-          margin-top: 5px;
+          color: #fff;
+          font-size: 17px;
+          font-weight: 950;
+        }
+
+        .home-podium-exact {
+          display: block;
+          margin-top: 3px;
           color: #94a3b8;
-          font-weight: 800;
+          font-size: 13px;
+          font-weight: 850;
+        }
+
+        .home-podium-points {
+          color: #baff00;
+          font-size: 20px;
+          font-weight: 950;
+          white-space: nowrap;
+        }
+
+        .home-empty {
+          padding: 16px;
+          border-radius: 18px;
+          background: rgba(255,255,255,.05);
+          border: 1px dashed rgba(255,255,255,.16);
+          color: #94a3b8;
+          font-weight: 850;
         }
 
         @media (max-width: 1100px) {
@@ -461,8 +570,7 @@ export default function HomePage() {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
-          .home-wide-clean,
-          .home-quick-grid {
+          .home-wide-clean {
             grid-template-columns: 1fr;
           }
         }
@@ -474,6 +582,15 @@ export default function HomePage() {
 
           .home-hero-clean h1 {
             font-size: 32px;
+          }
+
+          .home-podium-row {
+            grid-template-columns: 42px 1fr;
+          }
+
+          .home-podium-points {
+            grid-column: 2;
+            font-size: 17px;
           }
         }
       `}</style>
@@ -524,15 +641,48 @@ export default function HomePage() {
             <span>Équipe favorite</span>
             <strong>{data.club || "Non choisie"}</strong>
           </div>
-        </section>
-
-        <section className="home-panel-clean">
-          <h2>Match bonus</h2>
 
           <div className="home-line-clean">
             <span>Journée</span>
             <strong>{data.selectedJournee?.title || "Aucune"}</strong>
           </div>
+        </section>
+
+        <section className="home-panel-clean">
+          <h2>Podium du classement</h2>
+
+          {data.podium.length > 0 ? (
+            <div className="home-podium">
+              {data.podium.map((player, index) => (
+                <div className="home-podium-row" key={`${player.name}-${index}`}>
+                  <div className="home-podium-rank">
+                    {index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}
+                  </div>
+
+                  <div>
+                    <span className="home-podium-name">{player.name}</span>
+                    <span className="home-podium-exact">
+                      {player.exact} score(s) exact(s)
+                    </span>
+                  </div>
+
+                  <div className="home-podium-points">
+                    {player.points} pts
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="home-empty">
+              Le podium apparaîtra quand le classement sera enregistré.
+            </div>
+          )}
+        </section>
+      </div>
+
+      <div className="home-wide-clean">
+        <section className="home-panel-clean">
+          <h2>Match bonus</h2>
 
           <div className="home-line-clean">
             <span>Bonus sélectionné</span>
@@ -554,43 +704,26 @@ export default function HomePage() {
               : "Va choisir ton bonus dans la page Pronos"}
           </div>
         </section>
+
+        <section className="home-panel-clean">
+          <h2>À faire aujourd’hui</h2>
+
+          {data.todo.length > 0 ? (
+            <div className="home-todo-list">
+              {data.todo.map((item) => (
+                <div className="home-todo-item" key={item}>
+                  <span className="home-todo-dot"></span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="home-todo-ok">
+              Tout est prêt ✅
+            </div>
+          )}
+        </section>
       </div>
-
-      <section className="home-panel-clean">
-        <h2>Accès rapide</h2>
-
-        <div className="home-quick-grid">
-          <button type="button" className="home-quick-btn" onClick={() => goToPage("pronos")}>
-            <span>⚽</span>
-            <strong>Pronos</strong>
-            <small>Faire ou modifier mes pronostics</small>
-          </button>
-
-          <button type="button" className="home-quick-btn" onClick={() => goToPage("classement")}>
-            <span>🏆</span>
-            <strong>Classement</strong>
-            <small>Voir le classement général</small>
-          </button>
-
-          <button type="button" className="home-quick-btn" onClick={() => goToPage("stats")}>
-            <span>📊</span>
-            <strong>Stats</strong>
-            <small>Voir les statistiques</small>
-          </button>
-
-          <button type="button" className="home-quick-btn" onClick={() => goToPage("profil")}>
-            <span>👤</span>
-            <strong>Profil</strong>
-            <small>Équipe favorite et joueur</small>
-          </button>
-
-          <button type="button" className="home-quick-btn" onClick={() => goToPage("admin")}>
-            <span>⚙️</span>
-            <strong>Admin</strong>
-            <small>Gérer journées et résultats</small>
-          </button>
-        </div>
-      </section>
     </div>
   );
 }
