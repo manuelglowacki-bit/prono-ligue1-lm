@@ -1,73 +1,102 @@
-﻿import React, { useEffect, useState } from "react";
+﻿import React, { useState } from "react";
+import Pronos from "./pages/Pronos.jsx";
 
-const MATCHS_LIGUE_1 = [
-  ["RC Lens", "OL", "Vendredi", "20:45"],
-  ["PSG", "Nantes", "Samedi", "17:00"],
-  ["OM", "Rennes", "Samedi", "21:00"],
-  ["LOSC", "Nice", "Dimanche", "15:00"],
-  ["Monaco", "Strasbourg", "Dimanche", "17:15"],
-  ["Toulouse", "Brest", "Dimanche", "17:15"],
-  ["Angers", "Metz", "Dimanche", "17:15"],
-  ["Le Havre", "Auxerre", "Dimanche", "17:15"],
-  ["Paris FC", "Lorient", "Dimanche", "20:45"]
-];
-
-const MATCHS_BONUS = [
-  ["Premier League", "Liverpool", "Arsenal", "Samedi", "18:30"],
-  ["Liga", "Real Madrid", "Atlético Madrid", "Dimanche", "21:00"],
-  ["Serie A", "Inter", "Juventus", "Dimanche", "20:45"]
-];
-
-const STORAGE_KEY = "prono_ligue1_lm_page_prono";
+function PlaceholderPage({ title, text }) {
+  return (
+    <div className="placeholder-page">
+      <h1>{title}</h1>
+      <p>{text}</p>
+    </div>
+  );
+}
 
 export default function App() {
-  const [clubFavori, setClubFavori] = useState(() => {
-    return localStorage.getItem("favoriteTeam") || "RC Lens";
-  });
+  const [page, setPage] = useState("pronos");
 
-  const [pronos, setPronos] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-    } catch {
-      return {};
+  const menu = [
+    { id: "accueil", label: "Accueil" },
+    { id: "pronos", label: "Pronos" },
+    { id: "classement", label: "Classement" },
+    { id: "stats", label: "Stats" },
+    { id: "gazette", label: "La Gazette" },
+    { id: "trophees", label: "Trophées" },
+    { id: "profil", label: "Profil" },
+    { id: "admin", label: "Admin" }
+  ];
+
+  function renderPage() {
+    if (page === "pronos") return <Pronos />;
+
+    if (page === "accueil") {
+      return (
+        <PlaceholderPage
+          title="Accueil"
+          text="Bienvenue sur Prono Ligue 1 LM. La page pronos est intégrée au site."
+        />
+      );
     }
-  });
 
-  const [bonusChoisi, setBonusChoisi] = useState(() => {
-    return localStorage.getItem("bonusChoisi") || "";
-  });
+    if (page === "classement") {
+      return (
+        <PlaceholderPage
+          title="Classement"
+          text="Le classement sera reconnecté ici avec les points des joueurs."
+        />
+      );
+    }
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(pronos));
-  }, [pronos]);
+    if (page === "stats") {
+      return (
+        <PlaceholderPage
+          title="Stats"
+          text="Les statistiques seront affichées ici."
+        />
+      );
+    }
 
-  useEffect(() => {
-    localStorage.setItem("favoriteTeam", clubFavori);
-  }, [clubFavori]);
+    if (page === "gazette") {
+      return (
+        <PlaceholderPage
+          title="La Gazette"
+          text="Les actus et résumés de la compétition seront ici."
+        />
+      );
+    }
 
-  useEffect(() => {
-    localStorage.setItem("bonusChoisi", bonusChoisi);
-  }, [bonusChoisi]);
+    if (page === "trophees") {
+      return (
+        <PlaceholderPage
+          title="Trophées"
+          text="Les trophées et badges seront affichés ici."
+        />
+      );
+    }
 
-  function updateProno(id, data) {
-    setPronos((prev) => ({
-      ...prev,
-      [id]: {
-        ...(prev[id] || {}),
-        ...data
-      }
-    }));
+    if (page === "profil") {
+      return (
+        <PlaceholderPage
+          title="Profil"
+          text="Le profil joueur sera ici."
+        />
+      );
+    }
+
+    if (page === "admin") {
+      return (
+        <PlaceholderPage
+          title="Admin"
+          text="L’espace admin sera reconnecté ici."
+        />
+      );
+    }
+
+    return <Pronos />;
   }
 
-  function resetPronos() {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem("bonusChoisi");
-    setPronos({});
-    setBonusChoisi("");
-  }
+  const currentLabel = menu.find((item) => item.id === page)?.label || "Pronos";
 
   return (
-    <div className="page">
+    <div className="app-shell">
       <style>{`
         * {
           box-sizing: border-box;
@@ -75,185 +104,249 @@ export default function App() {
 
         body {
           margin: 0;
-          background: #07111f;
+          background: #050914;
+          color: white;
           font-family: Inter, Arial, sans-serif;
         }
 
-        .page {
+        .app-shell {
           min-height: 100vh;
-          padding: 28px;
-          color: #f8fafc;
+          display: grid;
+          grid-template-columns: 185px 1fr;
           background:
-            radial-gradient(circle at top left, rgba(250, 204, 21, 0.18), transparent 32%),
-            linear-gradient(135deg, #07111f 0%, #101827 50%, #050814 100%);
+            radial-gradient(circle at top right, rgba(186,255,0,.12), transparent 30%),
+            linear-gradient(135deg, #050914 0%, #08111f 55%, #030712 100%);
         }
 
-        .top {
-          display: flex;
-          justify-content: space-between;
-          gap: 18px;
-          align-items: flex-start;
+        .sidebar {
+          border-right: 1px solid rgba(255,255,255,.08);
+          background: rgba(3, 7, 18, .92);
+          padding: 18px;
+          position: sticky;
+          top: 0;
+          height: 100vh;
+        }
+
+        .brand {
+          border: 1px solid rgba(255,255,255,.1);
+          background: rgba(15,23,42,.85);
+          border-radius: 18px;
+          padding: 16px;
           margin-bottom: 22px;
         }
 
-        .kicker {
-          color: #facc15;
-          font-size: 13px;
-          font-weight: 900;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          margin-bottom: 8px;
+        .brand strong {
+          display: block;
+          font-size: 16px;
+          font-weight: 950;
+          letter-spacing: .04em;
         }
 
-        h1 {
-          margin: 0;
-          font-size: 36px;
-          line-height: 1;
+        .brand span {
+          display: block;
+          margin-top: 4px;
+          color: #9fb0ca;
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+
+        .nav {
+          display: grid;
+          gap: 8px;
+        }
+
+        .nav button {
+          border: 0;
+          background: transparent;
+          color: #9fb0ca;
+          text-align: left;
+          padding: 13px 14px;
+          border-radius: 999px;
+          font-weight: 950;
+          cursor: pointer;
+        }
+
+        .nav button.active {
+          background: #baff00;
+          color: #06111f;
+        }
+
+        .main {
+          min-width: 0;
+          padding: 18px;
+        }
+
+        .page-header {
+          background: rgba(15,23,42,.82);
+          border: 1px solid rgba(255,255,255,.09);
+          border-radius: 24px;
+          padding: 20px;
+          margin-bottom: 18px;
+        }
+
+        .page-header small {
+          color: #8fb0d8;
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: .14em;
+          text-transform: uppercase;
+        }
+
+        .page-header h1 {
+          margin: 6px 0 0;
+          font-size: 30px;
           font-weight: 950;
         }
 
-        .subtitle {
-          color: #cbd5e1;
-          margin-top: 10px;
-          font-size: 15px;
+        .placeholder-page {
+          min-height: 420px;
+          background: rgba(15,23,42,.7);
+          border: 1px solid rgba(255,255,255,.09);
+          border-radius: 24px;
+          padding: 24px;
         }
 
-        .actions {
+        .placeholder-page h1 {
+          margin: 0 0 8px;
+          font-size: 32px;
+          font-weight: 950;
+        }
+
+        .placeholder-page p {
+          color: #b6c2d9;
+          font-weight: 700;
+        }
+
+        .pronos-page {
+          color: #ffffff;
+          padding: 0;
+        }
+
+        .prono-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          margin-bottom: 22px;
+        }
+
+        .prono-title h1 {
+          margin: 0;
+          font-size: 34px;
+          font-weight: 950;
+        }
+
+        .prono-title p {
+          margin: 8px 0 0;
+          color: #b6c2d9;
+          font-weight: 700;
+        }
+
+        .prono-actions {
           display: flex;
           gap: 10px;
+          align-items: center;
           flex-wrap: wrap;
-          justify-content: flex-end;
         }
 
-        .input,
-        .button {
+        .prono-select,
+        .prono-club {
+          border: 1px solid rgba(255,255,255,.18);
+          background: #0f172a;
+          color: white;
           border-radius: 14px;
-          border: 1px solid rgba(250, 204, 21, 0.35);
-          background: rgba(15, 23, 42, 0.85);
-          color: #f8fafc;
           padding: 12px 14px;
           font-weight: 900;
           outline: none;
         }
 
-        .button {
-          cursor: pointer;
+        .prono-club {
+          border-color: rgba(190,255,0,.45);
         }
 
-        .button.gold {
-          background: #facc15;
-          color: #111827;
-          border-color: #facc15;
-        }
-
-        .rules {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 12px;
-          margin-bottom: 24px;
-        }
-
-        .rule {
-          background: rgba(15, 23, 42, 0.72);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 18px;
-          padding: 15px;
-          box-shadow: 0 18px 44px rgba(0,0,0,0.24);
-        }
-
-        .rule strong {
-          color: #facc15;
-          display: block;
-          margin-bottom: 5px;
-        }
-
-        .rule span {
-          color: #cbd5e1;
-          font-size: 13px;
-        }
-
-        .section {
+        .section-head {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin: 28px 0 14px;
+          margin: 24px 0 14px;
         }
 
-        .section h2 {
+        .section-head h2 {
           margin: 0;
-          font-size: 22px;
+          font-size: 24px;
           font-weight: 950;
         }
 
-        .section small {
-          color: #94a3b8;
-          font-weight: 800;
-        }
-
-        .grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 16px;
-        }
-
-        .card {
-          background: linear-gradient(180deg, rgba(30,41,59,0.94), rgba(15,23,42,0.96));
-          border: 1px solid rgba(255,255,255,0.11);
-          border-radius: 22px;
-          padding: 16px;
-          box-shadow: 0 18px 46px rgba(0,0,0,0.28);
-        }
-
-        .card.favorite {
-          border-color: rgba(250,204,21,0.7);
-          box-shadow: 0 0 0 1px rgba(250,204,21,0.18), 0 18px 46px rgba(0,0,0,0.28);
-        }
-
-        .card.bonus-selected {
-          border-color: rgba(34,197,94,0.72);
-        }
-
-        .card-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 15px;
-          color: #94a3b8;
-          font-size: 13px;
+        .section-head span {
+          color: #b6c2d9;
           font-weight: 900;
         }
 
+        .match-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px;
+        }
+
+        .match-card {
+          background: linear-gradient(180deg, #142033, #0b1220);
+          border: 1px solid rgba(255,255,255,.12);
+          border-radius: 22px;
+          padding: 16px;
+          box-shadow: 0 16px 38px rgba(0,0,0,.28);
+        }
+
+        .match-card.favorite {
+          border-color: rgba(190,255,0,.8);
+          box-shadow: 0 0 0 1px rgba(190,255,0,.2), 0 16px 38px rgba(0,0,0,.28);
+        }
+
+        .match-card.selected {
+          border-color: rgba(34,197,94,.9);
+        }
+
+        .match-meta {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          color: #9fb0ca;
+          font-size: 13px;
+          font-weight: 900;
+          margin-bottom: 14px;
+        }
+
         .badge {
-          padding: 6px 9px;
+          background: rgba(190,255,0,.14);
+          color: #c6ff00;
+          border: 1px solid rgba(190,255,0,.28);
           border-radius: 999px;
-          background: rgba(250,204,21,0.14);
-          color: #fde68a;
-          font-size: 12px;
+          padding: 5px 8px;
+          font-size: 11px;
           font-weight: 950;
         }
 
         .badge.green {
-          background: rgba(34,197,94,0.16);
-          color: #bbf7d0;
+          background: rgba(34,197,94,.15);
+          color: #86efac;
+          border-color: rgba(34,197,94,.35);
         }
 
         .teams {
           display: grid;
           gap: 8px;
-          margin-bottom: 15px;
+          margin-bottom: 14px;
         }
 
         .team {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          gap: 10px;
-          font-size: 17px;
+          font-size: 18px;
           font-weight: 950;
         }
 
-        .team span:last-child {
+        .team small {
           color: #64748b;
           font-size: 12px;
         }
@@ -266,9 +359,9 @@ export default function App() {
         }
 
         .choice {
-          border: 1px solid rgba(255,255,255,0.12);
-          background: rgba(255,255,255,0.07);
-          color: #e2e8f0;
+          border: 1px solid rgba(255,255,255,.12);
+          background: rgba(255,255,255,.07);
+          color: white;
           border-radius: 13px;
           padding: 11px 0;
           font-size: 15px;
@@ -277,21 +370,21 @@ export default function App() {
         }
 
         .choice.active {
-          background: #facc15;
-          border-color: #facc15;
-          color: #111827;
+          background: #baff00;
+          border-color: #baff00;
+          color: #07111f;
         }
 
         .score-box {
-          margin-top: 9px;
-          padding: 12px;
+          background: rgba(190,255,0,.08);
+          border: 1px solid rgba(190,255,0,.22);
           border-radius: 16px;
-          border: 1px solid rgba(250,204,21,0.22);
-          background: rgba(250,204,21,0.09);
+          padding: 12px;
+          margin-top: 8px;
         }
 
         .score-title {
-          color: #fde68a;
+          color: #d9ff66;
           font-size: 12px;
           font-weight: 950;
           margin-bottom: 9px;
@@ -299,19 +392,18 @@ export default function App() {
 
         .score-inputs {
           display: flex;
-          gap: 8px;
           align-items: center;
+          gap: 8px;
         }
 
         .score-inputs input {
           width: 56px;
-          text-align: center;
           border-radius: 12px;
-          border: 1px solid rgba(255,255,255,0.16);
-          background: rgba(15,23,42,0.9);
-          color: #f8fafc;
+          border: 1px solid rgba(255,255,255,.16);
+          background: #111827;
+          color: white;
           padding: 10px 6px;
-          font-size: 16px;
+          text-align: center;
           font-weight: 950;
           outline: none;
         }
@@ -319,14 +411,14 @@ export default function App() {
         .muted {
           color: #94a3b8;
           font-size: 12px;
-          line-height: 1.35;
           margin-top: 9px;
+          font-weight: 700;
         }
 
-        .bonus-button {
+        .bonus-btn {
           width: 100%;
-          border: 1px solid rgba(34,197,94,0.28);
-          background: rgba(34,197,94,0.13);
+          border: 1px solid rgba(34,197,94,.35);
+          background: rgba(34,197,94,.14);
           color: #bbf7d0;
           border-radius: 14px;
           padding: 11px;
@@ -335,237 +427,86 @@ export default function App() {
           margin-bottom: 13px;
         }
 
-        .bonus-button.active {
+        .bonus-btn.active {
           background: #22c55e;
           color: #052e16;
         }
 
         @media (max-width: 1100px) {
-          .grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-
-          .rules {
-            grid-template-columns: 1fr;
+          .match-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
 
-        @media (max-width: 720px) {
-          .page {
-            padding: 16px;
-          }
-
-          .top {
-            flex-direction: column;
-          }
-
-          .actions,
-          .input,
-          .button {
-            width: 100%;
-          }
-
-          .grid {
+        @media (max-width: 760px) {
+          .app-shell {
             grid-template-columns: 1fr;
           }
 
-          h1 {
-            font-size: 29px;
+          .sidebar {
+            position: relative;
+            height: auto;
+          }
+
+          .nav {
+            grid-template-columns: repeat(2, 1fr);
+          }
+
+          .nav button {
+            text-align: center;
+          }
+
+          .main {
+            padding: 12px;
+          }
+
+          .prono-top {
+            flex-direction: column;
+          }
+
+          .prono-actions,
+          .prono-select,
+          .prono-club {
+            width: 100%;
+          }
+
+          .match-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .prono-title h1 {
+            font-size: 28px;
           }
         }
       `}</style>
 
-      <div className="top">
-        <div>
-          <div className="kicker">Prono Ligue 1 LM</div>
-          <h1>Page Pronostics</h1>
-          <div className="subtitle">
-            3 matchs par ligne, 1/N/2, score exact sur ton club favori, puis les 3 matchs bonus à la fin.
-          </div>
+      <aside className="sidebar">
+        <div className="brand">
+          <strong>PRONO LM</strong>
+          <span>Saison 26/27</span>
         </div>
 
-        <div className="actions">
-          <input
-            className="input"
-            value={clubFavori}
-            onChange={(e) => setClubFavori(e.target.value)}
-            placeholder="Club favori"
-          />
+        <nav className="nav">
+          {menu.map((item) => (
+            <button
+              key={item.id}
+              className={page === item.id ? "active" : ""}
+              onClick={() => setPage(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
 
-          <button className="button gold" onClick={resetPronos}>
-            Réinitialiser
-          </button>
-        </div>
-      </div>
-
-      <div className="rules">
-        <div className="rule">
-          <strong>Ligue 1 classique</strong>
-          <span>1/N/2 correct = 1 point. Faux = 0.</span>
-        </div>
-
-        <div className="rule">
-          <strong>Club favori</strong>
-          <span>Score exact = 2 points. Résultat correct = 1 point.</span>
+      <main className="main">
+        <div className="page-header">
+          <small>Prono Ligue 1 LM</small>
+          <h1>{currentLabel}</h1>
         </div>
 
-        <div className="rule">
-          <strong>Match bonus</strong>
-          <span>1 seul choix. Score exact = 3 points. Résultat correct = 2 points.</span>
-        </div>
-      </div>
-
-      <div className="section">
-        <h2>Journée 1</h2>
-        <small>9 matchs Ligue 1</small>
-      </div>
-
-      <div className="grid">
-        {MATCHS_LIGUE_1.map(([home, away, day, hour], index) => {
-          const id = `match-${index}`;
-          const prono = pronos[id] || {};
-          const isFavorite = home.toLowerCase() === clubFavori.toLowerCase() || away.toLowerCase() === clubFavori.toLowerCase();
-
-          return (
-            <div key={id} className={`card ${isFavorite ? "favorite" : ""}`}>
-              <div className="card-top">
-                <span>{day} • {hour}</span>
-                {isFavorite && <span className="badge">Club favori</span>}
-              </div>
-
-              <div className="teams">
-                <div className="team">
-                  <strong>{home}</strong>
-                  <span>DOM</span>
-                </div>
-
-                <div className="team">
-                  <strong>{away}</strong>
-                  <span>EXT</span>
-                </div>
-              </div>
-
-              <div className="choices">
-                {["1", "N", "2"].map((choice) => (
-                  <button
-                    key={choice}
-                    className={`choice ${prono.result === choice ? "active" : ""}`}
-                    onClick={() => updateProno(id, { result: choice })}
-                  >
-                    {choice}
-                  </button>
-                ))}
-              </div>
-
-              {isFavorite ? (
-                <div className="score-box">
-                  <div className="score-title">Score exact club favori</div>
-                  <div className="score-inputs">
-                    <input
-                      type="number"
-                      min="0"
-                      value={prono.homeScore || ""}
-                      onChange={(e) => updateProno(id, { homeScore: e.target.value })}
-                      placeholder="0"
-                    />
-                    <strong>-</strong>
-                    <input
-                      type="number"
-                      min="0"
-                      value={prono.awayScore || ""}
-                      onChange={(e) => updateProno(id, { awayScore: e.target.value })}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="muted">Score exact disponible uniquement pour ton club favori.</div>
-                </div>
-              ) : (
-                <div className="muted">Score exact masqué : uniquement sur le club favori.</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="section">
-        <h2>Matchs bonus</h2>
-        <small>Choisis 1 seul match</small>
-      </div>
-
-      <div className="grid">
-        {MATCHS_BONUS.map(([league, home, away, day, hour], index) => {
-          const id = `bonus-${index}`;
-          const prono = pronos[id] || {};
-          const selected = bonusChoisi === id;
-
-          return (
-            <div key={id} className={`card ${selected ? "bonus-selected" : ""}`}>
-              <div className="card-top">
-                <span>{day} • {hour}</span>
-                <span className="badge green">{league}</span>
-              </div>
-
-              <button
-                className={`bonus-button ${selected ? "active" : ""}`}
-                onClick={() => setBonusChoisi(id)}
-              >
-                {selected ? "Bonus sélectionné" : "Choisir ce bonus"}
-              </button>
-
-              <div className="teams">
-                <div className="team">
-                  <strong>{home}</strong>
-                  <span>DOM</span>
-                </div>
-
-                <div className="team">
-                  <strong>{away}</strong>
-                  <span>EXT</span>
-                </div>
-              </div>
-
-              <div className="choices">
-                {["1", "N", "2"].map((choice) => (
-                  <button
-                    key={choice}
-                    className={`choice ${prono.result === choice ? "active" : ""}`}
-                    onClick={() => {
-                      setBonusChoisi(id);
-                      updateProno(id, { result: choice });
-                    }}
-                  >
-                    {choice}
-                  </button>
-                ))}
-              </div>
-
-              {selected && (
-                <div className="score-box">
-                  <div className="score-title">Score exact bonus</div>
-                  <div className="score-inputs">
-                    <input
-                      type="number"
-                      min="0"
-                      value={prono.homeScore || ""}
-                      onChange={(e) => updateProno(id, { homeScore: e.target.value })}
-                      placeholder="0"
-                    />
-                    <strong>-</strong>
-                    <input
-                      type="number"
-                      min="0"
-                      value={prono.awayScore || ""}
-                      onChange={(e) => updateProno(id, { awayScore: e.target.value })}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="muted">Score exact bonus = 3 points, résultat correct = 2 points.</div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+        {renderPage()}
+      </main>
     </div>
   );
 }
