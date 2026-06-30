@@ -88,7 +88,7 @@ function getAway(match) {
   return (
     match?.away ||
     match?.exterieur ||
-    match?.extérieur ||
+    match?.extÃ©rieur ||
     match?.equipeExterieur ||
     match?.teamAway ||
     match?.awayTeam ||
@@ -101,7 +101,7 @@ function getLeague(match) {
     match?.league ||
     match?.championnat ||
     match?.competition ||
-    match?.compétition ||
+    match?.compÃ©tition ||
     "Ligue 1"
   );
 }
@@ -109,7 +109,7 @@ function getLeague(match) {
 function getJournee(match) {
   return Number(
     match?.journee ||
-    match?.journée ||
+    match?.journÃ©e ||
     match?.round ||
     match?.matchday ||
     1
@@ -127,7 +127,7 @@ function getMatchId(match) {
 }
 
 function isBonus(match) {
-  const type = getText(match?.type || match?.categorie || match?.catégorie || "");
+  const type = getText(match?.type || match?.categorie || match?.catÃ©gorie || "");
   const league = getText(getLeague(match));
 
   return (
@@ -143,7 +143,7 @@ function buildJournees() {
     return adminJournees.map((j, index) => ({
       id: String(j.id || j.journee || j.numero || index + 1),
       number: Number(j.journee || j.numero || index + 1),
-      title: j.title || j.nom || `Journée ${j.journee || j.numero || index + 1}`,
+      title: j.title || j.nom || `JournÃ©e ${j.journee || j.numero || index + 1}`,
       matches: Array.isArray(j.matches) ? j.matches : [],
       bonus: Array.isArray(j.bonus) ? j.bonus : []
     }));
@@ -160,7 +160,7 @@ function buildJournees() {
         byRound[round] = {
           id: String(round),
           number: round,
-          title: `Journée ${round}`,
+          title: `JournÃ©e ${round}`,
           matches: [],
           bonus: []
         };
@@ -553,7 +553,7 @@ export default function HomePage() {
 
       <div className="home-grid-clean">
         <div className="home-card-clean">
-          <span>Journée active</span>
+          <span>JournÃ©e active</span>
           <strong>{data.selectedJournee?.title || "Aucune"}</strong>
           <small>{data.matchesCount} match(s) Ligue 1</small>
         </div>
@@ -563,19 +563,19 @@ export default function HomePage() {
           <strong>
             {data.selectedBonus
               ? `${getHome(data.selectedBonus)} vs ${getAway(data.selectedBonus)}`
-              : "À choisir"}
+              : "Ã€ choisir"}
           </strong>
           <small>
             {data.selectedBonus
               ? getLeague(data.selectedBonus)
-              : `${data.bonusCount} proposé(s)`}
+              : `${data.bonusCount} proposÃ©(s)`}
           </small>
         </div>
 
         <div className="home-card-clean">
           <span>Club favori</span>
           <strong>{data.club || "Aucun club"}</strong>
-          <small>Équipe favorite</small>
+          <small>Ã‰quipe favorite</small>
         </div>
       </div>
 
@@ -589,12 +589,12 @@ export default function HomePage() {
           </div>
 
           <div className="home-line-clean">
-            <span>Équipe favorite</span>
+            <span>Ã‰quipe favorite</span>
             <strong>{data.club || "Non choisie"}</strong>
           </div>
 
           <div className="home-line-clean">
-            <span>Journée</span>
+            <span>JournÃ©e</span>
             <strong>{data.selectedJournee?.title || "Aucune"}</strong>
           </div>
         </section>
@@ -607,7 +607,7 @@ export default function HomePage() {
               {data.podium.map((player, index) => (
                 <div className="home-podium-row" key={`${player.name}-${index}`}>
                   <div className="home-podium-rank">
-                    {index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}
+                    {index === 0 ? "ðŸ¥‡" : index === 1 ? "ðŸ¥ˆ" : "ðŸ¥‰"}
                   </div>
 
                   <div>
@@ -625,35 +625,56 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="home-empty">
-              Le podium apparaîtra quand le classement sera enregistré.
+              Le podium apparaÃ®tra quand le classement sera enregistrÃ©.
             </div>
           )}
         </section>
       </div>
+      <div className="home-wide-clean">
+        <section className="home-panel-clean">
+          <h2>Match bonus</h2>
 
-      <section className="home-panel-clean">
-        <h2>Match bonus</h2>
+          <div className="home-line-clean">
+            <span>Bonus sélectionné</span>
+            <strong>
+              {data.selectedBonus
+                ? `${getHome(data.selectedBonus)} vs ${getAway(data.selectedBonus)}`
+                : "Aucun"}
+            </strong>
+          </div>
 
-        <div className="home-line-clean">
-          <span>Bonus sélectionné</span>
-          <strong>
+          <div className="home-line-clean">
+            <span>Compétition</span>
+            <strong>{data.selectedBonus ? getLeague(data.selectedBonus) : "-"}</strong>
+          </div>
+
+          <div className={data.selectedBonus ? "home-pill-clean" : "home-pill-clean gold"}>
             {data.selectedBonus
-              ? `${getHome(data.selectedBonus)} vs ${getAway(data.selectedBonus)}`
-              : "Aucun"}
-          </strong>
-        </div>
+              ? "Bonus choisi"
+              : "Bonus pas encore choisi"}
+          </div>
+        </section>
 
-        <div className="home-line-clean">
-          <span>Compétition</span>
-          <strong>{data.selectedBonus ? getLeague(data.selectedBonus) : "-"}</strong>
-        </div>
+        <section className="home-panel-clean">
+          <h2>Résumé journée</h2>
 
-        <div className={data.selectedBonus ? "home-pill-clean" : "home-pill-clean gold"}>
-          {data.selectedBonus
-            ? "Bonus choisi"
-            : "Bonus pas encore choisi"}
-        </div>
-      </section>
+          <div className="home-line-clean">
+            <span>Journée</span>
+            <strong>{data.selectedJournee?.title || "Aucune"}</strong>
+          </div>
+
+          <div className="home-line-clean">
+            <span>Matchs Ligue 1</span>
+            <strong>{data.matchesCount}</strong>
+          </div>
+
+          <div className="home-line-clean">
+            <span>Bonus proposés</span>
+            <strong>{data.bonusCount}</strong>
+          </div>
+        </section>
+      </div>
+
     </div>
   );
 }
