@@ -200,6 +200,79 @@ function formatAutoLock(match) {
   });
 }
 
+function normalizeClubName(value) {
+  const raw = String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+
+  const aliases = {
+    lens: "lens",
+    rclens: "lens",
+    racingclublens: "lens",
+
+    psg: "psg",
+    parissg: "psg",
+    parissaintgermain: "psg",
+
+    om: "marseille",
+    marseille: "marseille",
+    olympiquedemarseille: "marseille",
+
+    ol: "lyon",
+    lyon: "lyon",
+    olympiquelyonnais: "lyon",
+
+    losc: "lille",
+    lille: "lille",
+    lilleosc: "lille",
+
+    monaco: "monaco",
+    asmonaco: "monaco",
+
+    rennes: "rennes",
+    staderennais: "rennes",
+
+    nantes: "nantes",
+    fcnantes: "nantes",
+
+    nice: "nice",
+    ogcnice: "nice",
+
+    strasbourg: "strasbourg",
+    rcstrasbourg: "strasbourg",
+
+    toulouse: "toulouse",
+    toulousefc: "toulouse",
+
+    brest: "brest",
+    stadebrestois: "brest",
+
+    angers: "angers",
+    angerssco: "angers",
+
+    metz: "metz",
+    fcmetz: "metz",
+
+    lehavre: "lehavre",
+    hac: "lehavre",
+
+    auxerre: "auxerre",
+    aja: "auxerre",
+
+    parisfc: "parisfc",
+    lorient: "lorient",
+    fclorient: "lorient"
+  };
+
+  return aliases[raw] || raw;
+}
+
+function sameClub(a, b) {
+  return normalizeClubName(a) === normalizeClubName(b);
+}
+
 export default function PronosPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -278,7 +351,7 @@ export default function PronosPage() {
     return (
       journeeLocked ||
       match.status === "Bloque" ||
-      match.status === "Fermé" ||
+      match.status === "FermÃ©" ||
       match.status === "Ferme" ||
       isAutoMatchLocked(match)
     );
@@ -286,7 +359,7 @@ export default function PronosPage() {
 
   function getBlockReason(match) {
     if (journeeLocked) return "Journee bloquee";
-    if (match.status === "Bloque" || match.status === "Fermé" || match.status === "Ferme") return "Bloque manuel";
+    if (match.status === "Bloque" || match.status === "FermÃ©" || match.status === "Ferme") return "Bloque manuel";
     if (isAutoMatchLocked(match)) return "Bloque auto";
     return "Ouvert";
   }
@@ -313,10 +386,7 @@ export default function PronosPage() {
   }
 
   function isFavoriteMatch(match) {
-    return (
-      match.home?.toLowerCase() === clubFavori.toLowerCase() ||
-      match.away?.toLowerCase() === clubFavori.toLowerCase()
-    );
+    return sameClub(match.home, clubFavori) || sameClub(match.away, clubFavori);
   }
 
   const matches = selectedJournee.matches || [];
