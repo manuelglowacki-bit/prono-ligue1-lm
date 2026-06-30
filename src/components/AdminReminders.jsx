@@ -1,3 +1,3 @@
-﻿export default function AdminReminders() {
+export default function AdminReminders() {
   return null;
 }

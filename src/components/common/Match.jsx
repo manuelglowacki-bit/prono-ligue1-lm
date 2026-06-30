@@ -1,4 +1,4 @@
-﻿export default function Match({ a, b }) {
+export default function Match({ a, b }) {
   return (
     <div className="match">
       <span className="crest">âš½</span>

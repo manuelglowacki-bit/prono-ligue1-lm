@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import '../styles/home.css';
 
 const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';

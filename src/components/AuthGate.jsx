@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AuthPage from '../pages/AuthPage';
 import '../styles/auth.css';
 import { ensureFavoriteTeam, ensureFavoriteTeamsForAccounts } from '../utils/favoriteTeam';

@@ -1,9 +1,9 @@
-﻿export default function StickySummary({ filledCount, totalCount, isComplete, pointsMax, pointsEarned }) {
+export default function StickySummary({ filledCount, totalCount, isComplete, pointsMax, pointsEarned }) {
   return (
     <aside className="pronos-summary card">
       <div className="summary-top">
-        <p className="eyebrow">RÃ©sumÃ©</p>
-        <h3>Ma journÃ©e</h3>
+        <p className="eyebrow">Résumé</p>
+        <h3>Ma journée</h3>
       </div>
 
       <div className="summary-stats">
@@ -16,7 +16,7 @@
           <strong>{pointsEarned} / {pointsMax} pts</strong>
         </div>
         <div>
-          <span>Ã‰quipe de cÅ“ur</span>
+          <span>Équipe de cÅ“ur</span>
           <strong>RC Lens</strong>
         </div>
         <div>
@@ -28,7 +28,7 @@
       <button className="primary-btn full" disabled={!isComplete}>
         Valider mes pronos
       </button>
-      <p className="summary-hint">Les pronos restent cachÃ©s jusquâ€™Ã  la clÃ´ture.</p>
+      <p className="summary-hint">Les pronos restent cachés jusqu'Ã  la clôture.</p>
     </aside>
   );
 }

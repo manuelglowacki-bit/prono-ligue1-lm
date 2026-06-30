@@ -1,4 +1,4 @@
-﻿export function getApiUrl(path = '') {
+export function getApiUrl(path = '') {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
 
   const envUrl = import.meta.env.VITE_API_BASE_URL?.trim();

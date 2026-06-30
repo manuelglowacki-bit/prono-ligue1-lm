@@ -1,43 +1,48 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
-
-const PRONOS_KEY = "prono_ligue1_lm_pronos";
-const FAVORITE_KEY = "favoriteTeam";
-
-/* 
-  PAGE PRONO CLEAN
-  - 3 matchs par ligne
-  - 1/N/2 sur tous les matchs Ligue 1
-  - Score exact seulement pour le club favori
-  - 3 matchs bonus à la fin
-  - 1 seul bonus sélectionnable
-*/
+import React, { useEffect, useMemo, useState } from "react";
 
 const DEFAULT_JOURNEES = [
   {
     id: "j1",
     number: 1,
-    title: "Journée 1",
+    title: "J1",
+    locked: false,
     lockAt: "",
     matches: [
-      { id: "j1-m1", home: "RC Lens", away: "OL", date: "Vendredi", time: "20:45" },
-      { id: "j1-m2", home: "PSG", away: "Nantes", date: "Samedi", time: "17:00" },
-      { id: "j1-m3", home: "OM", away: "Rennes", date: "Samedi", time: "21:00" },
-      { id: "j1-m4", home: "LOSC", away: "Nice", date: "Dimanche", time: "15:00" },
-      { id: "j1-m5", home: "Monaco", away: "Strasbourg", date: "Dimanche", time: "17:15" },
-      { id: "j1-m6", home: "Toulouse", away: "Brest", date: "Dimanche", time: "17:15" },
-      { id: "j1-m7", home: "Angers", away: "Metz", date: "Dimanche", time: "17:15" },
-      { id: "j1-m8", home: "Le Havre", away: "Auxerre", date: "Dimanche", time: "17:15" },
-      { id: "j1-m9", home: "Paris FC", away: "Lorient", date: "Dimanche", time: "20:45" },
+      { id: "j1-m1", home: "RC Lens", away: "OL", date: "2026-08-22", time: "20:45", status: "Ouvert" },
+      { id: "j1-m2", home: "PSG", away: "Nantes", date: "2026-08-23", time: "17:00", status: "Ouvert" },
+      { id: "j1-m3", home: "OM", away: "Rennes", date: "2026-08-23", time: "21:00", status: "Ouvert" }
     ],
-    bonus: [
-      { id: "j1-b1", league: "Premier League", home: "Liverpool", away: "Arsenal", date: "Samedi", time: "18:30" },
-      { id: "j1-b2", league: "Liga", home: "Real Madrid", away: "Atlético Madrid", date: "Dimanche", time: "21:00" },
-      { id: "j1-b3", league: "Serie A", home: "Inter", away: "Juventus", date: "Dimanche", time: "20:45" },
-    ],
-  },
+    bonus: []
+  }
 ];
 
-function readLocalStorage(key, fallback) {
+const PRONOS_KEY = "prono_lm_clean_pronos";
+const BONUS_KEY = "prono_lm_bonus_selected";
+const CLUB_KEY = "favoriteTeam";
+const SELECTED_JOURNEE_KEY = "selected_prono_journee";
+
+const CLUBS = [
+  "RC Lens",
+  "PSG",
+  "OM",
+  "LOSC",
+  "OL",
+  "Monaco",
+  "Rennes",
+  "Nantes",
+  "Nice",
+  "Strasbourg",
+  "Toulouse",
+  "Brest",
+  "Angers",
+  "Metz",
+  "Le Havre",
+  "Auxerre",
+  "Paris FC",
+  "Lorient"
+];
+
+function loadJson(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
@@ -46,452 +51,484 @@ function readLocalStorage(key, fallback) {
   }
 }
 
-function writeLocalStorage(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
+function normalizeJournees(data) {
+  if (!Array.isArray(data) || data.length === 0) return DEFAULT_JOURNEES;
+
+  return data.map((j, index) => ({
+    id: j.id || `j${index + 1}`,
+    number: j.number || index + 1,
+    title: j.title || `J${index + 1}`,
+    locked: Boolean(j.locked),
+    lockAt: j.lockAt || "",
+    matches: Array.isArray(j.matches)
+      ? j.matches.map((m, i) => ({
+          id: m.id || `${j.id || `j${index + 1}`}-m${i + 1}`,
+          home: m.home || "",
+          away: m.away || "",
+          date: m.date || "",
+          time: m.time || "",
+          status: m.status || "Ouvert"
+        }))
+      : [],
+    bonus: Array.isArray(j.bonus)
+      ? j.bonus.slice(0, 3).map((b, i) => ({
+          id: b.id || `${j.id || `j${index + 1}`}-b${i + 1}`,
+          league: b.league || "Bonus",
+          home: b.home || "",
+          away: b.away || "",
+          date: b.date || "",
+          time: b.time || "",
+          status: b.status || "Ouvert"
+        }))
+      : []
+  }));
 }
 
-function getFavoriteTeam() {
-  try {
-    return (
-      localStorage.getItem(FAVORITE_KEY) ||
-      localStorage.getItem("clubFavori") ||
-      localStorage.getItem("favorite_team") ||
-      "RC Lens"
-    );
-  } catch {
-    return "RC Lens";
-  }
-}
-
-function getImportedJournees() {
-  const possibleKeys = [
-    "journees",
-    "journees_ligue1",
-    "ligue1_journees",
-    "prono_ligue1_journees",
+function loadJournees() {
+  const keys = [
     "admin_journees",
-    "imported_journees",
+    "journees",
+    "prono_ligue1_journees",
+    "ligue1_journees",
+    "imported_journees"
   ];
 
-  for (const key of possibleKeys) {
-    const data = readLocalStorage(key, null);
+  for (const key of keys) {
+    const data = loadJson(key, null);
 
     if (Array.isArray(data) && data.length > 0) {
-      return data;
-    }
-
-    if (data?.journees && Array.isArray(data.journees) && data.journees.length > 0) {
-      return data.journees;
+      return normalizeJournees(data);
     }
   }
 
   return DEFAULT_JOURNEES;
 }
 
-function normalizeJournee(journee, index) {
-  const number = journee.number || journee.journee || journee.id || index + 1;
-
-  const matches =
-    journee.matches ||
-    journee.matchs ||
-    journee.ligue1 ||
-    journee.games ||
-    [];
-
-  const bonus =
-    journee.bonus ||
-    journee.matchsBonus ||
-    journee.bonusMatches ||
-    [];
-
-  return {
-    id: journee.id || `j${number}`,
-    number,
-    title: journee.title || journee.nom || `Journée ${number}`,
-    lockAt: journee.lockAt || journee.deadline || journee.dateBlocage || "",
-    matches: matches.map((m, i) => ({
-      id: m.id || `j${number}-m${i + 1}`,
-      home: m.home || m.domicile || m.teamHome || m.equipe1 || m.club1 || "",
-      away: m.away || m.exterieur || m.teamAway || m.equipe2 || m.club2 || "",
-      date: m.date || m.day || "",
-      time: m.time || m.heure || "",
-    })),
-    bonus: bonus.map((m, i) => ({
-      id: m.id || `j${number}-b${i + 1}`,
-      league: m.league || m.competition || m.ligue || "Bonus",
-      home: m.home || m.domicile || m.teamHome || m.equipe1 || m.club1 || "",
-      away: m.away || m.exterieur || m.teamAway || m.equipe2 || m.club2 || "",
-      date: m.date || m.day || "",
-      time: m.time || m.heure || "",
-    })),
-  };
-}
-
-function isLocked(lockAt) {
+function isTimeLocked(lockAt) {
   if (!lockAt) return false;
+
   const lockDate = new Date(lockAt);
   if (Number.isNaN(lockDate.getTime())) return false;
+
   return new Date() >= lockDate;
 }
 
-export default function Pronostics() {
-  const [journees] = useState(() =>
-    getImportedJournees().map((j, i) => normalizeJournee(j, i))
-  );
+function formatLockDate(lockAt) {
+  if (!lockAt) return "aucune heure globale definie";
+
+  const date = new Date(lockAt);
+  if (Number.isNaN(date.getTime())) return "heure invalide";
+
+  return date.toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function getMatchDateTime(match) {
+  const date = String(match.date || "").trim();
+  const time = String(match.time || "").trim();
+
+  if (!date || !time) return null;
+
+  const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date);
+  const timeOk = /^\d{2}:\d{2}$/.test(time);
+
+  if (!dateOk || !timeOk) return null;
+
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+
+  return new Date(year, month - 1, day, hour, minute, 0, 0);
+}
+
+function getMatchLockDate(match) {
+  const startDate = getMatchDateTime(match);
+
+  if (!startDate) return null;
+
+  return new Date(startDate.getTime() - 5 * 60 * 1000);
+}
+
+function isAutoMatchLocked(match) {
+  const lockDate = getMatchLockDate(match);
+
+  if (!lockDate) return false;
+
+  return new Date() >= lockDate;
+}
+
+function formatMatchDate(dateValue) {
+  const raw = String(dateValue || "").trim();
+
+  if (!raw) return "Date";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [year, month, day] = raw.split("-");
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+
+    return date.toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
+  }
+
+  return raw;
+}
+
+function formatMatchDateTime(dateValue, timeValue) {
+  const date = formatMatchDate(dateValue);
+  const time = String(timeValue || "").trim() || "Heure";
+  return `${date} - ${time}`;
+}
+
+function formatAutoLock(match) {
+  const lockDate = getMatchLockDate(match);
+
+  if (!lockDate) return "Blocage auto indisponible";
+
+  return lockDate.toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+export default function PronosPage() {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const journees = useMemo(() => loadJournees(), [refreshKey]);
 
   const [selectedJourneeId, setSelectedJourneeId] = useState(() => {
-    const first = getImportedJournees()[0];
-    return first?.id || "j1";
+    return localStorage.getItem(SELECTED_JOURNEE_KEY) || journees[0]?.id || "j1";
   });
 
-  const [favoriteTeam, setFavoriteTeam] = useState(getFavoriteTeam);
-  const [pronos, setPronos] = useState(() => readLocalStorage(PRONOS_KEY, {}));
+  const selectedJournee =
+    journees.find((j) => j.id === selectedJourneeId) ||
+    journees[0] ||
+    DEFAULT_JOURNEES[0];
 
-  const selectedJournee = useMemo(() => {
-    return journees.find((j) => j.id === selectedJourneeId) || journees[0];
-  }, [journees, selectedJourneeId]);
+  const [clubFavori, setClubFavori] = useState(() => {
+    return localStorage.getItem(CLUB_KEY) || "RC Lens";
+  });
+
+  const [pronos, setPronos] = useState(() => loadJson(PRONOS_KEY, {}));
+
+  const [bonusSelected, setBonusSelected] = useState(() => {
+    return localStorage.getItem(BONUS_KEY) || "";
+  });
+
+  const journeeLocked = Boolean(selectedJournee.locked) || isTimeLocked(selectedJournee.lockAt);
+  const lockLabel = formatLockDate(selectedJournee.lockAt);
 
   useEffect(() => {
-    writeLocalStorage(PRONOS_KEY, pronos);
+    function syncFavorite() {
+      setClubFavori(localStorage.getItem(CLUB_KEY) || "RC Lens");
+    }
+
+    window.addEventListener("favorite-team-updated", syncFavorite);
+    window.addEventListener("storage", syncFavorite);
+
+    return () => {
+      window.removeEventListener("favorite-team-updated", syncFavorite);
+      window.removeEventListener("storage", syncFavorite);
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(PRONOS_KEY, JSON.stringify(pronos));
   }, [pronos]);
 
-  const journeeKey = selectedJournee?.id || "j1";
-  const currentPronos = pronos[journeeKey] || {
-    matches: {},
-    selectedBonusId: "",
-    bonus: {},
-  };
+  useEffect(() => {
+    localStorage.setItem(CLUB_KEY, clubFavori);
+  }, [clubFavori]);
 
-  function updateMatchProno(matchId, patch) {
-    if (isLocked(selectedJournee.lockAt)) return;
+  useEffect(() => {
+    localStorage.setItem(BONUS_KEY, bonusSelected);
+  }, [bonusSelected]);
 
-    setPronos((prev) => {
-      const oldJournee = prev[journeeKey] || {
-        matches: {},
-        selectedBonusId: "",
-        bonus: {},
-      };
+  useEffect(() => {
+    localStorage.setItem(SELECTED_JOURNEE_KEY, selectedJournee.id);
+  }, [selectedJournee.id]);
 
-      return {
-        ...prev,
-        [journeeKey]: {
-          ...oldJournee,
-          matches: {
-            ...oldJournee.matches,
-            [matchId]: {
-              ...(oldJournee.matches?.[matchId] || {}),
-              ...patch,
-            },
-          },
-        },
-      };
-    });
+  function changeJournee(id) {
+    setSelectedJourneeId(id);
+    setBonusSelected("");
   }
 
-  function selectBonus(bonusId) {
-    if (isLocked(selectedJournee.lockAt)) return;
-
-    setPronos((prev) => {
-      const oldJournee = prev[journeeKey] || {
-        matches: {},
-        selectedBonusId: "",
-        bonus: {},
-      };
-
-      return {
-        ...prev,
-        [journeeKey]: {
-          ...oldJournee,
-          selectedBonusId: bonusId,
-        },
-      };
-    });
+  function previousJournee() {
+    const index = journees.findIndex((j) => j.id === selectedJournee.id);
+    const previous = journees[Math.max(0, index - 1)];
+    if (previous) changeJournee(previous.id);
   }
 
-  function updateBonusProno(bonusId, patch) {
-    if (isLocked(selectedJournee.lockAt)) return;
+  function nextJournee() {
+    const index = journees.findIndex((j) => j.id === selectedJournee.id);
+    const next = journees[Math.min(journees.length - 1, index + 1)];
+    if (next) changeJournee(next.id);
+  }
 
-    setPronos((prev) => {
-      const oldJournee = prev[journeeKey] || {
-        matches: {},
-        selectedBonusId: "",
-        bonus: {},
-      };
+  function isMatchBlocked(match) {
+    return (
+      journeeLocked ||
+      match.status === "Bloque" ||
+      match.status === "Fermé" ||
+      match.status === "Ferme" ||
+      isAutoMatchLocked(match)
+    );
+  }
 
-      return {
-        ...prev,
-        [journeeKey]: {
-          ...oldJournee,
-          bonus: {
-            ...oldJournee.bonus,
-            [bonusId]: {
-              ...(oldJournee.bonus?.[bonusId] || {}),
-              ...patch,
-            },
-          },
-        },
-      };
-    });
+  function getBlockReason(match) {
+    if (journeeLocked) return "Journee bloquee";
+    if (match.status === "Bloque" || match.status === "Fermé" || match.status === "Ferme") return "Bloque manuel";
+    if (isAutoMatchLocked(match)) return "Bloque auto";
+    return "Ouvert";
+  }
+
+  function updateProno(match, patch) {
+    if (isMatchBlocked(match)) return;
+
+    const key = selectedJournee.id;
+
+    setPronos((prev) => ({
+      ...prev,
+      [key]: {
+        ...(prev[key] || {}),
+        [match.id]: {
+          ...((prev[key] || {})[match.id] || {}),
+          ...patch
+        }
+      }
+    }));
+  }
+
+  function getProno(id) {
+    return pronos[selectedJournee.id]?.[id] || {};
   }
 
   function isFavoriteMatch(match) {
-    return match.home === favoriteTeam || match.away === favoriteTeam;
+    return (
+      match.home?.toLowerCase() === clubFavori.toLowerCase() ||
+      match.away?.toLowerCase() === clubFavori.toLowerCase()
+    );
   }
 
-  const locked = isLocked(selectedJournee?.lockAt);
+  const matches = selectedJournee.matches || [];
+  const bonus = (selectedJournee.bonus || []).slice(0, 3);
 
   return (
-    <div className="prono-page">
+    <div className="pronos-page-clean">
       <style>{`
-        .prono-page {
-          min-height: 100vh;
-          padding: 26px;
-          color: #f8fafc;
-          background:
-            radial-gradient(circle at top left, rgba(255, 215, 0, 0.16), transparent 34%),
-            linear-gradient(135deg, #07111f 0%, #101827 48%, #050814 100%);
-          font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        .pronos-page-clean {
+          color: #ffffff;
         }
 
-        .prono-header {
+        .prono-top-clean {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
           gap: 18px;
-          margin-bottom: 22px;
+          margin-bottom: 18px;
         }
 
-        .prono-kicker {
-          color: #facc15;
-          font-size: 13px;
-          text-transform: uppercase;
-          letter-spacing: .12em;
-          font-weight: 800;
-          margin-bottom: 8px;
-        }
-
-        .prono-title {
-          font-size: 34px;
-          line-height: 1;
+        .prono-title-clean h1 {
           margin: 0;
+          font-size: 38px;
+          line-height: 1;
           font-weight: 950;
         }
 
-        .prono-subtitle {
-          margin: 9px 0 0;
+        .prono-title-clean p {
+          margin: 10px 0 0;
           color: #cbd5e1;
-          font-size: 15px;
+          font-weight: 800;
         }
 
-        .prono-toolbar {
+        .prono-actions-clean {
           display: flex;
-          align-items: center;
           gap: 10px;
           flex-wrap: wrap;
           justify-content: flex-end;
+          max-width: 820px;
         }
 
-        .prono-select,
-        .favorite-input {
-          background: rgba(15, 23, 42, .86);
-          border: 1px solid rgba(250, 204, 21, .28);
-          color: #f8fafc;
-          border-radius: 14px;
-          padding: 12px 14px;
-          outline: none;
-          font-weight: 800;
-        }
-
-        .favorite-input {
-          width: 155px;
-        }
-
-        .status-pill {
-          border-radius: 999px;
-          padding: 11px 14px;
-          font-weight: 900;
-          font-size: 13px;
+        .prono-btn-clean,
+        .prono-select-clean {
           border: 1px solid rgba(255,255,255,.14);
-          background: rgba(255,255,255,.08);
+          background: rgba(34,197,94,.13);
+          color: #f8fafc;
+          border-radius: 16px;
+          padding: 13px 16px;
+          font-weight: 950;
+          cursor: pointer;
+          outline: none;
+          min-width: 130px;
         }
 
-        .status-pill.locked {
-          color: #fecaca;
-          border-color: rgba(248,113,113,.3);
-          background: rgba(127,29,29,.32);
+        .prono-select-clean {
+          background: #111827;
+          border-color: rgba(186,255,0,.35);
         }
 
-        .status-pill.open {
-          color: #bbf7d0;
-          border-color: rgba(34,197,94,.28);
-          background: rgba(20,83,45,.32);
-        }
-
-        .rules-card {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 12px;
-          margin-bottom: 22px;
-        }
-
-        .rule-box {
-          background: rgba(15, 23, 42, .68);
-          border: 1px solid rgba(255,255,255,.1);
+        .prono-lock-banner-clean {
+          margin-bottom: 18px;
+          padding: 15px 18px;
           border-radius: 18px;
-          padding: 14px;
-          box-shadow: 0 14px 38px rgba(0,0,0,.22);
-        }
-
-        .rule-box strong {
-          display: block;
-          color: #facc15;
-          margin-bottom: 5px;
-        }
-
-        .rule-box span {
-          color: #cbd5e1;
-          font-size: 13px;
-        }
-
-        .section-title {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin: 26px 0 14px;
-        }
-
-        .section-title h2 {
-          margin: 0;
-          font-size: 22px;
+          background: rgba(34,197,94,.10);
+          border: 1px solid rgba(34,197,94,.30);
+          color: #bbf7d0;
           font-weight: 950;
         }
 
-        .section-title small {
-          color: #94a3b8;
-          font-weight: 700;
+        .prono-lock-banner-clean.locked {
+          background: rgba(239,68,68,.13);
+          border-color: rgba(239,68,68,.35);
+          color: #fecaca;
         }
 
-        .matches-grid {
+        .section-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin: 26px 0 14px;
+        }
+
+        .section-head h2 {
+          margin: 0;
+          font-size: 28px;
+          font-weight: 950;
+        }
+
+        .section-head span {
+          color: #b6c2d9;
+          font-weight: 950;
+        }
+
+        .match-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 16px;
         }
 
         .match-card {
-          position: relative;
-          overflow: hidden;
-          background: linear-gradient(180deg, rgba(30, 41, 59, .9), rgba(15, 23, 42, .92));
-          border: 1px solid rgba(255,255,255,.1);
+          background: linear-gradient(180deg, rgba(20,32,51,.96), rgba(11,18,32,.98));
+          border: 1px solid rgba(255,255,255,.12);
           border-radius: 22px;
           padding: 16px;
-          box-shadow: 0 18px 46px rgba(0,0,0,.28);
+          box-shadow: 0 16px 38px rgba(0,0,0,.28);
         }
 
         .match-card.favorite {
-          border-color: rgba(250, 204, 21, .58);
-          box-shadow: 0 0 0 1px rgba(250,204,21,.12), 0 18px 46px rgba(0,0,0,.28);
+          border-color: rgba(186,255,0,.65);
         }
 
-        .match-card.bonus-selected {
+        .match-card.selected {
           border-color: rgba(34,197,94,.65);
         }
 
-        .match-top {
+        .match-card.blocked {
+          border-color: rgba(239,68,68,.35);
+          opacity: .72;
+        }
+
+        .match-meta {
           display: flex;
           justify-content: space-between;
-          align-items: center;
           gap: 10px;
-          margin-bottom: 14px;
-          color: #94a3b8;
+          color: #9fb0ca;
           font-size: 13px;
-          font-weight: 800;
+          font-weight: 900;
+          margin-bottom: 14px;
         }
 
         .badge {
+          background: rgba(186,255,0,.14);
+          color: #c6ff00;
+          border: 1px solid rgba(186,255,0,.28);
           border-radius: 999px;
-          padding: 6px 9px;
-          background: rgba(250, 204, 21, .13);
-          color: #fde68a;
-          font-size: 12px;
+          padding: 5px 8px;
+          font-size: 11px;
           font-weight: 950;
         }
 
-        .bonus-league {
-          background: rgba(59, 130, 246, .16);
-          color: #bfdbfe;
+        .badge.green {
+          background: rgba(34,197,94,.15);
+          color: #86efac;
+          border-color: rgba(34,197,94,.35);
+        }
+
+        .badge.red {
+          background: rgba(239,68,68,.15);
+          color: #fca5a5;
+          border-color: rgba(239,68,68,.35);
         }
 
         .teams {
           display: grid;
           gap: 8px;
-          margin-bottom: 15px;
+          margin-bottom: 14px;
         }
 
-        .team-line {
+        .team {
           display: flex;
-          align-items: center;
           justify-content: space-between;
-          gap: 10px;
-          font-size: 17px;
+          align-items: center;
+          font-size: 18px;
           font-weight: 950;
         }
 
-        .team-name {
-          overflow: hidden;
-          white-space: nowrap;
-          text-overflow: ellipsis;
-        }
-
-        .versus {
+        .team small {
           color: #64748b;
           font-size: 12px;
-          font-weight: 950;
         }
 
-        .pick-row {
+        .choices {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 8px;
-          margin-bottom: 13px;
+          margin-bottom: 12px;
         }
 
-        .pick-btn {
-          border: 1px solid rgba(255,255,255,.11);
+        .choice {
+          border: 1px solid rgba(255,255,255,.12);
           background: rgba(255,255,255,.07);
-          color: #e2e8f0;
+          color: white;
           border-radius: 13px;
           padding: 11px 0;
           font-size: 15px;
           font-weight: 950;
           cursor: pointer;
-          transition: .15s ease;
         }
 
-        .pick-btn:hover {
-          transform: translateY(-1px);
-          background: rgba(255,255,255,.12);
+        .choice.active {
+          background: #baff00;
+          border-color: #baff00;
+          color: #07111f;
         }
 
-        .pick-btn.active {
-          background: #facc15;
-          color: #111827;
-          border-color: #facc15;
+        .choice:disabled,
+        .score-inputs input:disabled,
+        .bonus-btn:disabled {
+          opacity: .55;
+          cursor: not-allowed;
         }
 
-        .exact-box {
-          margin-top: 8px;
+        .score-box {
+          background: rgba(186,255,0,.08);
+          border: 1px solid rgba(186,255,0,.22);
           border-radius: 16px;
-          background: rgba(250, 204, 21, .09);
-          border: 1px solid rgba(250, 204, 21, .2);
           padding: 12px;
+          margin-top: 8px;
         }
 
-        .exact-label {
-          color: #fde68a;
+        .score-title {
+          color: #d9ff66;
           font-size: 12px;
           font-weight: 950;
           margin-bottom: 9px;
@@ -504,349 +541,322 @@ export default function Pronostics() {
         }
 
         .score-inputs input {
-          width: 54px;
-          text-align: center;
+          width: 56px;
           border-radius: 12px;
           border: 1px solid rgba(255,255,255,.16);
-          background: rgba(15, 23, 42, .85);
-          color: #f8fafc;
+          background: #111827;
+          color: white;
           padding: 10px 6px;
-          font-size: 16px;
+          text-align: center;
           font-weight: 950;
           outline: none;
         }
 
-        .score-separator {
-          font-weight: 950;
-          color: #facc15;
-        }
-
-        .muted-info {
+        .muted {
           color: #94a3b8;
           font-size: 12px;
-          line-height: 1.35;
           margin-top: 9px;
+          font-weight: 800;
         }
 
-        .bonus-select-btn {
+        .bonus-btn {
           width: 100%;
-          border: 1px solid rgba(34,197,94,.25);
-          background: rgba(34,197,94,.12);
+          border: 1px solid rgba(34,197,94,.35);
+          background: rgba(34,197,94,.14);
           color: #bbf7d0;
           border-radius: 14px;
           padding: 11px;
           font-weight: 950;
           cursor: pointer;
-          margin-bottom: 12px;
+          margin-bottom: 13px;
         }
 
-        .bonus-select-btn.active {
+        .bonus-btn.active {
           background: #22c55e;
           color: #052e16;
         }
 
-        .disabled {
-          pointer-events: none;
-          opacity: .55;
-        }
-
-        .empty-card {
-          background: rgba(15, 23, 42, .72);
-          border: 1px dashed rgba(255,255,255,.18);
-          border-radius: 20px;
-          padding: 22px;
-          color: #cbd5e1;
-        }
-
         @media (max-width: 1100px) {
-          .matches-grid {
+          .match-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-
-          .rules-card {
-            grid-template-columns: 1fr;
           }
         }
 
         @media (max-width: 760px) {
-          .prono-page {
-            padding: 16px;
-          }
-
-          .prono-header {
+          .prono-top-clean {
             flex-direction: column;
           }
 
-          .prono-toolbar {
+          .prono-actions-clean,
+          .prono-btn-clean,
+          .prono-select-clean {
             width: 100%;
-            justify-content: stretch;
+            max-width: none;
           }
 
-          .prono-select,
-          .favorite-input,
-          .status-pill {
-            width: 100%;
-          }
-
-          .matches-grid {
+          .match-grid {
             grid-template-columns: 1fr;
           }
 
-          .prono-title {
-            font-size: 28px;
+          .prono-title-clean h1 {
+            font-size: 30px;
           }
         }
       `}</style>
 
-      <div className="prono-header">
-        <div>
-          <div className="prono-kicker">Prono Ligue 1 LM</div>
-          <h1 className="prono-title">Page Pronostics</h1>
-          <p className="prono-subtitle">
-            Choisis ton 1/N/2, ton score exact sur ton club favori, puis ton match bonus.
+      <div className="prono-top-clean">
+        <div className="prono-title-clean">
+          <h1>Mes pronos</h1>
+          <p>
+            Les matchs se bloquent automatiquement 5 minutes avant le debut.
           </p>
         </div>
 
-        <div className="prono-toolbar">
+        <div className="prono-actions-clean">
+          <button className="prono-btn-clean" type="button" onClick={() => setRefreshKey((v) => v + 1)}>
+            Actualiser
+          </button>
+
+          <button className="prono-btn-clean" type="button" onClick={previousJournee}>
+            Journee avant
+          </button>
+
           <select
-            className="prono-select"
-            value={selectedJournee?.id}
-            onChange={(e) => setSelectedJourneeId(e.target.value)}
+            className="prono-select-clean"
+            value={selectedJournee.id}
+            onChange={(e) => changeJournee(e.target.value)}
           >
             {journees.map((j) => (
               <option key={j.id} value={j.id}>
-                {j.title || `Journée ${j.number}`}
+                {j.title}
               </option>
             ))}
           </select>
 
-          <input
-            className="favorite-input"
-            value={favoriteTeam}
-            onChange={(e) => {
-              setFavoriteTeam(e.target.value);
-              try {
-                localStorage.setItem(FAVORITE_KEY, e.target.value);
-              } catch {
-                // ignore
-              }
-            }}
-            placeholder="Club favori"
-          />
+          <button className="prono-btn-clean" type="button" onClick={nextJournee}>
+            Journee apres
+          </button>
 
-          <div className={`status-pill ${locked ? "locked" : "open"}`}>
-            {locked ? "Pronostics bloqués" : "Pronostics ouverts"}
-          </div>
+          <select
+            className="prono-select-clean"
+            value={clubFavori}
+            onChange={(e) => setClubFavori(e.target.value)}
+          >
+            {CLUBS.map((club) => (
+              <option key={club} value={club}>
+                {club}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      <div className="rules-card">
-        <div className="rule-box">
-          <strong>Ligue 1 classique</strong>
-          <span>1/N/2 correct = 1 point. Faux = 0 point.</span>
-        </div>
-
-        <div className="rule-box">
-          <strong>Club favori</strong>
-          <span>Score exact = 2 points. Résultat correct = 1 point.</span>
-        </div>
-
-        <div className="rule-box">
-          <strong>Match bonus</strong>
-          <span>1 seul choix. Score exact = 3 points. Résultat correct = 2 points.</span>
-        </div>
+      <div className={`prono-lock-banner-clean ${journeeLocked ? "locked" : ""}`}>
+        {journeeLocked
+          ? `Journee bloquee pour ${selectedJournee.title}`
+          : `Blocage global : ${lockLabel}. Chaque match se bloque aussi 5 minutes avant son coup d'envoi.`}
       </div>
 
-      <div className="section-title">
-        <h2>{selectedJournee?.title || "Journée"}</h2>
-        <small>{selectedJournee?.matches?.length || 0} matchs Ligue 1</small>
+      <div className="section-head">
+        <h2>Matchs Ligue 1 - {selectedJournee.title}</h2>
+        <span>{matches.length} matchs</span>
       </div>
 
-      {selectedJournee?.matches?.length > 0 ? (
-        <div className={`matches-grid ${locked ? "disabled" : ""}`}>
-          {selectedJournee.matches.map((match) => {
-            const prono = currentPronos.matches?.[match.id] || {};
-            const favorite = isFavoriteMatch(match);
+      <div className="match-grid">
+        {matches.map((match) => {
+          const prono = getProno(match.id);
+          const favorite = isFavoriteMatch(match);
+          const blocked = isMatchBlocked(match);
+          const reason = getBlockReason(match);
 
-            return (
-              <div
-                key={match.id}
-                className={`match-card ${favorite ? "favorite" : ""}`}
-              >
-                <div className="match-top">
-                  <span>
-                    {match.date || "Date à définir"} {match.time ? `• ${match.time}` : ""}
-                  </span>
-                  {favorite && <span className="badge">Club favori</span>}
-                </div>
-
-                <div className="teams">
-                  <div className="team-line">
-                    <span className="team-name">{match.home}</span>
-                    <span className="versus">DOM</span>
-                  </div>
-
-                  <div className="team-line">
-                    <span className="team-name">{match.away}</span>
-                    <span className="versus">EXT</span>
-                  </div>
-                </div>
-
-                <div className="pick-row">
-                  {["1", "N", "2"].map((choice) => (
-                    <button
-                      key={choice}
-                      type="button"
-                      className={`pick-btn ${prono.result === choice ? "active" : ""}`}
-                      onClick={() => updateMatchProno(match.id, { result: choice })}
-                    >
-                      {choice}
-                    </button>
-                  ))}
-                </div>
-
-                {favorite ? (
-                  <div className="exact-box">
-                    <div className="exact-label">Score exact club favori</div>
-
-                    <div className="score-inputs">
-                      <input
-                        type="number"
-                        min="0"
-                        value={prono.homeScore ?? ""}
-                        onChange={(e) =>
-                          updateMatchProno(match.id, { homeScore: e.target.value })
-                        }
-                        placeholder="0"
-                      />
-                      <span className="score-separator">-</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={prono.awayScore ?? ""}
-                        onChange={(e) =>
-                          updateMatchProno(match.id, { awayScore: e.target.value })
-                        }
-                        placeholder="0"
-                      />
-                    </div>
-
-                    <div className="muted-info">
-                      Le score exact est disponible car ce match concerne ton club favori.
-                    </div>
-                  </div>
-                ) : (
-                  <div className="muted-info">
-                    Score exact masqué : uniquement sur le club favori.
-                  </div>
-                )}
+          return (
+            <div
+              key={match.id}
+              className={`match-card ${favorite ? "favorite" : ""} ${blocked ? "blocked" : ""}`}
+            >
+              <div className="match-meta">
+                <span>{formatMatchDateTime(match.date, match.time)}</span>
+                <span className={blocked ? "badge red" : "badge green"}>
+                  {blocked ? reason : "Ouvert"}
+                </span>
               </div>
-            );
-          })}
+
+              <div className="teams">
+                <div className="team">
+                  <span>{match.home}</span>
+                  <small>DOM</small>
+                </div>
+                <div className="team">
+                  <span>{match.away}</span>
+                  <small>EXT</small>
+                </div>
+              </div>
+
+              {favorite ? (
+                <div className="score-box">
+                  <div className="score-title">Score exact club favori</div>
+                  <div className="score-inputs">
+                    <input
+                      type="number"
+                      min="0"
+                      disabled={blocked}
+                      value={prono.homeScore || ""}
+                      onChange={(e) =>
+                        updateProno(match, {
+                          homeScore: e.target.value,
+                          result: ""
+                        })
+                      }
+                      placeholder="0"
+                    />
+                    <strong>-</strong>
+                    <input
+                      type="number"
+                      min="0"
+                      disabled={blocked}
+                      value={prono.awayScore || ""}
+                      onChange={(e) =>
+                        updateProno(match, {
+                          awayScore: e.target.value,
+                          result: ""
+                        })
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="muted">
+                    {blocked
+                      ? "Ce match est bloque."
+                      : `Blocage auto a ${formatAutoLock(match)}.`}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="choices">
+                    {["1", "N", "2"].map((choice) => (
+                      <button
+                        key={choice}
+                        disabled={blocked}
+                        className={`choice ${prono.result === choice ? "active" : ""}`}
+                        onClick={() =>
+                          updateProno(match, {
+                            result: choice,
+                            homeScore: "",
+                            awayScore: ""
+                          })
+                        }
+                      >
+                        {choice}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="muted">
+                    {blocked
+                      ? "Ce match est bloque."
+                      : `Blocage auto a ${formatAutoLock(match)}.`}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="section-head">
+        <h2>Les 3 matchs bonus - {selectedJournee.title}</h2>
+        <span>{bonusSelected ? "1/3 choisi" : "0/3"}</span>
+      </div>
+
+      {bonus.length === 0 ? (
+        <div className="match-card">
+          Aucun bonus importe pour cette journee.
         </div>
       ) : (
-        <div className="empty-card">
-          Aucun match importé pour cette journée.
-        </div>
-      )}
-
-      <div className="section-title">
-        <h2>Matchs bonus</h2>
-        <small>Choisis 1 seul match bonus</small>
-      </div>
-
-      {selectedJournee?.bonus?.length > 0 ? (
-        <div className={`matches-grid ${locked ? "disabled" : ""}`}>
-          {selectedJournee.bonus.slice(0, 3).map((bonus) => {
-            const selected = currentPronos.selectedBonusId === bonus.id;
-            const prono = currentPronos.bonus?.[bonus.id] || {};
+        <div className="match-grid">
+          {bonus.map((match) => {
+            const prono = getProno(match.id);
+            const selected = bonusSelected === match.id;
+            const blocked = journeeLocked || isAutoMatchLocked(match);
 
             return (
-              <div
-                key={bonus.id}
-                className={`match-card ${selected ? "bonus-selected" : ""}`}
-              >
-                <div className="match-top">
-                  <span>
-                    {bonus.date || "Date à définir"} {bonus.time ? `• ${bonus.time}` : ""}
+              <div key={match.id} className={`match-card ${selected ? "selected" : ""} ${blocked ? "blocked" : ""}`}>
+                <div className="match-meta">
+                  <span>{formatMatchDateTime(match.date, match.time)}</span>
+                  <span className={blocked ? "badge red" : "badge green"}>
+                    {blocked ? "Bloque auto" : match.league}
                   </span>
-                  <span className="badge bonus-league">{bonus.league}</span>
                 </div>
 
                 <button
-                  type="button"
-                  className={`bonus-select-btn ${selected ? "active" : ""}`}
-                  onClick={() => selectBonus(bonus.id)}
+                  className={`bonus-btn ${selected ? "active" : ""}`}
+                  disabled={blocked}
+                  onClick={() => {
+                    if (!blocked) setBonusSelected(match.id);
+                  }}
                 >
-                  {selected ? "Bonus sélectionné" : "Choisir ce bonus"}
+                  {selected ? "Bonus selectionne" : "Choisir ce bonus"}
                 </button>
 
                 <div className="teams">
-                  <div className="team-line">
-                    <span className="team-name">{bonus.home}</span>
-                    <span className="versus">DOM</span>
+                  <div className="team">
+                    <span>{match.home}</span>
+                    <small>DOM</small>
                   </div>
-
-                  <div className="team-line">
-                    <span className="team-name">{bonus.away}</span>
-                    <span className="versus">EXT</span>
+                  <div className="team">
+                    <span>{match.away}</span>
+                    <small>EXT</small>
                   </div>
                 </div>
 
-                <div className="pick-row">
-                  {["1", "N", "2"].map((choice) => (
-                    <button
-                      key={choice}
-                      type="button"
-                      className={`pick-btn ${prono.result === choice ? "active" : ""}`}
-                      onClick={() => {
-                        selectBonus(bonus.id);
-                        updateBonusProno(bonus.id, { result: choice });
-                      }}
-                    >
-                      {choice}
-                    </button>
-                  ))}
-                </div>
-
-                {selected && (
-                  <div className="exact-box">
-                    <div className="exact-label">Score exact bonus</div>
-
+                {selected ? (
+                  <div className="score-box">
+                    <div className="score-title">Score exact bonus</div>
                     <div className="score-inputs">
                       <input
                         type="number"
                         min="0"
-                        value={prono.homeScore ?? ""}
+                        disabled={blocked}
+                        value={prono.homeScore || ""}
                         onChange={(e) =>
-                          updateBonusProno(bonus.id, { homeScore: e.target.value })
+                          updateProno(match, {
+                            homeScore: e.target.value,
+                            result: ""
+                          })
                         }
                         placeholder="0"
                       />
-                      <span className="score-separator">-</span>
+                      <strong>-</strong>
                       <input
                         type="number"
                         min="0"
-                        value={prono.awayScore ?? ""}
+                        disabled={blocked}
+                        value={prono.awayScore || ""}
                         onChange={(e) =>
-                          updateBonusProno(bonus.id, { awayScore: e.target.value })
+                          updateProno(match, {
+                            awayScore: e.target.value,
+                            result: ""
+                          })
                         }
                         placeholder="0"
                       />
                     </div>
-
-                    <div className="muted-info">
-                      Score exact bonus = 3 points si bon score, 2 points si bon résultat.
+                    <div className="muted">
+                      {blocked
+                        ? "Ce bonus est bloque."
+                        : `Blocage auto a ${formatAutoLock(match)}.`}
                     </div>
+                  </div>
+                ) : (
+                  <div className="muted">
+                    {blocked
+                      ? "Ce bonus est bloque."
+                      : "Choisis ce bonus pour entrer ton score exact."}
                   </div>
                 )}
               </div>
             );
           })}
-        </div>
-      ) : (
-        <div className="empty-card">
-          Aucun match bonus renseigné pour cette journée.
         </div>
       )}
     </div>

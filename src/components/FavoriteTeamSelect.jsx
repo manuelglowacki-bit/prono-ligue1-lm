@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
 const FAVORITE_VALIDATED_KEY = 'prono_ligue1_lm_favorite_team_validated';

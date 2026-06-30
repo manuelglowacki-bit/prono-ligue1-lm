@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import '../styles/trophies.css';
 
 const PLAYER_KEY = 'prono_ligue1_lm_current_player';

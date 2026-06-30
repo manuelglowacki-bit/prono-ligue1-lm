@@ -1,4 +1,4 @@
-﻿const teamPairs = [
+const teamPairs = [
   ['RC Lens', 'PSG'],
   ['OM', 'Lyon'],
   ['Lille', 'Monaco'],
@@ -7,7 +7,7 @@
   ['Toulouse', 'Brest'],
   ['Le Havre', 'Auxerre'],
   ['Angers', 'Montpellier'],
-  ['Reims', 'Saint-Ã‰tienne'],
+  ['Reims', 'Saint-Étienne'],
   ['Marseille', 'Clermont'],
 ];
 
@@ -34,10 +34,10 @@ const buildDayMatches = (dayNumber) =>
 
 const buildBonusChoices = () => [
   {
-    label: 'Real Madrid vs AtlÃ©tico',
-    value: 'Real Madrid - AtlÃ©tico',
+    label: 'Real Madrid vs Atlético',
+    value: 'Real Madrid - Atlético',
     home: 'Real Madrid',
-    away: 'AtlÃ©tico',
+    away: 'Atlético',
     correctResult: '1',
     correctScore: { home: 2, away: 1 },
   },

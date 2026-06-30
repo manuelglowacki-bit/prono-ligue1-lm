@@ -1,4 +1,4 @@
-﻿export default function PredictionButtons({ selectedValue, onSelect }) {
+export default function PredictionButtons({ selectedValue, onSelect }) {
   const options = [
     { value: '1', label: '1' },
     { value: 'N', label: 'N', neutral: true },

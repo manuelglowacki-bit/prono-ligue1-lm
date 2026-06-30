@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getRegisteredPlayers } from '../utils/players';
 import '../styles/ranking.css';
 import { getDisplayName } from '../utils/displayNames';

@@ -1,4 +1,4 @@
-﻿import MatchCard from './MatchCard';
+import MatchCard from './MatchCard';
 
 export default function PredictionProgress({ value = 0, label = '0 / 0 pronos remplis', matches = [], selections = [], onSelect = () => {} }) {
   return (

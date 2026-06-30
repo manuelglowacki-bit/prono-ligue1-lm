@@ -1,3 +1,3 @@
-﻿export default function AdminAutoReminder() {
+export default function AdminAutoReminder() {
   return null;
 }

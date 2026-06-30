@@ -1,3 +1,3 @@
-﻿export default function AdminAIControl() {
+export default function AdminAIControl() {
   return null;
 }

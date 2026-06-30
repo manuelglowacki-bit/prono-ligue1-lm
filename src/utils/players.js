@@ -1,4 +1,4 @@
-﻿export const ACCOUNTS_KEY = 'prono_ligue1_lm_accounts';
+export const ACCOUNTS_KEY = 'prono_ligue1_lm_accounts';
 
 export function safeJson(key, fallback) {
   try {

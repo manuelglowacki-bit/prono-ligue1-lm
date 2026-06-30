@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import '../styles/auth.css';
 import { ensureFavoriteTeam } from '../utils/favoriteTeam';
 

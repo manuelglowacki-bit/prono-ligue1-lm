@@ -1,4 +1,4 @@
-﻿import BonusMatchCard from './BonusMatchCard';
+import BonusMatchCard from './BonusMatchCard';
 
 export default function FavoriteTeamCard({
   bonusChoices = [],
@@ -14,8 +14,8 @@ export default function FavoriteTeamCard({
       <section className="card heart-card">
         <div className="section-heading compact">
           <div>
-            <p className="eyebrow">Ã‰quipe de cÅ“ur</p>
-            <h2>Ton Ã©quipe de cÅ“ur : RC Lens</h2>
+            <p className="eyebrow">Équipe de cÅ“ur</p>
+            <h2>Ton équipe de cÅ“ur : RC Lens</h2>
           </div>
         </div>
 
@@ -42,7 +42,7 @@ export default function FavoriteTeamCard({
           </label>
         </div>
 
-        <p className="helper-text">Score exact = 2 pts Â· Bon rÃ©sultat = 1 pt</p>
+        <p className="helper-text">Score exact = 2 pts · Bon résultat = 1 pt</p>
       </section>
 
       <BonusMatchCard

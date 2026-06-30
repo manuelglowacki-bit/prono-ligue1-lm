@@ -1,4 +1,4 @@
-﻿export const ACCOUNTS_KEY = 'prono_ligue1_lm_accounts';
+export const ACCOUNTS_KEY = 'prono_ligue1_lm_accounts';
 export const SESSION_KEY = 'prono_ligue1_lm_session';
 export const PLAYER_KEY = 'prono_ligue1_lm_current_player';
 export const DISPLAY_NAMES_KEY = 'prono_ligue1_lm_display_names';

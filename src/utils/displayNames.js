@@ -1,4 +1,4 @@
-﻿export const DISPLAY_NAMES_KEY = 'prono_ligue1_lm_display_names';
+export const DISPLAY_NAMES_KEY = 'prono_ligue1_lm_display_names';
 
 export function getDisplayNames() {
   try {

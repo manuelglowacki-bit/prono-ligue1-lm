@@ -1,4 +1,4 @@
-﻿const CLUB_ALIASES = {
+const CLUB_ALIASES = {
   psg: ["psg", "paris", "paris sg", "paris saint germain", "paris saint-germain"],
   marseille: ["marseille", "om", "olympique de marseille"],
   lyon: ["lyon", "ol", "olympique lyonnais"],

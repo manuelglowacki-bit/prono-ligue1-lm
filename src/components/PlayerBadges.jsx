@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getPlayerOwnedBadges } from '../utils/badgeOwners';
 import '../styles/playerBadges.css';
 

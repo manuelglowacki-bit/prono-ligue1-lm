@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import AdminExcelImportMatches from "./AdminExcelImportMatches.jsx";
 
 export default function AdminCleanPage() {

@@ -1,4 +1,4 @@
-﻿import { Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 export default function PronosHeader({ isComplete, selectedDay, onValidate }) {
   return (
@@ -6,10 +6,10 @@ export default function PronosHeader({ isComplete, selectedDay, onValidate }) {
       <div>
         <div className="page-badge">
           <Sparkles size={14} />
-          ClÃ´ture dans 2j 04h
+          Clôture dans 2j 04h
         </div>
         <h1>Mes pronos</h1>
-        <p>{`JournÃ©e ${selectedDay} Â· Ligue 1 2026/2027`}</p>
+        <p>{`Journée ${selectedDay} · Ligue 1 2026/2027`}</p>
       </div>
       <button className="primary-btn" disabled={!isComplete} onClick={onValidate}>
         Valider mes pronos

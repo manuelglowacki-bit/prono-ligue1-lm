@@ -1,4 +1,4 @@
-﻿export const players = ['Laurent','Quentin','Jo B','Jonathan','Eric L','Yannis','Giovani','Manu','David J','Samuel'];
+export const players = ['Laurent','Quentin','Jo B','Jonathan','Eric L','Yannis','Giovani','Manu','David J','Samuel'];
 
 export const teams = ['RC Lens','OM','PSG','LOSC','OL','Monaco','Nantes','Rennes','Strasbourg','Nice'];
 
@@ -26,7 +26,7 @@ export const pronosMatches = [
 
 export const bonusMatches = [
   ['Premier League', 'Man City - Liverpool'],
-  ['La Liga', 'Real Madrid - BarÃ§a'],
+  ['La Liga', 'Real Madrid - Barça'],
   ['Serie A', 'Juventus - Milan'],
 ];
 
@@ -43,16 +43,16 @@ export const trophies = [
 export const badges = [
   'Leader Laurent',
   'Roi du 1N2 Samuel',
-  'Roi Ã©quipe de cÅ“ur Manu',
+  'Roi équipe de cÅ“ur Manu',
   'Roi bonus Jonathan',
   'Roi scores exacts Eric L',
 ];
 
 export const trophyProgressions = [
   '10 scores exacts',
-  '20 points Ã©quipe de cÅ“ur',
+  '20 points équipe de cÅ“ur',
   '30 points bonus',
-  'Leader 10 journÃ©es',
+  'Leader 10 journées',
 ];
 
 export const hallOfFame = players.slice(0, 8).map((p, i) => ({
@@ -68,7 +68,7 @@ export const adminMatches = [
 
 export const adminBonusMatches = [
   'Man City - Arsenal',
-  'Real Madrid - BarÃ§a',
+  'Real Madrid - Barça',
   'Inter - Juventus',
 ];
 

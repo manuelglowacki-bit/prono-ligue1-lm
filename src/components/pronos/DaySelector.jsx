@@ -1,7 +1,7 @@
-﻿export default function DaySelector({ days, activeDay = 0, onSelectDay }) {
+export default function DaySelector({ days, activeDay = 0, onSelectDay }) {
   return (
     <section className="rounds-strip card">
-      <div className="rounds-label">JournÃ©es</div>
+      <div className="rounds-label">Journées</div>
       <div className="rounds-scroll">
         {days.map((day, index) => (
           <button

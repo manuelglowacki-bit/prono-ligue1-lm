@@ -1,4 +1,4 @@
-﻿import { isAdminSession } from '../utils/authSecurity';
+import { isAdminSession } from '../utils/authSecurity';
 import React from 'react';
 
 const menuItems = [
