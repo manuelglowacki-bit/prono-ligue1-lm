@@ -4,6 +4,10 @@ const CLUB_KEY = "favoriteTeam";
 const CLUB_FAVORI_KEY = "clubFavori";
 const SELECTED_CLUB_KEY = "selectedClub";
 const FAVORITE_TEAM_KEY = "prono_ligue1_lm_favorite_team";
+const FAVORITE_VALIDATED_KEY = "favoriteTeamValidated";
+const FAVORITE_VALIDATED_BY_PLAYER_KEY = "prono_ligue1_lm_favorite_team_validated";
+const FAVORITE_DEADLINE_KEY = "favoriteTeamDeadline";
+const FAVORITE_DEADLINE_ALT_KEY = "prono_ligue1_lm_favorite_deadline";
 
 const MATCHS_KEY = "prono_ligue1_lm_matchs_admin";
 const JOURNEES_KEY = "admin_journees";
@@ -11,6 +15,30 @@ const PLAYER_KEY = "prono_ligue1_lm_current_player";
 const BONUS_CHOICES_KEY = "prono_ligue1_lm_bonus_choices";
 const SELECTED_JOURNEE_KEY = "selected_prono_journee";
 const BONUS_SELECTED_KEY = "prono_lm_bonus_selected";
+
+const DEFAULT_TEAM = "RC Lens";
+const DEFAULT_DEADLINE = "2026-07-12T23:23";
+
+const CLUBS = [
+  "RC Lens",
+  "PSG",
+  "OM",
+  "LOSC",
+  "OL",
+  "AS Monaco",
+  "Stade Rennais",
+  "OGC Nice",
+  "FC Nantes",
+  "Strasbourg",
+  "Toulouse",
+  "Brest",
+  "Auxerre",
+  "Angers",
+  "Le Havre",
+  "Metz",
+  "Lorient",
+  "Paris FC"
+];
 
 const RANKING_KEYS = [
   "prono_ligue1_lm_classement",
@@ -39,6 +67,33 @@ function cleanText(value) {
     .trim();
 }
 
+function hideOldFavoritePanel() {
+  try {
+    const elements = Array.from(document.querySelectorAll("section, article, div"));
+
+    elements.forEach((element) => {
+      if (element.closest(".home-page-clean")) return;
+
+      const text = cleanText(element.textContent);
+
+      const isOldFavoriteBlock =
+        text.includes("club favori") &&
+        (
+          text.includes("choisis ton equipe favorite") ||
+          text.includes("valider mon equipe") ||
+          text.includes("equipe favorite non validee") ||
+          text.includes("equipe favorite validee")
+        );
+
+      if (isOldFavoriteBlock) {
+        element.style.display = "none";
+      }
+    });
+  } catch {
+    // Ne bloque jamais l'accueil.
+  }
+}
+
 function getCurrentPlayer() {
   return (
     localStorage.getItem(PLAYER_KEY) ||
@@ -48,7 +103,63 @@ function getCurrentPlayer() {
   );
 }
 
-function getFavoriteTeam(player) {
+function getDeadline() {
+  return (
+    localStorage.getItem(FAVORITE_DEADLINE_KEY) ||
+    localStorage.getItem(FAVORITE_DEADLINE_ALT_KEY) ||
+    DEFAULT_DEADLINE
+  );
+}
+
+function isDeadlinePassed(deadline) {
+  const date = new Date(deadline);
+  if (Number.isNaN(date.getTime())) return false;
+  return new Date() > date;
+}
+
+function formatDeadline(deadline) {
+  const date = new Date(deadline);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Date non définie";
+  }
+
+  return date.toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function getValidatedStatus(player) {
+  if (localStorage.getItem(FAVORITE_VALIDATED_KEY) === "true") return true;
+
+  const saved = loadJson(FAVORITE_VALIDATED_BY_PLAYER_KEY, {});
+
+  if (typeof saved === "boolean") return saved;
+
+  if (saved && typeof saved === "object") {
+    return Boolean(saved[player] || saved.validated || saved.valide);
+  }
+
+  return false;
+}
+
+function setValidatedStatus(player, value) {
+  localStorage.setItem(FAVORITE_VALIDATED_KEY, value ? "true" : "false");
+
+  const saved = loadJson(FAVORITE_VALIDATED_BY_PLAYER_KEY, {});
+  const next =
+    saved && typeof saved === "object" && !Array.isArray(saved)
+      ? { ...saved, [player]: value }
+      : { [player]: value };
+
+  localStorage.setItem(FAVORITE_VALIDATED_BY_PLAYER_KEY, JSON.stringify(next));
+}
+
+function readFavoriteTeam(player) {
   const direct =
     localStorage.getItem(CLUB_KEY) ||
     localStorage.getItem(CLUB_FAVORI_KEY) ||
@@ -73,6 +184,42 @@ function getFavoriteTeam(player) {
   }
 
   return "";
+}
+
+function saveFavoriteTeam(player, club, validated = false) {
+  const finalClub = club || DEFAULT_TEAM;
+
+  localStorage.setItem(CLUB_KEY, finalClub);
+  localStorage.setItem(CLUB_FAVORI_KEY, finalClub);
+  localStorage.setItem(SELECTED_CLUB_KEY, finalClub);
+  localStorage.setItem("favoriteClub", finalClub);
+
+  const saved = loadJson(FAVORITE_TEAM_KEY, {});
+  const next =
+    saved && typeof saved === "object" && !Array.isArray(saved)
+      ? { ...saved, [player]: finalClub, club: finalClub, favoriteTeam: finalClub }
+      : { [player]: finalClub, club: finalClub, favoriteTeam: finalClub };
+
+  localStorage.setItem(FAVORITE_TEAM_KEY, JSON.stringify(next));
+
+  if (validated) {
+    setValidatedStatus(player, true);
+  }
+
+  window.dispatchEvent(new Event("storage"));
+  window.dispatchEvent(new CustomEvent("favorite-team-updated"));
+}
+
+function getFavoriteTeam(player, deadline) {
+  const validated = getValidatedStatus(player);
+  const passed = isDeadlinePassed(deadline);
+
+  if (!validated && passed) {
+    saveFavoriteTeam(player, DEFAULT_TEAM, true);
+    return DEFAULT_TEAM;
+  }
+
+  return readFavoriteTeam(player) || DEFAULT_TEAM;
 }
 
 function getHome(match) {
@@ -371,11 +518,17 @@ function buildPodium() {
 
 export default function HomePage() {
   const [refresh, setRefresh] = useState(0);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     function update() {
+      hideOldFavoritePanel();
       setRefresh((value) => value + 1);
     }
+
+    hideOldFavoritePanel();
+    setTimeout(hideOldFavoritePanel, 200);
+    setTimeout(hideOldFavoritePanel, 1000);
 
     window.addEventListener("storage", update);
     window.addEventListener("favorite-team-updated", update);
@@ -395,7 +548,11 @@ export default function HomePage() {
 
   const data = useMemo(() => {
     const player = getCurrentPlayer();
-    const club = getFavoriteTeam(player);
+    const deadline = getDeadline();
+    const deadlinePassed = isDeadlinePassed(deadline);
+    const validated = getValidatedStatus(player);
+    const club = getFavoriteTeam(player, deadline);
+
     const allMatches = readFlatMatches();
     const journees = buildJournees(allMatches);
 
@@ -431,6 +588,9 @@ export default function HomePage() {
     return {
       player,
       club,
+      deadline,
+      deadlinePassed,
+      validated: getValidatedStatus(player),
       selectedJournee,
       matchesCount: selectedJournee.matches.length,
       bonusCount: selectedJournee.bonus.length,
@@ -441,6 +601,32 @@ export default function HomePage() {
       podium: buildPodium()
     };
   }, [refresh]);
+
+  function handleClubChange(event) {
+    const nextClub = event.target.value;
+    saveFavoriteTeam(data.player, nextClub, false);
+    setValidatedStatus(data.player, false);
+    setMessage("");
+    setRefresh((value) => value + 1);
+  }
+
+  function handleValidateClub() {
+    if (!data.club) {
+      setMessage("Choisis une équipe avant de valider.");
+      return;
+    }
+
+    if (data.deadlinePassed) {
+      saveFavoriteTeam(data.player, DEFAULT_TEAM, true);
+      setMessage("Date limite passée : RC Lens est automatiquement validé.");
+      setRefresh((value) => value + 1);
+      return;
+    }
+
+    saveFavoriteTeam(data.player, data.club, true);
+    setMessage(`Équipe favorite validée : ${data.club}`);
+    setRefresh((value) => value + 1);
+  }
 
   return (
     <div className="home-page-clean">
@@ -561,6 +747,77 @@ export default function HomePage() {
         .home-line-clean strong {
           color: #fff;
           text-align: right;
+        }
+
+        .home-favorite-control {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 12px;
+          margin-top: 16px;
+        }
+
+        .home-select {
+          width: 100%;
+          min-height: 48px;
+          border-radius: 16px;
+          border: 1px solid rgba(186,255,0,.38);
+          background: rgba(15,23,42,.96);
+          color: #fff;
+          padding: 0 14px;
+          font-weight: 950;
+          outline: none;
+        }
+
+        .home-btn {
+          min-height: 48px;
+          border: 0;
+          border-radius: 16px;
+          padding: 0 18px;
+          background: #baff00;
+          color: #07111f;
+          cursor: pointer;
+          font-weight: 950;
+          box-shadow: 0 12px 26px rgba(186,255,0,.18);
+        }
+
+        .home-btn:hover {
+          filter: brightness(1.05);
+        }
+
+        .home-status {
+          display: inline-flex;
+          margin-top: 14px;
+          padding: 9px 13px;
+          border-radius: 999px;
+          font-weight: 950;
+        }
+
+        .home-status.ok {
+          background: rgba(34,197,94,.13);
+          border: 1px solid rgba(34,197,94,.30);
+          color: #bbf7d0;
+        }
+
+        .home-status.wait {
+          background: rgba(239,68,68,.13);
+          border: 1px solid rgba(239,68,68,.30);
+          color: #fecaca;
+        }
+
+        .home-deadline {
+          margin-top: 10px;
+          color: #cbd5e1;
+          font-weight: 850;
+        }
+
+        .home-message {
+          margin-top: 12px;
+          padding: 11px 13px;
+          border-radius: 14px;
+          background: rgba(186,255,0,.12);
+          border: 1px solid rgba(186,255,0,.22);
+          color: #ecfccb;
+          font-weight: 900;
         }
 
         .home-pill-clean {
@@ -684,6 +941,10 @@ export default function HomePage() {
             font-size: 32px;
           }
 
+          .home-favorite-control {
+            grid-template-columns: 1fr;
+          }
+
           .home-summary-mini {
             grid-template-columns: 1fr;
           }
@@ -708,7 +969,7 @@ export default function HomePage() {
         <div className="home-card-clean">
           <span>Club favori</span>
           <strong>{data.club || "Aucun club"}</strong>
-          <small>Équipe favorite</small>
+          <small>{data.validated ? "Équipe validée" : "En attente de validation"}</small>
         </div>
 
         <div className="home-card-clean">
@@ -743,6 +1004,45 @@ export default function HomePage() {
             <span>Équipe favorite</span>
             <strong>{data.club || "Non choisie"}</strong>
           </div>
+
+          <div className="home-favorite-control">
+            <select
+              className="home-select"
+              value={data.club || DEFAULT_TEAM}
+              onChange={handleClubChange}
+              disabled={data.deadlinePassed}
+            >
+              {CLUBS.map((club) => (
+                <option key={club} value={club}>
+                  {club}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              className="home-btn"
+              onClick={handleValidateClub}
+            >
+              Valider
+            </button>
+          </div>
+
+          <div className={data.validated ? "home-status ok" : "home-status wait"}>
+            {data.validated
+              ? `Équipe favorite validée : ${data.club}`
+              : `Équipe favorite non validée : ${data.club}`}
+          </div>
+
+          <div className="home-deadline">
+            Date limite : {formatDeadline(data.deadline)}
+          </div>
+
+          <div className="home-deadline">
+            Si aucune équipe n’est validée avant la date limite, RC Lens sera sélectionné automatiquement.
+          </div>
+
+          {message && <div className="home-message">{message}</div>}
         </section>
 
         <section className="home-panel-clean">
