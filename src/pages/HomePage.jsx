@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 const CLUB_KEY = "favoriteTeam";
-const VALIDATED_KEY = "favoriteTeamValidated";
-const DEADLINE_KEY = "favoriteTeamDeadline";
 const JOURNEES_KEY = "admin_journees";
 const MATCHS_KEY = "prono_ligue1_lm_matchs_admin";
 const PLAYER_KEY = "prono_ligue1_lm_current_player";
@@ -21,7 +19,10 @@ function loadJson(key, fallback) {
 }
 
 function getText(value) {
-  return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function getCurrentPlayer() {
@@ -52,51 +53,6 @@ function getFavoriteTeam(player) {
   }
 
   return "";
-}
-
-function getFavoriteValidated(player) {
-  if (localStorage.getItem(VALIDATED_KEY) === "true") return true;
-
-  const saved = loadJson("prono_ligue1_lm_favorite_team_validated", {});
-  if (typeof saved === "boolean") return saved;
-
-  if (saved && typeof saved === "object") {
-    return Boolean(saved[player] || saved.validated || saved.valide);
-  }
-
-  return false;
-}
-
-function getDeadline() {
-  return (
-    localStorage.getItem(DEADLINE_KEY) ||
-    localStorage.getItem("prono_ligue1_lm_favorite_deadline") ||
-    ""
-  );
-}
-
-function formatDate(value) {
-  if (!value) return "Aucune date";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Date invalide";
-
-  return date.toLocaleString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
-function isPassed(value) {
-  if (!value) return false;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-
-  return new Date() >= date;
 }
 
 function getHome(match) {
@@ -145,7 +101,13 @@ function getJournee(match) {
 }
 
 function getMatchId(match) {
-  return String(match?.id || match?.matchId || match?.idMatch || match?.match_id || "");
+  return String(
+    match?.id ||
+    match?.matchId ||
+    match?.idMatch ||
+    match?.match_id ||
+    ""
+  );
 }
 
 function isBonus(match) {
@@ -160,6 +122,7 @@ function isBonus(match) {
 
 function buildJournees() {
   const adminJournees = loadJson(JOURNEES_KEY, []);
+
   if (Array.isArray(adminJournees) && adminJournees.length > 0) {
     return adminJournees.map((j, index) => ({
       id: String(j.id || j.journee || j.numero || index + 1),
@@ -176,6 +139,7 @@ function buildJournees() {
   if (Array.isArray(matches)) {
     matches.forEach((match) => {
       const round = getJournee(match);
+
       if (!byRound[round]) {
         byRound[round] = {
           id: String(round),
@@ -224,11 +188,15 @@ function goToPage(page) {
   const wanted = aliases[page] || [page];
 
   localStorage.setItem("prono_ligue1_lm_active_page", page);
+
   window.dispatchEvent(new CustomEvent("prono:navigate", { detail: page }));
   window.dispatchEvent(new CustomEvent("navigate", { detail: page }));
+
   window.location.hash = page;
 
-  const buttons = Array.from(document.querySelectorAll("button, a, [role='button']"));
+  const buttons = Array.from(
+    document.querySelectorAll("button, a, [role='button']")
+  );
 
   const found = buttons.find((element) => {
     const content = getText([
@@ -279,11 +247,9 @@ export default function HomePage() {
   const data = useMemo(() => {
     const player = getCurrentPlayer();
     const club = getFavoriteTeam(player);
-    const validated = getFavoriteValidated(player);
-    const deadline = getDeadline();
-    const deadlinePassed = isPassed(deadline);
 
     const journees = buildJournees();
+
     const selectedJourneeId =
       localStorage.getItem(SELECTED_JOURNEE_KEY) ||
       localStorage.getItem("prono_ligue1_lm_selected_journee") ||
@@ -297,6 +263,7 @@ export default function HomePage() {
       null;
 
     const bonusList = selectedJournee?.bonus || [];
+
     const selectedBonus = selectedJournee
       ? getSelectedBonus(player, selectedJournee.number, bonusList)
       : null;
@@ -304,9 +271,6 @@ export default function HomePage() {
     return {
       player,
       club,
-      validated,
-      deadline,
-      deadlinePassed,
       selectedJournee,
       selectedBonus,
       matchesCount: selectedJournee?.matches?.length || 0,
@@ -348,7 +312,7 @@ export default function HomePage() {
 
         .home-grid-clean {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 16px;
           margin-bottom: 20px;
         }
@@ -442,12 +406,6 @@ export default function HomePage() {
           border: 1px solid rgba(34,197,94,.30);
           color: #bbf7d0;
           font-weight: 950;
-        }
-
-        .home-pill-clean.red {
-          background: rgba(239,68,68,.13);
-          border-color: rgba(239,68,68,.30);
-          color: #fecaca;
         }
 
         .home-pill-clean.gold {
@@ -546,16 +504,10 @@ export default function HomePage() {
           </small>
         </div>
 
-        <div className={data.validated ? "home-card-clean" : "home-card-clean warning"}>
+        <div className="home-card-clean">
           <span>Club favori</span>
           <strong>{data.club || "Aucun club"}</strong>
-          <small>{data.validated ? "Club validé" : "Club non validé"}</small>
-        </div>
-
-        <div className={data.deadlinePassed ? "home-card-clean warning" : "home-card-clean"}>
-          <span>Date butoir</span>
-          <strong>{data.deadlinePassed ? "Bloquée" : "Ouverte"}</strong>
-          <small>{formatDate(data.deadline)}</small>
+          <small>Équipe favorite</small>
         </div>
       </div>
 
@@ -571,22 +523,6 @@ export default function HomePage() {
           <div className="home-line-clean">
             <span>Équipe favorite</span>
             <strong>{data.club || "Non choisie"}</strong>
-          </div>
-
-          <div className="home-line-clean">
-            <span>Validation</span>
-            <strong>{data.validated ? "Validée" : "Non validée"}</strong>
-          </div>
-
-          <div className="home-line-clean">
-            <span>Limite de choix</span>
-            <strong>{formatDate(data.deadline)}</strong>
-          </div>
-
-          <div className={data.validated ? "home-pill-clean" : "home-pill-clean red"}>
-            {data.validated
-              ? "Équipe favorite bien validée"
-              : "Va valider ton équipe favorite"}
           </div>
         </section>
 
