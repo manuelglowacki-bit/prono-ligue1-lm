@@ -1,13 +1,38 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 const CLUB_KEY = "favoriteTeam";
+const CLUB_FAVORI_KEY = "clubFavori";
+const SELECTED_CLUB_KEY = "selectedClub";
+const FAVORITE_TEAM_KEY = "prono_ligue1_lm_favorite_team";
+
 const JOURNEES_KEY = "admin_journees";
 const MATCHS_KEY = "prono_ligue1_lm_matchs_admin";
 const PLAYER_KEY = "prono_ligue1_lm_current_player";
-const FAVORITE_TEAM_KEY = "prono_ligue1_lm_favorite_team";
 const BONUS_CHOICES_KEY = "prono_ligue1_lm_bonus_choices";
 const SELECTED_JOURNEE_KEY = "selected_prono_journee";
 const BONUS_SELECTED_KEY = "prono_lm_bonus_selected";
+const VALIDATIONS_KEY = "prono_ligue1_lm_validations_journees";
+
+const CLUBS = [
+  "RC Lens",
+  "PSG",
+  "OM",
+  "LOSC",
+  "OL",
+  "AS Monaco",
+  "Stade Rennais",
+  "OGC Nice",
+  "FC Nantes",
+  "Strasbourg",
+  "Toulouse",
+  "Brest",
+  "Auxerre",
+  "Angers",
+  "Le Havre",
+  "Metz",
+  "Lorient",
+  "Paris FC"
+];
 
 const RANKING_KEYS = [
   "prono_ligue1_lm_classement",
@@ -30,7 +55,8 @@ function getText(value) {
   return String(value || "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 }
 
 function getCurrentPlayer() {
@@ -43,10 +69,15 @@ function getCurrentPlayer() {
 }
 
 function getFavoriteTeam(player) {
-  const direct = localStorage.getItem(CLUB_KEY);
+  const direct =
+    localStorage.getItem(CLUB_KEY) ||
+    localStorage.getItem(CLUB_FAVORI_KEY) ||
+    localStorage.getItem(SELECTED_CLUB_KEY);
+
   if (direct) return direct;
 
   const saved = loadJson(FAVORITE_TEAM_KEY, "");
+
   if (typeof saved === "string") return saved;
 
   if (saved && typeof saved === "object") {
@@ -55,12 +86,31 @@ function getFavoriteTeam(player) {
       saved.team ||
       saved.club ||
       saved.favoriteTeam ||
+      saved.clubFavori ||
       saved.equipe ||
       ""
     );
   }
 
   return "";
+}
+
+function saveFavoriteTeam(player, club) {
+  localStorage.setItem(CLUB_KEY, club);
+  localStorage.setItem(CLUB_FAVORI_KEY, club);
+  localStorage.setItem(SELECTED_CLUB_KEY, club);
+  localStorage.setItem("favoriteClub", club);
+
+  const saved = loadJson(FAVORITE_TEAM_KEY, {});
+  const next =
+    saved && typeof saved === "object" && !Array.isArray(saved)
+      ? { ...saved, [player]: club, club, favoriteTeam: club }
+      : { [player]: club, club, favoriteTeam: club };
+
+  localStorage.setItem(FAVORITE_TEAM_KEY, JSON.stringify(next));
+
+  window.dispatchEvent(new Event("storage"));
+  window.dispatchEvent(new CustomEvent("favorite-team-updated"));
 }
 
 function getHome(match) {
@@ -197,13 +247,7 @@ function getPlayerName(item) {
 }
 
 function getPlayerPoints(item) {
-  return Number(
-    item?.points ||
-    item?.pts ||
-    item?.total ||
-    item?.score ||
-    0
-  );
+  return Number(item?.points || item?.pts || item?.total || item?.score || 0);
 }
 
 function getPlayerExact(item) {
@@ -240,6 +284,7 @@ function buildPodium() {
 
   for (const key of RANKING_KEYS) {
     const data = normalizeRankingData(loadJson(key, []));
+
     if (Array.isArray(data) && data.length > 0) {
       ranking = data;
       break;
@@ -260,8 +305,105 @@ function buildPodium() {
     .slice(0, 3);
 }
 
+function getPronosForPlayer(player) {
+  const possibleKeys = [
+    `pronos:${player}`,
+    "pronos",
+    "pronostics",
+    "userPronos",
+    "prono_ligue1_lm_pronos_joueurs"
+  ];
+
+  for (const key of possibleKeys) {
+    const value = loadJson(key, null);
+
+    if (!value || typeof value !== "object") continue;
+
+    if (value[player] && typeof value[player] === "object") {
+      return value[player];
+    }
+
+    return value;
+  }
+
+  return {};
+}
+
+function hasProno(prono) {
+  if (!prono || typeof prono !== "object") return false;
+
+  const prediction =
+    prono.prediction ||
+    prono.resultat ||
+    prono.resultat1N2 ||
+    prono.winner ||
+    "";
+
+  const scoreDom =
+    prono.scoreDom ??
+    prono.homeScore ??
+    prono.scoreHome ??
+    prono.domScore ??
+    "";
+
+  const scoreExt =
+    prono.scoreExt ??
+    prono.awayScore ??
+    prono.scoreAway ??
+    prono.extScore ??
+    "";
+
+  return Boolean(prediction) || (scoreDom !== "" && scoreExt !== "");
+}
+
+function getPronoByMatch(pronos, match) {
+  const id = getMatchId(match);
+
+  if (id && pronos[id]) return pronos[id];
+
+  const home = getText(getHome(match));
+  const away = getText(getAway(match));
+  const round = String(getJournee(match));
+
+  return Object.values(pronos || {}).find((p) => {
+    if (!p || typeof p !== "object") return false;
+
+    const pHome = getText(p.home || p.domicile || p.equipeDomicile);
+    const pAway = getText(p.away || p.exterieur || p.equipeExterieur);
+    const pRound = String(p.journee || p.round || p.matchday || "");
+
+    return pHome === home && pAway === away && (!pRound || pRound === round);
+  });
+}
+
+function getValidationKey(player, journee) {
+  return `${player}-J${journee}`;
+}
+
+function isPronosValidated(player, journee) {
+  const validations = loadJson(VALIDATIONS_KEY, {});
+  return Boolean(
+    validations?.[getValidationKey(player, journee)] ||
+    validations?.[`${player}-${journee}`] ||
+    validations?.[`J${journee}`]
+  );
+}
+
+function validatePronos(player, journee) {
+  const validations = loadJson(VALIDATIONS_KEY, {});
+  const next = {
+    ...validations,
+    [getValidationKey(player, journee)]: true
+  };
+
+  localStorage.setItem(VALIDATIONS_KEY, JSON.stringify(next));
+  window.dispatchEvent(new Event("storage"));
+  window.dispatchEvent(new CustomEvent("pronos-validated"));
+}
+
 export default function HomePage() {
   const [refresh, setRefresh] = useState(0);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     function update() {
@@ -270,16 +412,18 @@ export default function HomePage() {
 
     window.addEventListener("storage", update);
     window.addEventListener("favorite-team-updated", update);
-    window.addEventListener("favorite-deadline-updated", update);
     window.addEventListener("bonus-choice-updated", update);
+    window.addEventListener("pronos-updated", update);
+    window.addEventListener("pronos-validated", update);
 
     const interval = setInterval(update, 1500);
 
     return () => {
       window.removeEventListener("storage", update);
       window.removeEventListener("favorite-team-updated", update);
-      window.removeEventListener("favorite-deadline-updated", update);
       window.removeEventListener("bonus-choice-updated", update);
+      window.removeEventListener("pronos-updated", update);
+      window.removeEventListener("pronos-validated", update);
       clearInterval(interval);
     };
   }, []);
@@ -308,6 +452,26 @@ export default function HomePage() {
       ? getSelectedBonus(player, selectedJournee.number, bonusList)
       : null;
 
+    const pronos = getPronosForPlayer(player);
+
+    const ligue1Done = selectedJournee?.matches?.filter((match) =>
+      hasProno(getPronoByMatch(pronos, match))
+    ).length || 0;
+
+    const selectedBonusDone = selectedBonus
+      ? hasProno(getPronoByMatch(pronos, selectedBonus))
+      : false;
+
+    const totalToDo =
+      (selectedJournee?.matches?.length || 0) + (bonusList.length > 0 ? 1 : 0);
+
+    const done = ligue1Done + (selectedBonusDone ? 1 : 0);
+    const allPronosDone = totalToDo > 0 && done >= totalToDo;
+
+    const validated = selectedJournee
+      ? isPronosValidated(player, selectedJournee.number)
+      : false;
+
     const podium = buildPodium();
 
     const todo = [];
@@ -316,12 +480,16 @@ export default function HomePage() {
       todo.push("Choisir ton équipe favorite");
     }
 
-    if (!selectedBonus) {
+    if (!selectedBonus && bonusList.length > 0) {
       todo.push("Choisir ton match bonus");
     }
 
-    if (selectedJournee && selectedJournee.matches?.length > 0) {
-      todo.push("Faire tes pronos Ligue 1");
+    if (!allPronosDone) {
+      todo.push("Faire tous tes pronos");
+    }
+
+    if (allPronosDone && !validated) {
+      todo.push("Valider tes pronos");
     }
 
     return {
@@ -332,9 +500,36 @@ export default function HomePage() {
       matchesCount: selectedJournee?.matches?.length || 0,
       bonusCount: bonusList.length,
       podium,
-      todo
+      todo,
+      done,
+      totalToDo,
+      allPronosDone,
+      validated
     };
   }, [refresh]);
+
+  function handleFavoriteChange(event) {
+    const value = event.target.value;
+    saveFavoriteTeam(data.player, value);
+    setMessage(`Équipe favorite validée : ${value}`);
+    setRefresh((v) => v + 1);
+  }
+
+  function handleValidatePronos() {
+    if (!data.selectedJournee) {
+      setMessage("Aucune journée active.");
+      return;
+    }
+
+    if (!data.allPronosDone) {
+      setMessage("Il manque encore des pronos avant de valider.");
+      return;
+    }
+
+    validatePronos(data.player, data.selectedJournee.number);
+    setMessage("Pronos validés ✅");
+    setRefresh((v) => v + 1);
+  }
 
   return (
     <div className="home-page-clean">
@@ -453,6 +648,70 @@ export default function HomePage() {
         .home-line-clean strong {
           color: #fff;
           text-align: right;
+        }
+
+        .home-select-row {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 10px;
+          margin-top: 14px;
+        }
+
+        .home-select {
+          width: 100%;
+          min-height: 44px;
+          border: 1px solid rgba(255,255,255,.14);
+          border-radius: 14px;
+          padding: 0 14px;
+          background: rgba(15,23,42,.95);
+          color: #fff;
+          font-weight: 900;
+          outline: none;
+        }
+
+        .home-small-btn,
+        .home-validate-btn {
+          border: 0;
+          cursor: pointer;
+          border-radius: 14px;
+          padding: 0 16px;
+          min-height: 44px;
+          background: #baff00;
+          color: #07111f;
+          font-weight: 950;
+          box-shadow: 0 12px 28px rgba(186,255,0,.18);
+        }
+
+        .home-small-btn:hover,
+        .home-validate-btn:hover {
+          filter: brightness(1.05);
+        }
+
+        .home-validate-btn {
+          width: 100%;
+          margin-top: 14px;
+        }
+
+        .home-validate-btn.is-done {
+          background: rgba(34,197,94,.22);
+          color: #bbf7d0;
+          border: 1px solid rgba(34,197,94,.35);
+          box-shadow: none;
+        }
+
+        .home-validate-btn:disabled {
+          cursor: not-allowed;
+          opacity: .55;
+        }
+
+        .home-message {
+          margin-bottom: 16px;
+          padding: 12px 14px;
+          border-radius: 16px;
+          background: rgba(186,255,0,.12);
+          border: 1px solid rgba(186,255,0,.25);
+          color: #ecfccb;
+          font-weight: 900;
         }
 
         .home-pill-clean {
@@ -584,6 +843,10 @@ export default function HomePage() {
             font-size: 32px;
           }
 
+          .home-select-row {
+            grid-template-columns: 1fr;
+          }
+
           .home-podium-row {
             grid-template-columns: 42px 1fr;
           }
@@ -599,6 +862,8 @@ export default function HomePage() {
         <h1>Accueil</h1>
         <p>Tableau de bord de la saison Prono Ligue 1 LM.</p>
       </section>
+
+      {message && <div className="home-message">{message}</div>}
 
       <div className="home-grid-clean">
         <div className="home-card-clean">
@@ -642,9 +907,36 @@ export default function HomePage() {
             <strong>{data.club || "Non choisie"}</strong>
           </div>
 
-          <div className="home-line-clean">
-            <span>Journée</span>
-            <strong>{data.selectedJournee?.title || "Aucune"}</strong>
+          <div className="home-select-row">
+            <select
+              className="home-select"
+              value={data.club || ""}
+              onChange={handleFavoriteChange}
+            >
+              <option value="">Choisir mon équipe favorite</option>
+              {CLUBS.map((club) => (
+                <option key={club} value={club}>
+                  {club}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              className="home-small-btn"
+              onClick={() => {
+                if (!data.club) {
+                  setMessage("Choisis une équipe favorite avant de valider.");
+                  return;
+                }
+
+                saveFavoriteTeam(data.player, data.club);
+                setMessage(`Équipe favorite validée : ${data.club}`);
+                setRefresh((v) => v + 1);
+              }}
+            >
+              Valider
+            </button>
           </div>
         </section>
 
@@ -722,6 +1014,16 @@ export default function HomePage() {
               Tout est prêt ✅
             </div>
           )}
+
+          <button
+            type="button"
+            className={data.validated ? "home-validate-btn is-done" : "home-validate-btn"}
+            onClick={handleValidatePronos}
+          >
+            {data.validated
+              ? "Pronos validés ✅"
+              : `Valider mes pronos ${data.done}/${data.totalToDo}`}
+          </button>
         </section>
       </div>
     </div>
