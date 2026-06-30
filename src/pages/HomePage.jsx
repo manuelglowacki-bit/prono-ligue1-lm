@@ -5,8 +5,8 @@ const CLUB_FAVORI_KEY = "clubFavori";
 const SELECTED_CLUB_KEY = "selectedClub";
 const FAVORITE_TEAM_KEY = "prono_ligue1_lm_favorite_team";
 
-const JOURNEES_KEY = "admin_journees";
 const MATCHS_KEY = "prono_ligue1_lm_matchs_admin";
+const JOURNEES_KEY = "admin_journees";
 const PLAYER_KEY = "prono_ligue1_lm_current_player";
 const BONUS_CHOICES_KEY = "prono_ligue1_lm_bonus_choices";
 const SELECTED_JOURNEE_KEY = "selected_prono_journee";
@@ -37,35 +37,6 @@ function cleanText(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
-}
-
-function hideDuplicateFavoritePanel() {
-  try {
-    const elements = Array.from(document.querySelectorAll("section, article, div"));
-
-    const candidates = elements.filter((element) => {
-      if (element.closest(".home-page-clean")) return false;
-
-      const text = cleanText(element.textContent);
-
-      return (
-        text.includes("club favori") &&
-        text.includes("choisis ton equipe favorite")
-      );
-    });
-
-    if (candidates.length === 0) return;
-
-    const target = candidates.sort(
-      (a, b) => String(a.textContent || "").length - String(b.textContent || "").length
-    )[0];
-
-    if (target) {
-      target.style.display = "none";
-    }
-  } catch {
-    // Sécurité : ne bloque jamais la page.
-  }
 }
 
 function getCurrentPlayer() {
@@ -111,6 +82,8 @@ function getHome(match) {
     match?.equipeDomicile ||
     match?.teamHome ||
     match?.homeTeam ||
+    match?.club1 ||
+    match?.equipe1 ||
     ""
   );
 }
@@ -123,28 +96,39 @@ function getAway(match) {
     match?.equipeExterieur ||
     match?.teamAway ||
     match?.awayTeam ||
+    match?.club2 ||
+    match?.equipe2 ||
     ""
   );
 }
 
 function getLeague(match) {
   return (
-    match?.league ||
     match?.championnat ||
+    match?.league ||
     match?.competition ||
     match?.compétition ||
-    "Ligue 1"
+    match?.categorie ||
+    match?.catégorie ||
+    ""
   );
 }
 
-function getJournee(match) {
-  return Number(
+function getJourneeRaw(match) {
+  return (
     match?.journee ||
     match?.journée ||
     match?.round ||
     match?.matchday ||
+    match?.j ||
     1
   );
+}
+
+function getJourneeNumber(value) {
+  const text = String(value || "").trim();
+  const found = text.match(/\d+/);
+  return found ? Number(found[0]) : 1;
 }
 
 function getMatchId(match) {
@@ -158,6 +142,17 @@ function getMatchId(match) {
 }
 
 function getMatchTitle(match) {
+  if (!match) return "";
+
+  const label =
+    match.label ||
+    match.affiche ||
+    match.match ||
+    match.rencontre ||
+    "";
+
+  if (label && String(label).includes("vs")) return String(label);
+
   const home = getHome(match);
   const away = getAway(match);
 
@@ -171,70 +166,136 @@ function isBonus(match) {
   const league = cleanText(getLeague(match));
 
   return (
+    type === "bonus" ||
     type.includes("bonus") ||
-    (!league.includes("ligue 1") && !league.includes("ligue1"))
+    type === "b" ||
+    (!league.includes("ligue 1") && !league.includes("ligue1") && league !== "")
   );
 }
 
-function buildJournees() {
-  const adminJournees = loadJson(JOURNEES_KEY, []);
+function readFlatMatches() {
+  const flat = loadJson(MATCHS_KEY, []);
+  if (Array.isArray(flat) && flat.length > 0) return flat;
 
-  if (Array.isArray(adminJournees) && adminJournees.length > 0) {
-    return adminJournees.map((j, index) => ({
-      id: String(j.id || j.journee || j.numero || index + 1),
-      number: Number(j.journee || j.numero || index + 1),
-      title: j.title || j.nom || `J${j.journee || j.numero || index + 1}`,
-      matches: Array.isArray(j.matches) ? j.matches : [],
-      bonus: Array.isArray(j.bonus) ? j.bonus : []
+  const journees = loadJson(JOURNEES_KEY, []);
+  if (!Array.isArray(journees)) return [];
+
+  return journees.flatMap((j, index) => {
+    const round = j.journee || j.numero || index + 1;
+    const normal = Array.isArray(j.matches) ? j.matches : [];
+    const bonus = Array.isArray(j.bonus) ? j.bonus : [];
+
+    return [...normal, ...bonus].map((match) => ({
+      ...match,
+      journee: match.journee || round
     }));
-  }
+  });
+}
 
-  const matches = loadJson(MATCHS_KEY, []);
+function buildJournees(matches) {
   const byRound = {};
 
-  if (Array.isArray(matches)) {
-    matches.forEach((match) => {
-      const round = getJournee(match);
+  matches.forEach((match) => {
+    const round = getJourneeNumber(getJourneeRaw(match));
 
-      if (!byRound[round]) {
-        byRound[round] = {
-          id: String(round),
-          number: round,
-          title: `J${round}`,
-          matches: [],
-          bonus: []
-        };
-      }
+    if (!byRound[round]) {
+      byRound[round] = {
+        id: String(round),
+        number: round,
+        title: `J${round}`,
+        matches: [],
+        bonus: []
+      };
+    }
 
-      if (isBonus(match)) {
-        byRound[round].bonus.push(match);
-      } else {
-        byRound[round].matches.push(match);
-      }
-    });
-  }
+    if (isBonus(match)) {
+      byRound[round].bonus.push(match);
+    } else {
+      byRound[round].matches.push(match);
+    }
+  });
 
   return Object.values(byRound).sort((a, b) => a.number - b.number);
 }
 
-function getSelectedBonus(player, journee, bonusList) {
-  const directId = localStorage.getItem(BONUS_SELECTED_KEY) || "";
+function getChoiceValue(choices, player, journeeNumber) {
+  const keys = [
+    `${player}-J${journeeNumber}`,
+    `${player}-${journeeNumber}`,
+    `${player}-j${journeeNumber}`,
+    `J${journeeNumber}`,
+    `j${journeeNumber}`,
+    String(journeeNumber)
+  ];
 
+  for (const key of keys) {
+    if (choices && choices[key]) return choices[key];
+  }
+
+  return "";
+}
+
+function normalizeChoice(value) {
+  if (!value) return "";
+
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  if (typeof value === "object") {
+    return (
+      value.id ||
+      value.matchId ||
+      value.match_id ||
+      value.label ||
+      value.affiche ||
+      value.match ||
+      getMatchTitle(value) ||
+      ""
+    );
+  }
+
+  return "";
+}
+
+function findBonusMatch(player, journeeNumber, bonusList, allMatches) {
   const choices = loadJson(BONUS_CHOICES_KEY, {});
-  const choiceId =
-    directId ||
-    choices?.[`${player}-J${journee}`] ||
-    choices?.[`${player}-${journee}`] ||
-    choices?.[`J${journee}`] ||
-    choices?.[journee] ||
-    "";
+  const direct = loadJson(BONUS_SELECTED_KEY, "");
+
+  const choiceFromJournee = getChoiceValue(choices, player, journeeNumber);
+  const choiceId = normalizeChoice(choiceFromJournee || direct);
 
   if (!choiceId) return null;
 
-  return (
-    bonusList.find((b) => getMatchId(b) && getMatchId(b) === String(choiceId)) ||
-    null
-  );
+  const allBonus = allMatches.filter(isBonus);
+  const pool = [...bonusList, ...allBonus];
+
+  const byId = pool.find((match) => {
+    const id = getMatchId(match);
+    return id && String(id) === String(choiceId);
+  });
+
+  if (byId) return byId;
+
+  const wanted = cleanText(choiceId);
+
+  const byLabel = pool.find((match) => {
+    const title = cleanText(getMatchTitle(match));
+    const label = cleanText(match?.label || match?.affiche || match?.match || "");
+    return title === wanted || label === wanted;
+  });
+
+  if (byLabel) return byLabel;
+
+  if (typeof choiceFromJournee === "object" && getMatchTitle(choiceFromJournee)) {
+    return choiceFromJournee;
+  }
+
+  if (typeof direct === "object" && getMatchTitle(direct)) {
+    return direct;
+  }
+
+  return null;
 }
 
 function getPlayerName(item) {
@@ -313,17 +374,13 @@ export default function HomePage() {
 
   useEffect(() => {
     function update() {
-      hideDuplicateFavoritePanel();
-      setRefresh((v) => v + 1);
+      setRefresh((value) => value + 1);
     }
-
-    hideDuplicateFavoritePanel();
-    setTimeout(hideDuplicateFavoritePanel, 250);
-    setTimeout(hideDuplicateFavoritePanel, 1000);
 
     window.addEventListener("storage", update);
     window.addEventListener("favorite-team-updated", update);
     window.addEventListener("bonus-choice-updated", update);
+    window.addEventListener("pronos-updated", update);
 
     const interval = setInterval(update, 1500);
 
@@ -331,6 +388,7 @@ export default function HomePage() {
       window.removeEventListener("storage", update);
       window.removeEventListener("favorite-team-updated", update);
       window.removeEventListener("bonus-choice-updated", update);
+      window.removeEventListener("pronos-updated", update);
       clearInterval(interval);
     };
   }, []);
@@ -338,40 +396,48 @@ export default function HomePage() {
   const data = useMemo(() => {
     const player = getCurrentPlayer();
     const club = getFavoriteTeam(player);
+    const allMatches = readFlatMatches();
+    const journees = buildJournees(allMatches);
 
-    const journees = buildJournees();
-
-    const selectedJourneeId =
+    const storedJournee =
       localStorage.getItem(SELECTED_JOURNEE_KEY) ||
       localStorage.getItem("prono_ligue1_lm_selected_journee") ||
-      journees?.[0]?.id ||
-      "";
+      journees?.[0]?.number ||
+      1;
+
+    const journeeNumber = getJourneeNumber(storedJournee);
 
     const selectedJournee =
-      journees.find((j) => String(j.id) === String(selectedJourneeId)) ||
-      journees.find((j) => String(j.number) === String(selectedJourneeId)) ||
+      journees.find((j) => Number(j.number) === Number(journeeNumber)) ||
       journees?.[0] ||
-      null;
+      {
+        id: "1",
+        number: 1,
+        title: "J1",
+        matches: [],
+        bonus: []
+      };
 
-    const bonusList = selectedJournee?.bonus || [];
-
-    const selectedBonus = selectedJournee
-      ? getSelectedBonus(player, selectedJournee.number, bonusList)
-      : null;
+    const selectedBonus = findBonusMatch(
+      player,
+      selectedJournee.number,
+      selectedJournee.bonus,
+      allMatches
+    );
 
     const selectedBonusTitle = getMatchTitle(selectedBonus);
-    const hasSelectedBonus = Boolean(selectedBonusTitle);
+    const hasSelectedBonus = Boolean(selectedBonus && selectedBonusTitle);
 
     return {
       player,
       club,
       selectedJournee,
+      matchesCount: selectedJournee.matches.length,
+      bonusCount: selectedJournee.bonus.length,
       selectedBonus,
       selectedBonusTitle,
+      selectedBonusLeague: hasSelectedBonus ? getLeague(selectedBonus) || "Bonus" : "",
       hasSelectedBonus,
-      selectedBonusLeague: hasSelectedBonus ? getLeague(selectedBonus) : "",
-      matchesCount: selectedJournee?.matches?.length || 0,
-      bonusCount: bonusList.length,
       podium: buildPodium()
     };
   }, [refresh]);
@@ -470,10 +536,6 @@ export default function HomePage() {
           padding: 22px;
           border-radius: 24px;
           background: linear-gradient(180deg, rgba(15,23,42,.92), rgba(2,6,23,.96));
-        }
-
-        .home-panel-clean.is-empty-compact {
-          min-height: 0;
         }
 
         .home-panel-clean h2 {
@@ -644,6 +706,12 @@ export default function HomePage() {
 
       <div className="home-grid-clean">
         <div className="home-card-clean">
+          <span>Club favori</span>
+          <strong>{data.club || "Aucun club"}</strong>
+          <small>Équipe favorite</small>
+        </div>
+
+        <div className="home-card-clean">
           <span>Journée active</span>
           <strong>{data.selectedJournee?.title || "Aucune"}</strong>
           <small>{data.matchesCount} match(s) Ligue 1</small>
@@ -659,12 +727,6 @@ export default function HomePage() {
               ? data.selectedBonusLeague
               : `${data.bonusCount} bonus proposé(s)`}
           </small>
-        </div>
-
-        <div className="home-card-clean">
-          <span>Club favori</span>
-          <strong>{data.club || "Aucun club"}</strong>
-          <small>Équipe favorite</small>
         </div>
       </div>
 
@@ -683,7 +745,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className={data.podium.length > 0 ? "home-panel-clean" : "home-panel-clean is-empty-compact"}>
+        <section className="home-panel-clean">
           <h2>Podium du classement</h2>
 
           {data.podium.length > 0 ? (
@@ -717,6 +779,22 @@ export default function HomePage() {
 
       <div className="home-wide-clean">
         <section className="home-panel-clean">
+          <h2>Résumé journée</h2>
+
+          <div className="home-summary-mini">
+            <div className="home-mini-box">
+              <span>Matchs Ligue 1</span>
+              <strong>{data.matchesCount}</strong>
+            </div>
+
+            <div className="home-mini-box">
+              <span>Bonus proposés</span>
+              <strong>{data.bonusCount}</strong>
+            </div>
+          </div>
+        </section>
+
+        <section className="home-panel-clean">
           <h2>Match bonus</h2>
 
           <div className="home-line-clean">
@@ -733,22 +811,6 @@ export default function HomePage() {
 
           <div className={data.hasSelectedBonus ? "home-pill-clean" : "home-pill-clean gold"}>
             {data.hasSelectedBonus ? "Bonus choisi" : "Bonus pas encore choisi"}
-          </div>
-        </section>
-
-        <section className="home-panel-clean">
-          <h2>Résumé journée</h2>
-
-          <div className="home-summary-mini">
-            <div className="home-mini-box">
-              <span>Matchs Ligue 1</span>
-              <strong>{data.matchesCount}</strong>
-            </div>
-
-            <div className="home-mini-box">
-              <span>Bonus proposés</span>
-              <strong>{data.bonusCount}</strong>
-            </div>
           </div>
         </section>
       </div>
