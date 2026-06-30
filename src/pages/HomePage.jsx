@@ -17,7 +17,9 @@ const RANKING_KEYS = [
   "prono_ligue1_lm_ranking",
   "classement",
   "ranking",
-  "playersRanking"
+  "playersRanking",
+  "players",
+  "scores"
 ];
 
 function loadJson(key, fallback) {
@@ -35,6 +37,35 @@ function cleanText(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
+}
+
+function hideDuplicateFavoritePanel() {
+  try {
+    const elements = Array.from(document.querySelectorAll("section, article, div"));
+
+    const candidates = elements.filter((element) => {
+      if (element.closest(".home-page-clean")) return false;
+
+      const text = cleanText(element.textContent);
+
+      return (
+        text.includes("club favori") &&
+        text.includes("choisis ton equipe favorite")
+      );
+    });
+
+    if (candidates.length === 0) return;
+
+    const target = candidates.sort(
+      (a, b) => String(a.textContent || "").length - String(b.textContent || "").length
+    )[0];
+
+    if (target) {
+      target.style.display = "none";
+    }
+  } catch {
+    // Sécurité : ne bloque jamais la page.
+  }
 }
 
 function getCurrentPlayer() {
@@ -88,7 +119,7 @@ function getAway(match) {
   return (
     match?.away ||
     match?.exterieur ||
-    match?.exterieurTeam ||
+    match?.extérieur ||
     match?.equipeExterieur ||
     match?.teamAway ||
     match?.awayTeam ||
@@ -101,6 +132,7 @@ function getLeague(match) {
     match?.league ||
     match?.championnat ||
     match?.competition ||
+    match?.compétition ||
     "Ligue 1"
   );
 }
@@ -108,6 +140,7 @@ function getLeague(match) {
 function getJournee(match) {
   return Number(
     match?.journee ||
+    match?.journée ||
     match?.round ||
     match?.matchday ||
     1
@@ -124,8 +157,17 @@ function getMatchId(match) {
   );
 }
 
+function getMatchTitle(match) {
+  const home = getHome(match);
+  const away = getAway(match);
+
+  if (!home || !away) return "";
+
+  return `${home} vs ${away}`;
+}
+
 function isBonus(match) {
-  const type = cleanText(match?.type || match?.categorie || "");
+  const type = cleanText(match?.type || match?.categorie || match?.catégorie || "");
   const league = cleanText(getLeague(match));
 
   return (
@@ -141,7 +183,7 @@ function buildJournees() {
     return adminJournees.map((j, index) => ({
       id: String(j.id || j.journee || j.numero || index + 1),
       number: Number(j.journee || j.numero || index + 1),
-      title: j.title || j.nom || `Journée ${j.journee || j.numero || index + 1}`,
+      title: j.title || j.nom || `J${j.journee || j.numero || index + 1}`,
       matches: Array.isArray(j.matches) ? j.matches : [],
       bonus: Array.isArray(j.bonus) ? j.bonus : []
     }));
@@ -158,7 +200,7 @@ function buildJournees() {
         byRound[round] = {
           id: String(round),
           number: round,
-          title: `Journée ${round}`,
+          title: `J${round}`,
           matches: [],
           bonus: []
         };
@@ -187,7 +229,12 @@ function getSelectedBonus(player, journee, bonusList) {
     choices?.[journee] ||
     "";
 
-  return bonusList.find((b) => getMatchId(b) === String(choiceId)) || null;
+  if (!choiceId) return null;
+
+  return (
+    bonusList.find((b) => getMatchId(b) && getMatchId(b) === String(choiceId)) ||
+    null
+  );
 }
 
 function getPlayerName(item) {
@@ -266,8 +313,13 @@ export default function HomePage() {
 
   useEffect(() => {
     function update() {
+      hideDuplicateFavoritePanel();
       setRefresh((v) => v + 1);
     }
+
+    hideDuplicateFavoritePanel();
+    setTimeout(hideDuplicateFavoritePanel, 250);
+    setTimeout(hideDuplicateFavoritePanel, 1000);
 
     window.addEventListener("storage", update);
     window.addEventListener("favorite-team-updated", update);
@@ -307,11 +359,17 @@ export default function HomePage() {
       ? getSelectedBonus(player, selectedJournee.number, bonusList)
       : null;
 
+    const selectedBonusTitle = getMatchTitle(selectedBonus);
+    const hasSelectedBonus = Boolean(selectedBonusTitle);
+
     return {
       player,
       club,
       selectedJournee,
       selectedBonus,
+      selectedBonusTitle,
+      hasSelectedBonus,
+      selectedBonusLeague: hasSelectedBonus ? getLeague(selectedBonus) : "",
       matchesCount: selectedJournee?.matches?.length || 0,
       bonusCount: bonusList.length,
       podium: buildPodium()
@@ -330,8 +388,8 @@ export default function HomePage() {
           padding: 28px;
           border-radius: 28px;
           background:
-            radial-gradient(circle at top left, rgba(186,255,0,.18), transparent 34%),
-            linear-gradient(135deg, rgba(15,23,42,.98), rgba(29,78,216,.35));
+            radial-gradient(circle at top left, rgba(186,255,0,.16), transparent 34%),
+            linear-gradient(135deg, rgba(15,23,42,.98), rgba(29,78,216,.34));
           border: 1px solid rgba(255,255,255,.10);
           box-shadow: 0 24px 70px rgba(0,0,0,.28);
         }
@@ -362,6 +420,7 @@ export default function HomePage() {
           grid-template-columns: 1fr 1fr;
           gap: 16px;
           margin-bottom: 18px;
+          align-items: start;
         }
 
         .home-card-clean,
@@ -371,6 +430,7 @@ export default function HomePage() {
         }
 
         .home-card-clean {
+          min-height: 112px;
           padding: 20px;
           border-radius: 22px;
           background: linear-gradient(180deg, rgba(20,32,51,.96), rgba(11,18,32,.98));
@@ -410,6 +470,10 @@ export default function HomePage() {
           padding: 22px;
           border-radius: 24px;
           background: linear-gradient(180deg, rgba(15,23,42,.92), rgba(2,6,23,.96));
+        }
+
+        .home-panel-clean.is-empty-compact {
+          min-height: 0;
         }
 
         .home-panel-clean h2 {
@@ -504,12 +568,39 @@ export default function HomePage() {
         }
 
         .home-empty {
-          padding: 16px;
+          padding: 15px 16px;
           border-radius: 18px;
           background: rgba(255,255,255,.05);
           border: 1px dashed rgba(255,255,255,.16);
           color: #94a3b8;
           font-weight: 850;
+        }
+
+        .home-summary-mini {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+
+        .home-mini-box {
+          padding: 16px;
+          border-radius: 18px;
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.10);
+        }
+
+        .home-mini-box span {
+          display: block;
+          color: #94a3b8;
+          font-weight: 900;
+          font-size: 13px;
+          margin-bottom: 8px;
+        }
+
+        .home-mini-box strong {
+          color: #fff;
+          font-size: 28px;
+          font-weight: 950;
         }
 
         @media (max-width: 1100px) {
@@ -529,6 +620,10 @@ export default function HomePage() {
 
           .home-hero-clean h1 {
             font-size: 32px;
+          }
+
+          .home-summary-mini {
+            grid-template-columns: 1fr;
           }
 
           .home-podium-row {
@@ -554,17 +649,15 @@ export default function HomePage() {
           <small>{data.matchesCount} match(s) Ligue 1</small>
         </div>
 
-        <div className={data.selectedBonus ? "home-card-clean" : "home-card-clean warning"}>
+        <div className={data.hasSelectedBonus ? "home-card-clean" : "home-card-clean warning"}>
           <span>Bonus choisi</span>
           <strong>
-            {data.selectedBonus
-              ? `${getHome(data.selectedBonus)} vs ${getAway(data.selectedBonus)}`
-              : "À choisir"}
+            {data.hasSelectedBonus ? data.selectedBonusTitle : "Aucun bonus"}
           </strong>
           <small>
-            {data.selectedBonus
-              ? getLeague(data.selectedBonus)
-              : `${data.bonusCount} proposé(s)`}
+            {data.hasSelectedBonus
+              ? data.selectedBonusLeague
+              : `${data.bonusCount} bonus proposé(s)`}
           </small>
         </div>
 
@@ -588,14 +681,9 @@ export default function HomePage() {
             <span>Équipe favorite</span>
             <strong>{data.club || "Non choisie"}</strong>
           </div>
-
-          <div className="home-line-clean">
-            <span>Journée</span>
-            <strong>{data.selectedJournee?.title || "Aucune"}</strong>
-          </div>
         </section>
 
-        <section className="home-panel-clean">
+        <section className={data.podium.length > 0 ? "home-panel-clean" : "home-panel-clean is-empty-compact"}>
           <h2>Podium du classement</h2>
 
           {data.podium.length > 0 ? (
@@ -634,38 +722,33 @@ export default function HomePage() {
           <div className="home-line-clean">
             <span>Bonus sélectionné</span>
             <strong>
-              {data.selectedBonus
-                ? `${getHome(data.selectedBonus)} vs ${getAway(data.selectedBonus)}`
-                : "Aucun"}
+              {data.hasSelectedBonus ? data.selectedBonusTitle : "Aucun"}
             </strong>
           </div>
 
           <div className="home-line-clean">
             <span>Compétition</span>
-            <strong>{data.selectedBonus ? getLeague(data.selectedBonus) : "-"}</strong>
+            <strong>{data.hasSelectedBonus ? data.selectedBonusLeague : "-"}</strong>
           </div>
 
-          <div className={data.selectedBonus ? "home-pill-clean" : "home-pill-clean gold"}>
-            {data.selectedBonus ? "Bonus choisi" : "Bonus pas encore choisi"}
+          <div className={data.hasSelectedBonus ? "home-pill-clean" : "home-pill-clean gold"}>
+            {data.hasSelectedBonus ? "Bonus choisi" : "Bonus pas encore choisi"}
           </div>
         </section>
 
         <section className="home-panel-clean">
           <h2>Résumé journée</h2>
 
-          <div className="home-line-clean">
-            <span>Journée</span>
-            <strong>{data.selectedJournee?.title || "Aucune"}</strong>
-          </div>
+          <div className="home-summary-mini">
+            <div className="home-mini-box">
+              <span>Matchs Ligue 1</span>
+              <strong>{data.matchesCount}</strong>
+            </div>
 
-          <div className="home-line-clean">
-            <span>Matchs Ligue 1</span>
-            <strong>{data.matchesCount}</strong>
-          </div>
-
-          <div className="home-line-clean">
-            <span>Bonus proposés</span>
-            <strong>{data.bonusCount}</strong>
+            <div className="home-mini-box">
+              <span>Bonus proposés</span>
+              <strong>{data.bonusCount}</strong>
+            </div>
           </div>
         </section>
       </div>
