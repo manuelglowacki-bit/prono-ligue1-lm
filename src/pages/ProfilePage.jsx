@@ -321,6 +321,31 @@ function getOwnedLeaderBadges(currentPlayer, rankingStats) {
    PAGE PROFIL
 ========================= */
 
+function cleanFavoriteClubDisplay(value) {
+  if (!value) return "Non choisi";
+
+  if (typeof value === "string") {
+    const raw = value.trim();
+
+    if (raw.startsWith("{") && raw.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed.favoriteTeam || parsed.club || parsed.Manu || Object.values(parsed).find(Boolean) || "Non choisi";
+      } catch {
+        return raw;
+      }
+    }
+
+    return raw;
+  }
+
+  if (typeof value === "object") {
+    return value.favoriteTeam || value.club || value.Manu || Object.values(value).find(Boolean) || "Non choisi";
+  }
+
+  return String(value);
+}
+
 export default function ProfilePage() {
   const fileInputRef = useRef(null);
 
@@ -427,17 +452,7 @@ export default function ProfilePage() {
           <span>Photo, statistiques, badges et préférences.</span>
         </div>
 
-        <div className="profile-player-select">
-          <span>Joueur actif</span>
-
-          <select value={currentPlayer} onChange={(e) => changePlayer(e.target.value)}>
-            {PLAYERS.map((player) => (
-              <option key={player} value={player}>
-                {player}
-              </option>
-            ))}
-          </select>
-        </div>
+        
       </section>
 
       <section className="profile-hero">
@@ -581,15 +596,9 @@ export default function ProfilePage() {
           </div>
 
           <div className="profile-preferences">
-            <div>
-              <span>Photo</span>
-              <strong>{photo ? 'Ajoutée' : 'Non ajoutée'}</strong>
-            </div>
+            
 
-            <div>
-              <span>Club favori</span>
-              <strong>{favoriteTeam || 'À choisir'}</strong>
-            </div>
+            
 
             <div className="profile-name-editor">
               <span>Nom affiché</span>

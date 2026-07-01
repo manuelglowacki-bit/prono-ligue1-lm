@@ -1,0 +1,1023 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
+import { parseExcelWorkbookToJournees } from "../utils/excelJournees.js";
+
+const STORAGE_KEY = "admin_pronos_manager_v3";
+const PUBLIC_JOURNEES_KEY = "admin_journees";
+
+const DEFAULT_JOURNEES = [
+  {
+    id: "j1",
+    number: 1,
+    title: "J1",
+    locked: false,
+    lockAt: "",
+    matches: [
+      {
+        id: "j1-m1",
+        home: "RC Lens",
+        away: "OL",
+        date: "2026-08-22",
+        time: "20:45",
+        status: "Ouvert",
+        homeScore: "",
+        awayScore: ""
+      },
+      {
+        id: "j1-m2",
+        home: "PSG",
+        away: "Nantes",
+        date: "2026-08-23",
+        time: "17:00",
+        status: "Ouvert",
+        homeScore: "",
+        awayScore: ""
+      },
+      {
+        id: "j1-m3",
+        home: "OM",
+        away: "Rennes",
+        date: "2026-08-23",
+        time: "21:00",
+        status: "Ouvert",
+        homeScore: "",
+        awayScore: ""
+      }
+    ],
+    bonus: [
+      {
+        id: "j1-b1",
+        league: "Premier League",
+        home: "Liverpool",
+        away: "Chelsea",
+        date: "2026-08-22",
+        time: "18:30",
+        homeScore: "",
+        awayScore: ""
+      },
+      {
+        id: "j1-b2",
+        league: "Bundesliga",
+        home: "Bayern",
+        away: "Dortmund",
+        date: "2026-08-22",
+        time: "18:30",
+        homeScore: "",
+        awayScore: ""
+      },
+      {
+        id: "j1-b3",
+        league: "Serie A",
+        home: "Milan",
+        away: "Naples",
+        date: "2026-08-23",
+        time: "20:45",
+        homeScore: "",
+        awayScore: ""
+      }
+    ]
+  }
+];
+
+function loadJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function savePublicJournees(journees) {
+  localStorage.setItem(PUBLIC_JOURNEES_KEY, JSON.stringify(journees));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(journees));
+}
+
+function toDateInputValue(value) {
+  const raw = String(value || "").trim();
+
+  if (!raw) return "";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  const fr = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+
+  if (fr) {
+    const day = fr[1].padStart(2, "0");
+    const month = fr[2].padStart(2, "0");
+    const year = fr[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  return "";
+}
+
+function toTimeInputValue(value) {
+  const raw = String(value || "").trim();
+
+  if (!raw) return "";
+
+  const match = raw.match(/(\d{1,2})[:hH](\d{2})/);
+
+  if (match) {
+    const hour = match[1].padStart(2, "0");
+    const minute = match[2].padStart(2, "0");
+    return `${hour}:${minute}`;
+  }
+
+  return "";
+}
+
+function normalizeJournees(data) {
+  if (!Array.isArray(data) || data.length === 0) return DEFAULT_JOURNEES;
+
+  return data.map((j, index) => {
+    const journeyId = j.id || `j${index + 1}`;
+
+    return {
+      id: journeyId,
+      number: j.number || index + 1,
+      title: j.title || `J${index + 1}`,
+      locked: Boolean(j.locked),
+      lockAt: j.lockAt || "",
+      matches: Array.isArray(j.matches)
+        ? j.matches.map((m, i) => ({
+            id: m.id || `${journeyId}-m${i + 1}`,
+            home: m.home || "",
+            away: m.away || "",
+            date: toDateInputValue(m.date) || "",
+            time: toTimeInputValue(m.time) || "",
+            status: m.status || "Ouvert",
+            homeScore: m.homeScore || "",
+            awayScore: m.awayScore || ""
+          }))
+        : [],
+      bonus: Array.isArray(j.bonus)
+        ? j.bonus.slice(0, 3).map((b, i) => ({
+            id: b.id || `${journeyId}-b${i + 1}`,
+            league: b.league || "",
+            home: b.home || "",
+            away: b.away || "",
+            date: toDateInputValue(b.date) || "",
+            time: toTimeInputValue(b.time) || "",
+            homeScore: b.homeScore || "",
+            awayScore: b.awayScore || ""
+          }))
+        : []
+    };
+  });
+}
+
+function makeEmptyBonus(journeyId, index) {
+  return {
+    id: `${journeyId}-b${index + 1}`,
+    league: "",
+    home: "",
+    away: "",
+    date: "",
+    time: "",
+    homeScore: "",
+    awayScore: ""
+  };
+}
+
+function ensureThreeBonus(journee) {
+  const bonus = Array.isArray(journee.bonus) ? [...journee.bonus] : [];
+
+  while (bonus.length < 3) {
+    bonus.push(makeEmptyBonus(journee.id, bonus.length));
+  }
+
+  return {
+    ...journee,
+    lockAt: journee.lockAt || "",
+    bonus: bonus.slice(0, 3)
+  };
+}
+
+export default function AdminPage() {
+  const fileInputRef = useRef(null);
+
+  const [journees, setJournees] = useState(() => {
+    const saved =
+      loadJson(PUBLIC_JOURNEES_KEY, null) ||
+      loadJson(STORAGE_KEY, null) ||
+      DEFAULT_JOURNEES;
+
+    return normalizeJournees(saved).map(ensureThreeBonus);
+  });
+
+  const [selectedJourneeId, setSelectedJourneeId] = useState(() => {
+    const saved =
+      loadJson(PUBLIC_JOURNEES_KEY, null) ||
+      loadJson(STORAGE_KEY, null) ||
+      DEFAULT_JOURNEES;
+
+    return normalizeJournees(saved)[0]?.id || "j1";
+  });
+
+  const [message, setMessage] = useState("Page admin prete.");
+
+  const selectedJournee = useMemo(() => {
+    return (
+      journees.find((j) => j.id === selectedJourneeId) ||
+      journees[0] ||
+      DEFAULT_JOURNEES[0]
+    );
+  }, [journees, selectedJourneeId]);
+
+  useEffect(() => {
+    savePublicJournees(journees);
+  }, [journees]);
+
+  function updateSelectedJournee(patch) {
+    setJournees((prev) =>
+      prev.map((j) =>
+        j.id === selectedJournee.id
+          ? ensureThreeBonus({ ...j, ...patch })
+          : j
+      )
+    );
+  }
+
+  function updateMatch(matchId, patch) {
+    const nextMatches = selectedJournee.matches.map((match) =>
+      match.id === matchId ? { ...match, ...patch } : match
+    );
+
+    updateSelectedJournee({ matches: nextMatches });
+  }
+
+  function updateBonus(bonusId, patch) {
+    const currentBonus = ensureThreeBonus(selectedJournee).bonus;
+
+    const nextBonus = currentBonus.map((bonus) =>
+      bonus.id === bonusId ? { ...bonus, ...patch } : bonus
+    );
+
+    updateSelectedJournee({ bonus: nextBonus });
+  }
+
+  function toggleMatchStatus(matchId) {
+    const match = selectedJournee.matches.find((m) => m.id === matchId);
+    const nextStatus = match?.status === "Bloque" ? "Ouvert" : "Bloque";
+
+    updateMatch(matchId, { status: nextStatus });
+
+    setMessage(
+      nextStatus === "Bloque"
+        ? "Match bloque."
+        : "Match ouvert."
+    );
+  }
+
+  function addMatch() {
+    const number = selectedJournee.matches.length + 1;
+
+    const newMatch = {
+      id: `${selectedJournee.id}-m${number}`,
+      home: "",
+      away: "",
+      date: "",
+      time: "",
+      status: "Ouvert",
+      homeScore: "",
+      awayScore: ""
+    };
+
+    updateSelectedJournee({
+      matches: [...selectedJournee.matches, newMatch]
+    });
+
+    setMessage("Nouveau match ajoute.");
+  }
+
+  function removeMatch(matchId) {
+    updateSelectedJournee({
+      matches: selectedJournee.matches.filter((match) => match.id !== matchId)
+    });
+
+    setMessage("Match supprime.");
+  }
+
+  function toggleLock() {
+    const locked = !selectedJournee.locked;
+
+    updateSelectedJournee({
+      locked
+    });
+
+    setMessage(locked ? "Journee fermee." : "Journee rouverte.");
+  }
+
+  function saveAll() {
+    savePublicJournees(journees);
+    setMessage("Sauvegarde OK. La page Pronos recupere cette configuration.");
+  }
+
+  function previousJournee() {
+    const index = journees.findIndex((j) => j.id === selectedJournee.id);
+    const previous = journees[Math.max(0, index - 1)];
+    if (previous) setSelectedJourneeId(previous.id);
+  }
+
+  function nextJournee() {
+    const index = journees.findIndex((j) => j.id === selectedJournee.id);
+    const next = journees[Math.min(journees.length - 1, index + 1)];
+    if (next) setSelectedJourneeId(next.id);
+  }
+
+  function addJournee() {
+    const number = journees.length + 1;
+
+    const newJournee = ensureThreeBonus({
+      id: `j${number}`,
+      number,
+      title: `J${number}`,
+      locked: false,
+      lockAt: "",
+      matches: [],
+      bonus: []
+    });
+
+    setJournees((prev) => [...prev, newJournee]);
+    setSelectedJourneeId(newJournee.id);
+    setMessage(`J${number} ajoutee.`);
+  }
+
+  function handleExcelImport(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+
+        const workbook = XLSX.read(data, {
+          type: "array",
+          cellDates: true
+        });
+
+        const imported = parseExcelWorkbookToJournees(workbook)
+          .map((j) => ({
+            ...j,
+            locked: false,
+            lockAt: j.lockAt || "",
+            matches: (j.matches || []).map((m) => ({
+              ...m,
+              date: toDateInputValue(m.date) || "",
+              time: toTimeInputValue(m.time) || "",
+              status: m.status || "Ouvert",
+              homeScore: m.homeScore || "",
+              awayScore: m.awayScore || ""
+            })),
+            bonus: (j.bonus || []).map((b) => ({
+              ...b,
+              date: toDateInputValue(b.date) || "",
+              time: toTimeInputValue(b.time) || "",
+              homeScore: b.homeScore || "",
+              awayScore: b.awayScore || ""
+            }))
+          }))
+          .map(ensureThreeBonus);
+
+        if (!imported.length) {
+          setMessage("Import impossible : aucune ligne valide trouvee.");
+          return;
+        }
+
+        setJournees(imported);
+        setSelectedJourneeId(imported[0].id);
+        savePublicJournees(imported);
+
+        setMessage(`${imported.length} journee(s) importee(s) depuis Excel.`);
+      } catch (error) {
+        console.error(error);
+        setMessage("Erreur import Excel.");
+      } finally {
+        event.target.value = "";
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  }
+
+  const matches = selectedJournee.matches || [];
+  const bonus = ensureThreeBonus(selectedJournee).bonus;
+
+  return (
+    <div className="admin-pronos-page">
+      <style>{`
+        .admin-pronos-page {
+          color: #ffffff;
+          padding: 4px;
+        }
+
+        .admin-pronos-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          margin-bottom: 18px;
+          padding: 24px;
+          border-radius: 28px;
+          background:
+            radial-gradient(circle at top left, rgba(186,255,0,.18), transparent 34%),
+            linear-gradient(135deg, rgba(15,23,42,.98), rgba(29,78,216,.35));
+          border: 1px solid rgba(255,255,255,.10);
+        }
+
+        .admin-pronos-title h1 {
+          margin: 0;
+          font-size: 38px;
+          line-height: 1;
+          font-weight: 950;
+          letter-spacing: -.04em;
+        }
+
+        .admin-pronos-title p {
+          margin: 10px 0 0;
+          color: #cbd5e1;
+          font-weight: 750;
+        }
+
+        .admin-pronos-actions {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .admin-btn,
+        .admin-select {
+          border: 1px solid rgba(255,255,255,.14);
+          background: rgba(255,255,255,.08);
+          color: #f8fafc;
+          border-radius: 999px;
+          padding: 12px 16px;
+          font-weight: 950;
+          cursor: pointer;
+          outline: none;
+        }
+
+        .admin-select {
+          background: #111827;
+          min-width: 95px;
+        }
+
+        .admin-btn.green {
+          background: #baff00;
+          border-color: #baff00;
+          color: #07111f;
+        }
+
+        .admin-btn.gold {
+          background: #ffd21f;
+          border-color: #ffd21f;
+          color: #07111f;
+        }
+
+        .admin-btn.red {
+          background: #ef4444;
+          border-color: #ef4444;
+          color: #ffffff;
+        }
+
+        .admin-message {
+          margin-bottom: 18px;
+          padding: 14px 16px;
+          border-radius: 18px;
+          background: rgba(186,255,0,.08);
+          border: 1px solid rgba(186,255,0,.20);
+          color: #d9ff66;
+          font-weight: 850;
+        }
+
+        .admin-lock-card {
+          margin-bottom: 18px;
+          padding: 18px;
+          border-radius: 22px;
+          background: linear-gradient(180deg, rgba(15,23,42,.92), rgba(2,6,23,.96));
+          border: 1px solid rgba(255,255,255,.10);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+
+        .admin-lock-card strong {
+          display: block;
+          font-size: 18px;
+          font-weight: 950;
+          margin-bottom: 5px;
+        }
+
+        .admin-lock-card span {
+          color: #94a3b8;
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .admin-lock-input {
+          background: #111827;
+          color: #f8fafc;
+          border: 1px solid rgba(186,255,0,.35);
+          border-radius: 16px;
+          padding: 12px 14px;
+          font-weight: 950;
+          outline: none;
+        }
+
+        .section-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin: 24px 0 14px;
+        }
+
+        .section-head h2 {
+          margin: 0;
+          font-size: 26px;
+          font-weight: 950;
+        }
+
+        .section-head span {
+          color: #b6c2d9;
+          font-weight: 900;
+        }
+
+        .admin-match-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px;
+        }
+
+        .admin-match-card {
+          background: linear-gradient(180deg, rgba(20,32,51,.96), rgba(11,18,32,.98));
+          border: 1px solid rgba(255,255,255,.12);
+          border-radius: 22px;
+          padding: 16px;
+          box-shadow: 0 16px 38px rgba(0,0,0,.28);
+        }
+
+        .admin-match-card.blocked {
+          border-color: rgba(239,68,68,.38);
+          opacity: .92;
+        }
+
+        .admin-match-card.bonus {
+          border-color: rgba(34,197,94,.32);
+        }
+
+        .admin-match-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 14px;
+        }
+
+        .admin-number {
+          width: 40px;
+          height: 40px;
+          border-radius: 14px;
+          background: rgba(186,255,0,.16);
+          color: #baff00;
+          display: grid;
+          place-items: center;
+          font-size: 20px;
+          font-weight: 950;
+        }
+
+        .admin-status-btn {
+          border-radius: 999px;
+          padding: 9px 12px;
+          border: 1px solid rgba(34,197,94,.30);
+          background: rgba(34,197,94,.14);
+          color: #86efac;
+          font-size: 12px;
+          font-weight: 950;
+          cursor: pointer;
+        }
+
+        .admin-status-btn.blocked {
+          background: rgba(239,68,68,.14);
+          color: #fca5a5;
+          border-color: rgba(239,68,68,.30);
+        }
+
+        .admin-pill {
+          border-radius: 999px;
+          padding: 7px 10px;
+          background: rgba(34,197,94,.14);
+          color: #86efac;
+          border: 1px solid rgba(34,197,94,.30);
+          font-size: 12px;
+          font-weight: 950;
+        }
+
+        .admin-fields {
+          display: grid;
+          gap: 10px;
+        }
+
+        .admin-fields label {
+          display: grid;
+          gap: 6px;
+          color: #9fb0ca;
+          font-size: 12px;
+          font-weight: 950;
+          text-transform: uppercase;
+          letter-spacing: .08em;
+        }
+
+        .admin-input {
+          width: 100%;
+          background: #111827;
+          color: #f8fafc;
+          border: 1px solid rgba(255,255,255,.14);
+          border-radius: 14px;
+          padding: 11px 12px;
+          font-weight: 900;
+          outline: none;
+        }
+
+        .admin-input:focus {
+          border-color: rgba(186,255,0,.55);
+        }
+
+        .admin-two {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+
+        .score-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .score-row input {
+          text-align: center;
+        }
+
+        .admin-card-actions {
+          display: flex;
+          gap: 8px;
+          margin-top: 12px;
+        }
+
+        .admin-card-actions button {
+          flex: 1;
+          border-radius: 999px;
+          padding: 10px 12px;
+          border: 1px solid rgba(255,255,255,.14);
+          background: rgba(255,255,255,.08);
+          color: #f8fafc;
+          font-weight: 950;
+          cursor: pointer;
+        }
+
+        .admin-card-actions button.red {
+          background: rgba(239,68,68,.18);
+          color: #fca5a5;
+          border-color: rgba(239,68,68,.30);
+        }
+
+        @media (max-width: 1200px) {
+          .admin-match-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 760px) {
+          .admin-pronos-top {
+            flex-direction: column;
+          }
+
+          .admin-pronos-actions,
+          .admin-btn,
+          .admin-select {
+            width: 100%;
+          }
+
+          .admin-match-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .admin-pronos-title h1 {
+            font-size: 30px;
+          }
+        }
+      `}</style>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        style={{ display: "none" }}
+        onChange={handleExcelImport}
+      />
+
+      <div className="admin-pronos-top">
+        <div className="admin-pronos-title">
+          <h1>Admin pronostics</h1>
+          <p>Meme presentation que la page Pronos, mais ici tu geres les journees, les matchs et les bonus.</p>
+        </div>
+
+        <div className="admin-pronos-actions">
+          <button className="admin-btn green" type="button" onClick={() => fileInputRef.current?.click()}>
+            Importer Excel
+          </button>
+
+          <button className="admin-btn" type="button" onClick={previousJournee}>
+            Journee avant
+          </button>
+
+          <select
+            className="admin-select"
+            value={selectedJournee.id}
+            onChange={(e) => setSelectedJourneeId(e.target.value)}
+          >
+            {journees.map((j) => (
+              <option key={j.id} value={j.id}>
+                {j.title}
+              </option>
+            ))}
+          </select>
+
+          <button className="admin-btn" type="button" onClick={nextJournee}>
+            Journee apres
+          </button>
+
+          <button className="admin-btn" type="button" onClick={addJournee}>
+            Ajouter journee
+          </button>
+
+          <button className="admin-btn gold" type="button" onClick={toggleLock}>
+            {selectedJournee.locked ? "Rouvrir journee" : "Fermer journee"}
+          </button>
+
+          <button className="admin-btn green" type="button" onClick={saveAll}>
+            Sauvegarder
+          </button>
+        </div>
+      </div>
+
+      <div className="admin-message">
+        {message}
+      </div>
+
+      <div className="admin-lock-card">
+        <div>
+          <strong>Heure de blocage des pronos</strong>
+          <span>Cette heure sera affichee sur la page Pronos pour {selectedJournee.title}.</span>
+        </div>
+
+        <input
+          className="admin-lock-input"
+          type="datetime-local"
+          value={selectedJournee.lockAt || ""}
+          onChange={(e) =>
+            updateSelectedJournee({
+              lockAt: e.target.value
+            })
+          }
+        />
+      </div>
+
+      <div className="section-head">
+        <h2>Matchs Ligue 1 - {selectedJournee.title}</h2>
+        <span>{matches.length} matchs</span>
+      </div>
+
+      <div className="admin-pronos-actions" style={{ marginBottom: 16 }}>
+        <button className="admin-btn green" type="button" onClick={addMatch}>
+          Ajouter un match Ligue 1
+        </button>
+      </div>
+
+      <div className="admin-match-grid">
+        {matches.map((match, index) => {
+          const blocked = match.status === "Bloque";
+
+          return (
+            <div key={match.id} className={`admin-match-card ${blocked ? "blocked" : ""}`}>
+              <div className="admin-match-top">
+                <div className="admin-number">{index + 1}</div>
+
+                <button
+                  type="button"
+                  className={`admin-status-btn ${blocked ? "blocked" : ""}`}
+                  onClick={() => toggleMatchStatus(match.id)}
+                >
+                  {blocked ? "Bloque" : "Ouvert"}
+                </button>
+              </div>
+
+              <div className="admin-fields">
+                <label>
+                  Equipe domicile
+                  <input
+                    className="admin-input"
+                    value={match.home || ""}
+                    onChange={(e) => updateMatch(match.id, { home: e.target.value })}
+                    placeholder="RC Lens"
+                  />
+                </label>
+
+                <label>
+                  Equipe exterieur
+                  <input
+                    className="admin-input"
+                    value={match.away || ""}
+                    onChange={(e) => updateMatch(match.id, { away: e.target.value })}
+                    placeholder="OL"
+                  />
+                </label>
+
+                <div className="admin-two">
+                  <label>
+                    Date
+                    <input
+                      className="admin-input"
+                      type="date"
+                      value={toDateInputValue(match.date)}
+                      onChange={(e) => updateMatch(match.id, { date: e.target.value })}
+                    />
+                  </label>
+
+                  <label>
+                    Heure
+                    <input
+                      className="admin-input"
+                      type="time"
+                      value={toTimeInputValue(match.time)}
+                      onChange={(e) => updateMatch(match.id, { time: e.target.value })}
+                    />
+                  </label>
+                </div>
+
+                <label>
+                  Resultat final
+                  <div className="score-row">
+                    <input
+                      className="admin-input"
+                      type="number"
+                      min="0"
+                      value={match.homeScore || ""}
+                      onChange={(e) => updateMatch(match.id, { homeScore: e.target.value })}
+                      placeholder="0"
+                    />
+                    <strong>-</strong>
+                    <input
+                      className="admin-input"
+                      type="number"
+                      min="0"
+                      value={match.awayScore || ""}
+                      onChange={(e) => updateMatch(match.id, { awayScore: e.target.value })}
+                      placeholder="0"
+                    />
+                  </div>
+                </label>
+              </div>
+
+              <div className="admin-card-actions">
+                <button type="button" onClick={saveAll}>
+                  Valider
+                </button>
+
+                <button className="red" type="button" onClick={() => removeMatch(match.id)}>
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="section-head">
+        <h2>Les 3 matchs bonus - {selectedJournee.title}</h2>
+        <span>3 bonus modifiables</span>
+      </div>
+
+      <div className="admin-match-grid">
+        {bonus.map((match, index) => (
+          <div key={match.id} className="admin-match-card bonus">
+            <div className="admin-match-top">
+              <div className="admin-number">{index + 1}</div>
+              <span className="admin-pill">Bonus</span>
+            </div>
+
+            <div className="admin-fields">
+              <label>
+                Competition
+                <input
+                  className="admin-input"
+                  value={match.league || ""}
+                  onChange={(e) => updateBonus(match.id, { league: e.target.value })}
+                  placeholder="Premier League"
+                />
+              </label>
+
+              <label>
+                Equipe domicile
+                <input
+                  className="admin-input"
+                  value={match.home || ""}
+                  onChange={(e) => updateBonus(match.id, { home: e.target.value })}
+                  placeholder="Liverpool"
+                />
+              </label>
+
+              <label>
+                Equipe exterieur
+                <input
+                  className="admin-input"
+                  value={match.away || ""}
+                  onChange={(e) => updateBonus(match.id, { away: e.target.value })}
+                  placeholder="Chelsea"
+                />
+              </label>
+
+              <div className="admin-two">
+                <label>
+                  Date
+                  <input
+                    className="admin-input"
+                    type="date"
+                    value={toDateInputValue(match.date)}
+                    onChange={(e) => updateBonus(match.id, { date: e.target.value })}
+                  />
+                </label>
+
+                <label>
+                  Heure
+                  <input
+                    className="admin-input"
+                    type="time"
+                    value={toTimeInputValue(match.time)}
+                    onChange={(e) => updateBonus(match.id, { time: e.target.value })}
+                  />
+                </label>
+              </div>
+
+              <label>
+                Resultat final bonus
+                <div className="score-row">
+                  <input
+                    className="admin-input"
+                    type="number"
+                    min="0"
+                    value={match.homeScore || ""}
+                    onChange={(e) => updateBonus(match.id, { homeScore: e.target.value })}
+                    placeholder="0"
+                  />
+                  <strong>-</strong>
+                  <input
+                    className="admin-input"
+                    type="number"
+                    min="0"
+                    value={match.awayScore || ""}
+                    onChange={(e) => updateBonus(match.id, { awayScore: e.target.value })}
+                    placeholder="0"
+                  />
+                </div>
+              </label>
+            </div>
+
+            <div className="admin-card-actions">
+              <button type="button" onClick={saveAll}>
+                Valider
+              </button>
+
+              <button
+                className="red"
+                type="button"
+                onClick={() =>
+                  updateBonus(match.id, {
+                    league: "",
+                    home: "",
+                    away: "",
+                    date: "",
+                    time: "",
+                    homeScore: "",
+                    awayScore: ""
+                  })
+                }
+              >
+                Effacer
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

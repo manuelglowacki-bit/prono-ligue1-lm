@@ -273,6 +273,31 @@ function sameClub(a, b) {
   return normalizeClubName(a) === normalizeClubName(b);
 }
 
+function cleanFavoriteClubDisplay(value) {
+  if (!value) return "Non choisi";
+
+  if (typeof value === "string") {
+    const raw = value.trim();
+
+    if (raw.startsWith("{") && raw.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed.favoriteTeam || parsed.club || parsed.Manu || Object.values(parsed).find(Boolean) || "Non choisi";
+      } catch {
+        return raw;
+      }
+    }
+
+    return raw;
+  }
+
+  if (typeof value === "object") {
+    return value.favoriteTeam || value.club || value.Manu || Object.values(value).find(Boolean) || "Non choisi";
+  }
+
+  return String(value);
+}
+
 export default function PronosPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 

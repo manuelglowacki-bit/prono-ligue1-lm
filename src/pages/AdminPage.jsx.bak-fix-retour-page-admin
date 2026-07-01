@@ -1,0 +1,604 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
+import { parseExcelWorkbookToJournees } from "../utils/excelJournees.js";
+
+const STORAGE_KEY = "admin_pronos_manager_v3";
+const PUBLIC_JOURNEES_KEY = "admin_journees";
+const FAVORITE_DEADLINE_KEYS = [
+  "favorite_team_deadline",
+  "favorite_club_deadline",
+  "admin_favorite_deadline",
+  "favoriteDeadline"
+];
+
+const DEFAULT_JOURNEES = [
+  {
+    id: "j1",
+    number: 1,
+    title: "J1",
+    locked: false,
+    lockAt: "",
+    matches: [
+      {
+        id: "j1-m1",
+        home: "RC Lens",
+        away: "OL",
+        date: "2026-08-22",
+        time: "20:45",
+        status: "Ouvert",
+        homeScore: "",
+        awayScore: ""
+      },
+      {
+        id: "j1-m2",
+        home: "PSG",
+        away: "Nantes",
+        date: "2026-08-23",
+        time: "17:00",
+        status: "Ouvert",
+        homeScore: "",
+        awayScore: ""
+      },
+      {
+        id: "j1-m3",
+        home: "OM",
+        away: "Rennes",
+        date: "2026-08-23",
+        time: "21:00",
+        status: "Ouvert",
+        homeScore: "",
+        awayScore: ""
+      }
+    ],
+    bonus: [
+      {
+        id: "j1-b1",
+        league: "Premier League",
+        home: "Liverpool",
+        away: "Chelsea",
+        date: "2026-08-22",
+        time: "18:30",
+        homeScore: "",
+        awayScore: ""
+      },
+      {
+        id: "j1-b2",
+        league: "Bundesliga",
+        home: "Bayern",
+        away: "Dortmund",
+        date: "2026-08-22",
+        time: "18:30",
+        homeScore: "",
+        awayScore: ""
+      },
+      {
+        id: "j1-b3",
+        league: "Serie A",
+        home: "Milan",
+        away: "Naples",
+        date: "2026-08-23",
+        time: "20:45",
+        homeScore: "",
+        awayScore: ""
+      }
+    ]
+  }
+];
+
+function loadJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function savePublicJournees(journees) {
+  localStorage.setItem(PUBLIC_JOURNEES_KEY, JSON.stringify(journees));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(journees));
+}
+
+function loadFavoriteDeadlineValue() {
+  try {
+    for (const key of FAVORITE_DEADLINE_KEYS) {
+      const value = localStorage.getItem(key);
+      if (value) return value.replace(/^"|"$/g, "");
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function saveFavoriteDeadlineValue(value) {
+  FAVORITE_DEADLINE_KEYS.forEach((key) => {
+    localStorage.setItem(key, value || "");
+  });
+}
+
+function formatFavoriteDeadline(value) {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function toDateInputValue(value) {
+  const raw = String(value || "").trim();
+
+  if (!raw) return "";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  const fr = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+
+  if (fr) {
+    const day = fr[1].padStart(2, "0");
+    const month = fr[2].padStart(2, "0");
+    const year = fr[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  return "";
+}
+
+function toTimeInputValue(value) {
+  const raw = String(value || "").trim();
+
+  if (!raw) return "";
+
+  const match = raw.match(/(\d{1,2})[:hH](\d{2})/);
+
+  if (match) {
+    const hour = match[1].padStart(2, "0");
+    const minute = match[2].padStart(2, "0");
+    return `${hour}:${minute}`;
+  }
+
+  return "";
+}
+
+function normalizeJournees(data) {
+  if (!Array.isArray(data) || data.length === 0) return DEFAULT_JOURNEES;
+
+  return data.map((j, index) => {
+    const journeyId = j.id || `j${index + 1}`;
+
+    return {
+      id: journeyId,
+      number: j.number || index + 1,
+      title: j.title || `J${index + 1}`,
+      locked: Boolean(j.locked),
+      lockAt: j.lockAt || "",
+      matches: Array.isArray(j.matches)
+        ? j.matches.map((m, i) => ({
+            id: m.id || `${journeyId}-m${i + 1}`,
+            home: m.home || "",
+            away: m.away || "",
+            date: toDateInputValue(m.date) || "",
+            time: toTimeInputValue(m.time) || "",
+            status: m.status || "Ouvert",
+            homeScore: m.homeScore || "",
+            awayScore: m.awayScore || ""
+          }))
+        : [],
+      bonus: Array.isArray(j.bonus)
+        ? j.bonus.slice(0, 3).map((b, i) => ({
+            id: b.id || `${journeyId}-b${i + 1}`,
+            league: b.league || "",
+            home: b.home || "",
+            away: b.away || "",
+            date: toDateInputValue(b.date) || "",
+            time: toTimeInputValue(b.time) || "",
+            homeScore: b.homeScore || "",
+            awayScore: b.awayScore || ""
+          }))
+        : []
+    };
+  });
+}
+
+function makeEmptyBonus(journeyId, index) {
+  return {
+    id: `${journeyId}-b${index + 1}`,
+    league: "",
+    home: "",
+    away: "",
+    date: "",
+    time: "",
+    homeScore: "",
+    awayScore: ""
+  };
+}
+
+function ensureThreeBonus(journee) {
+  const bonus = Array.isArray(journee.bonus) ? [...journee.bonus] : [];
+
+  while (bonus.length < 3) {
+    bonus.push(makeEmptyBonus(journee.id, bonus.length));
+  }
+
+  return {
+    ...journee,
+    lockAt: journee.lockAt || "",
+    bonus: bonus.slice(0, 3)
+  };
+}
+
+export default function AdminPage() {
+  const fileInputRef = useRef(null);
+
+  const [journees, setJournees] = useState(() => {
+    const saved =
+      loadJson(PUBLIC_JOURNEES_KEY, null) ||
+      loadJson(STORAGE_KEY, null) ||
+      DEFAULT_JOURNEES;
+
+    return normalizeJournees(saved).map(ensureThreeBonus);
+  });
+
+  const [selectedJourneeId, setSelectedJourneeId] = useState(() => {
+    const saved =
+      loadJson(PUBLIC_JOURNEES_KEY, null) ||
+      loadJson(STORAGE_KEY, null) ||
+      DEFAULT_JOURNEES;
+
+    return normalizeJournees(saved)[0]?.id || "j1";
+  });
+
+  const [message, setMessage] = useState("Page admin prete.");
+  const [favoriteDeadline, setFavoriteDeadline] = useState(() => loadFavoriteDeadlineValue());
+  const [favoriteDeadlineMessage, setFavoriteDeadlineMessage] = useState("Date butoir non modifiee.");
+
+  const selectedJournee = useMemo(() => {
+    return (
+      journees.find((j) => j.id === selectedJourneeId) ||
+      journees[0] ||
+      DEFAULT_JOURNEES[0]
+    );
+  }, [journees, selectedJourneeId]);
+
+  useEffect(() => {
+    savePublicJournees(journees);
+  }, [journees]);
+
+  function updateSelectedJournee(patch) {
+    setJournees((prev) =>
+      prev.map((j) =>
+        j.id === selectedJournee.id
+          ? ensureThreeBonus({ ...j, ...patch })
+          : j
+      )
+    );
+  }
+
+  function updateMatch(matchId, patch) {
+    const nextMatches = selectedJournee.matches.map((match) =>
+      match.id === matchId ? { ...match, ...patch } : match
+    );
+
+    updateSelectedJournee({ matches: nextMatches });
+  }
+
+  function updateBonus(bonusId, patch) {
+    const currentBonus = ensureThreeBonus(selectedJournee).bonus;
+
+    const nextBonus = currentBonus.map((bonus) =>
+      bonus.id === bonusId ? { ...bonus, ...patch } : bonus
+    );
+
+    updateSelectedJournee({ bonus: nextBonus });
+  }
+
+  function adminScoreIsFilled(value) {
+    return value !== "" && value !== null && value !== undefined;
+  }
+
+  function adminToScore(value) {
+    if (!adminScoreIsFilled(value)) return "";
+    const number = Number(value);
+    return Number.isNaN(number) ? "" : number;
+  }
+
+  function adminResultFromScore(home, away) {
+    if (home > away) return "1";
+    if (home < away) return "2";
+    return "N";
+  }
+
+  function getRegularMatchesAdmin(journee) {
+    if (Array.isArray(journee?.matches)) {
+      return { key: "matches", list: journee.matches };
+    }
+
+    if (Array.isArray(journee?.matchs)) {
+      return { key: "matchs", list: journee.matchs };
+    }
+
+    if (Array.isArray(journee?.normal)) {
+      return { key: "normal", list: journee.normal };
+    }
+
+    return { key: "matches", list: [] };
+  }
+
+  function buildAdminValidatedPatch(match) {
+    const home = adminToScore(
+      match.scoreDomicile ??
+      match.scoreHome ??
+      match.homeScore ??
+      match.scoreDom ??
+      match.finalHome ??
+      match.resultHome ??
+      match.homeGoals
+    );
+
+    const away = adminToScore(
+      match.scoreExterieur ??
+      match.scoreAway ??
+      match.awayScore ??
+      match.scoreExt ??
+      match.finalAway ??
+      match.resultAway ??
+      match.awayGoals
+    );
+
+    if (!adminScoreIsFilled(home) || !adminScoreIsFilled(away)) {
+      return null;
+    }
+
+    const resultat = adminResultFromScore(home, away);
+
+    return {
+      scoreDomicile: home,
+      scoreExterieur: away,
+      scoreHome: home,
+      scoreAway: away,
+      homeScore: home,
+      awayScore: away,
+      scoreDom: home,
+      scoreExt: away,
+      finalHome: home,
+      finalAway: away,
+      resultHome: home,
+      resultAway: away,
+      homeGoals: home,
+      awayGoals: away,
+      score: home + "-" + away,
+      resultat,
+      result: resultat,
+      resultatFinal: resultat,
+      status: "FINISHED",
+      statut: "FINISHED",
+      statutLong: "Résultat validé",
+      adminValidated: true,
+      validated: true,
+      isValidated: true,
+      resultValidatedAt: new Date().toISOString()
+    };
+  }
+
+  function validateAdminMatch(matchId) {
+    const regular = getRegularMatchesAdmin(selectedJournee);
+    const regularMatch = regular.list.find((item) => item.id === matchId);
+
+    if (regularMatch) {
+      const patch = buildAdminValidatedPatch(regularMatch);
+
+      if (!patch) {
+        alert("Mets le résultat final avant de valider.");
+        return;
+      }
+
+      const nextMatches = regular.list.map((item) =>
+        item.id === matchId ? { ...item, ...patch } : item
+      );
+
+      updateSelectedJournee({
+        [regular.key]: nextMatches
+      });
+
+      return;
+    }
+
+    const currentBonus = ensureThreeBonus(selectedJournee).bonus;
+    const bonusMatch = currentBonus.find((item) => item.id === matchId);
+
+    if (bonusMatch) {
+      const patch = buildAdminValidatedPatch(bonusMatch);
+
+      if (!patch) {
+        alert("Mets le résultat final bonus avant de valider.");
+        return;
+      }
+
+      updateBonus(matchId, patch);
+    }
+  }
+
+
+  function toggleMatchStatus(matchId) {
+    const match = selectedJournee.matches.find((m) => m.id === matchId);
+    const nextStatus = match?.status === "Bloque" ? "Ouvert" : "Bloque";
+
+    updateMatch(matchId, { status: nextStatus });
+
+    setMessage(
+      nextStatus === "Bloque"
+        ? "Match bloque."
+        : "Match ouvert."
+    );
+  }
+
+  function addMatch() {
+    const number = selectedJournee.matches.length + 1;
+
+    const newMatch = {
+      id: `${selectedJournee.id}-m${number}`,
+      home: "",
+      away: "",
+      date: "",
+      time: "",
+      status: "Ouvert",
+      homeScore: "",
+      awayScore: ""
+    };
+
+    updateSelectedJournee({
+      matches: [...selectedJournee.matches, newMatch]
+    });
+
+    setMessage("Nouveau match ajoute.");
+  }
+
+  function removeMatch(matchId) {
+    updateSelectedJournee({
+      matches: selectedJournee.matches.filter((match) => match.id !== matchId)
+    });
+
+    setMessage("Match supprime.");
+  }
+
+  function toggleLock() {
+    const locked = !selectedJournee.locked;
+
+    updateSelectedJournee({
+      locked
+    });
+
+    setMessage(locked ? "Journee fermee." : "Journee rouverte.");
+  }
+
+  function saveAll() {
+    savePublicJournees(journees);
+    setMessage("Sauvegarde OK. La page Pronos recupere cette configuration.");
+  }
+
+  function validateFavoriteDeadline() {
+    saveFavoriteDeadlineValue(favoriteDeadline);
+
+    if (favoriteDeadline) {
+      setFavoriteDeadlineMessage("Date butoir sauvegardee : " + formatFavoriteDeadline(favoriteDeadline));
+      setMessage("Date butoir club favori sauvegardee.");
+    } else {
+      setFavoriteDeadlineMessage("Aucune date butoir : choix encore ouvert.");
+      setMessage("Date butoir club favori ouverte.");
+    }
+  }
+
+  function clearFavoriteDeadline() {
+    setFavoriteDeadline("");
+    saveFavoriteDeadlineValue("");
+    setFavoriteDeadlineMessage("Date butoir effacee.");
+    setMessage("Date butoir club favori effacee.");
+  }
+
+  function previousJournee() {
+    const index = journees.findIndex((j) => j.id === selectedJournee.id);
+    const previous = journees[Math.max(0, index - 1)];
+    if (previous) setSelectedJourneeId(previous.id);
+  }
+
+  function nextJournee() {
+    const index = journees.findIndex((j) => j.id === selectedJournee.id);
+    const next = journees[Math.min(journees.length - 1, index + 1)];
+    if (next) setSelectedJourneeId(next.id);
+  }
+
+  function addJournee() {
+    const number = journees.length + 1;
+
+    const newJournee = ensureThreeBonus({
+      id: `j${number}`,
+      number,
+      title: `J${number}`,
+      locked: false,
+      lockAt: "",
+      matches: [],
+      bonus: []
+    });
+
+    setJournees((prev) => [...prev, newJournee]);
+    setSelectedJourneeId(newJournee.id);
+    setMessage(`J${number} ajoutee.`);
+  }
+
+  function handleExcelImport(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+
+        const workbook = XLSX.read(data, {
+          type: "array",
+          cellDates: true
+        });
+
+        const imported = parseExcelWorkbookToJournees(workbook)
+          .map((j) => ({
+            ...j,
+            locked: false,
+            lockAt: j.lockAt || "",
+            matches: (j.matches || []).map((m) => ({
+              ...m,
+              date: toDateInputValue(m.date) || "",
+              time: toTimeInputValue(m.time) || "",
+              status: m.status || "Ouvert",
+              homeScore: m.homeScore || "",
+              awayScore: m.awayScore || ""
+            })),
+            bonus: (j.bonus || []).map((b) => ({
+              ...b,
+              date: toDateInputValue(b.date) || "",
+              time: toTimeInputValue(b.time) || "",
+              homeScore: b.homeScore || "",
+              awayScore: b.awayScore || ""
+            }))
+          }))
+          .map(ensureThreeBonus);
+
+        if (!imported.length) {
+          setMessage("Import impossible : aucune ligne valide trouvee.");
+          return;
+        }
+
+        setJournees(imported);
+        setSelectedJourneeId(imported[0].id);
+        savePublicJournees(imported);
+
+        setMessage(`${imported.length} journee(s) importee(s) depuis Excel.`);
+      } catch (error) {
+        console.error(error);
+        setMessage("Erreur import Excel.");
+      } finally {
+        event.target.value = "";
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  }
+
+  const matches = selectedJournee.matches || [];
+  const bonus = ensureThreeBonus(selectedJournee).bonus;
+
+  return (
+    
+  );
+}

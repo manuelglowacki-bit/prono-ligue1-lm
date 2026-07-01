@@ -1,328 +1,260 @@
+
 import * as XLSX from "xlsx";
 
-function clean(value) {
-  return String(value ?? "").trim();
-}
-
-function normalize(value) {
-  return clean(value)
+function cleanHeader(value) {
+  return String(value || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "")
-    .replace(/[_\-’']/g, "");
+    .replace(/[^a-z0-9]/g, "");
 }
 
-function excelDateToText(value) {
+function getCell(row, names) {
+  const wanted = names.map(cleanHeader);
+
+  for (const key of Object.keys(row)) {
+    if (wanted.includes(cleanHeader(key))) {
+      return row[key];
+    }
+  }
+
+  return "";
+}
+
+function pad(value) {
+  return String(value).padStart(2, "0");
+}
+
+function toDateInputValue(value) {
   if (!value) return "";
 
-  if (value instanceof Date) {
-    return value.toLocaleDateString("fr-FR");
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.getFullYear() + "-" + pad(value.getMonth() + 1) + "-" + pad(value.getDate());
   }
 
   if (typeof value === "number") {
     const parsed = XLSX.SSF.parse_date_code(value);
-    if (parsed && parsed.y && parsed.m && parsed.d) {
-      const day = String(parsed.d).padStart(2, "0");
-      const month = String(parsed.m).padStart(2, "0");
-      return `${day}/${month}/${parsed.y}`;
+
+    if (parsed) {
+      return parsed.y + "-" + pad(parsed.m) + "-" + pad(parsed.d);
     }
   }
 
-  return clean(value);
+  const raw = String(value || "").trim();
+
+  if (!raw) return "";
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    return raw.slice(0, 10);
+  }
+
+  const fr = raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+
+  if (fr) {
+    return fr[3] + "-" + pad(fr[2]) + "-" + pad(fr[1]);
+  }
+
+  return "";
 }
 
-function findHeaderRow(matrix) {
-  let bestIndex = 0;
-  let bestScore = -1;
+function toTimeInputValue(value) {
+  if (!value) return "";
 
-  matrix.slice(0, 40).forEach((row, index) => {
-    const cells = row.map(normalize);
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return pad(value.getHours()) + ":" + pad(value.getMinutes());
+  }
 
-    let score = 0;
-
-    for (const cell of cells) {
-      if (cell.includes("idmatch")) score += 3;
-      if (cell.includes("journee")) score += 3;
-      if (cell.includes("domicile")) score += 4;
-      if (cell.includes("exterieur")) score += 4;
-      if (cell.includes("exterieur")) score += 4;
-      if (cell.includes("equipe1")) score += 3;
-      if (cell.includes("equipe2")) score += 3;
-      if (cell.includes("club1")) score += 3;
-      if (cell.includes("club2")) score += 3;
-      if (cell.includes("match")) score += 2;
-      if (cell.includes("date")) score += 2;
-      if (cell.includes("heure") || cell.includes("horaire")) score += 2;
+  if (typeof value === "number") {
+    if (value > 0 && value < 1) {
+      const totalMinutes = Math.round(value * 24 * 60);
+      return pad(Math.floor(totalMinutes / 60)) + ":" + pad(totalMinutes % 60);
     }
 
-    if (score > bestScore) {
-      bestScore = score;
-      bestIndex = index;
-    }
-  });
+    const parsed = XLSX.SSF.parse_date_code(value);
 
-  return bestIndex;
+    if (parsed) {
+      return pad(parsed.H || 0) + ":" + pad(parsed.M || 0);
+    }
+  }
+
+  const raw = String(value || "").trim();
+  const match = raw.match(/(\d{1,2})[:hH](\d{2})/);
+
+  if (match) {
+    return pad(match[1]) + ":" + match[2];
+  }
+
+  return "";
 }
 
-function rowsFromSheet(sheet) {
-  const matrix = XLSX.utils.sheet_to_json(sheet, {
-    header: 1,
-    defval: "",
-    raw: true
-  });
+function getJourneeNumber(row, sheetName, rowIndex) {
+  const value = getCell(row, [
+    "Journée",
+    "Journee",
+    "J",
+    "Round",
+    "N° journée",
+    "Numero journee",
+    "Numéro journée",
+    "Matchday"
+  ]);
 
-  if (!matrix.length) return [];
+  const direct = String(value || "").match(/\d+/);
 
-  const headerIndex = findHeaderRow(matrix);
-  const headers = matrix[headerIndex].map((h, i) => {
-    const value = clean(h);
-    return value || `col_${i}`;
-  });
+  if (direct) {
+    return Number(direct[0]);
+  }
 
-  const rows = [];
+  const sheet = String(sheetName || "").match(/\d+/);
 
-  for (let i = headerIndex + 1; i < matrix.length; i++) {
-    const line = matrix[i];
+  if (sheet) {
+    return Number(sheet[0]);
+  }
 
-    if (!line || line.every((cell) => clean(cell) === "")) continue;
+  return Math.floor(rowIndex / 9) + 1;
+}
 
-    const row = {};
+function getHome(row) {
+  return getCell(row, [
+    "Domicile",
+    "Equipe domicile",
+    "Équipe domicile",
+    "Club domicile",
+    "Home",
+    "Home Team",
+    "HomeTeam",
+    "Equipe 1",
+    "Équipe 1",
+    "Team 1",
+    "Local"
+  ]);
+}
 
-    headers.forEach((header, index) => {
-      row[header] = line[index] ?? "";
+function getAway(row) {
+  return getCell(row, [
+    "Extérieur",
+    "Exterieur",
+    "Equipe exterieur",
+    "Équipe extérieur",
+    "Club extérieur",
+    "Away",
+    "Away Team",
+    "AwayTeam",
+    "Equipe 2",
+    "Équipe 2",
+    "Team 2",
+    "Visiteur"
+  ]);
+}
+
+function splitMatchText(row) {
+  const text = String(getCell(row, [
+    "Match",
+    "Affiche",
+    "Rencontre",
+    "Fixture",
+    "Game"
+  ]) || "").trim();
+
+  if (!text) return { home: "", away: "" };
+
+  const parts = text
+    .replace(/\s+vs\s+/i, " - ")
+    .replace(/\s+v\s+/i, " - ")
+    .split(/\s+-\s+/);
+
+  return {
+    home: String(parts[0] || "").trim(),
+    away: String(parts[1] || "").trim()
+  };
+}
+
+function getDate(row) {
+  return getCell(row, [
+    "Date",
+    "Jour",
+    "Date match",
+    "Match date",
+    "Kickoff",
+    "Coup d'envoi",
+    "Coup denvoi"
+  ]);
+}
+
+function getTime(row) {
+  return getCell(row, [
+    "Heure",
+    "Horaire",
+    "Time",
+    "Kickoff",
+    "Coup d'envoi",
+    "Coup denvoi"
+  ]);
+}
+
+export function parseExcelWorkbookToJournees(workbook) {
+  const map = new Map();
+
+  workbook.SheetNames.forEach((sheetName) => {
+    const sheet = workbook.Sheets[sheetName];
+
+    const rows = XLSX.utils.sheet_to_json(sheet, {
+      defval: "",
+      raw: true
     });
 
-    rows.push(row);
-  }
+    rows.forEach((row, rowIndex) => {
+      const journeeNumber = getJourneeNumber(row, sheetName, rowIndex);
 
-  return rows;
-}
+      let home = String(getHome(row) || "").trim();
+      let away = String(getAway(row) || "").trim();
 
-function getValue(row, possibleNames) {
-  const keys = Object.keys(row);
-  const wanted = possibleNames.map(normalize);
-
-  for (const key of keys) {
-    const normalizedKey = normalize(key);
-
-    if (wanted.includes(normalizedKey)) {
-      return clean(row[key]);
-    }
-  }
-
-  return "";
-}
-
-function getByContains(row, possibleParts) {
-  const keys = Object.keys(row);
-  const wanted = possibleParts.map(normalize);
-
-  for (const key of keys) {
-    const normalizedKey = normalize(key);
-
-    if (wanted.some((part) => normalizedKey.includes(part))) {
-      return clean(row[key]);
-    }
-  }
-
-  return "";
-}
-
-function splitMatchText(value) {
-  const raw = clean(value);
-
-  if (!raw) return { home: "", away: "" };
-
-  const separators = [" vs ", " VS ", " - ", "-", " v ", " V ", " / ", "/"];
-
-  for (const separator of separators) {
-    if (raw.includes(separator)) {
-      const parts = raw.split(separator).map(clean).filter(Boolean);
-
-      if (parts.length >= 2) {
-        return {
-          home: parts[0],
-          away: parts[1]
-        };
+      if (!home || !away) {
+        const fromText = splitMatchText(row);
+        home = home || fromText.home;
+        away = away || fromText.away;
       }
-    }
-  }
 
-  return { home: "", away: "" };
-}
+      if (!home || !away) return;
 
-function normalizeJournee(value, idMatch, fallbackIndex) {
-  const fromId = clean(idMatch).match(/J0?(\d{1,2})/i);
+      const rawDate = getDate(row);
+      const rawTime = getTime(row);
 
-  if (fromId?.[1]) {
-    return `J${Number(fromId[1])}`;
-  }
+      const date = toDateInputValue(rawDate);
+      const time = toTimeInputValue(rawTime) || toTimeInputValue(rawDate);
 
-  const raw = clean(value);
-  const number = raw.match(/\d+/)?.[0];
+      const id = "j" + journeeNumber;
 
-  if (number) return `J${Number(number)}`;
+      if (!map.has(id)) {
+        map.set(id, {
+          id,
+          number: journeeNumber,
+          title: "J" + journeeNumber,
+          locked: false,
+          lockAt: "",
+          matches: [],
+          bonus: []
+        });
+      }
 
-  return `J${fallbackIndex + 1}`;
-}
+      const journee = map.get(id);
+      const matchNumber = journee.matches.length + 1;
 
-function makeMatchId(journee, type, index) {
-  return `${journee.toLowerCase()}-${type}${index + 1}`;
-}
-
-function parseRows(rows) {
-  const grouped = {};
-
-  rows.forEach((row, index) => {
-    const idMatch = getValue(row, [
-      "ID match",
-      "Id match",
-      "ID",
-      "Match ID",
-      "Identifiant"
-    ]);
-
-    const journee = normalizeJournee(
-      getValue(row, [
-        "Journee",
-        "Journée",
-        "Numero journee",
-        "Numéro journée",
-        "N° journée",
-        "Round",
-        "J"
-      ]),
-      idMatch,
-      index
-    );
-
-    let home =
-      getValue(row, [
-        "Domicile",
-        "Equipe domicile",
-        "Équipe domicile",
-        "Club domicile",
-        "Recevant",
-        "Home",
-        "Home Team",
-        "Equipe 1",
-        "Équipe 1",
-        "Club 1",
-        "Equipe A",
-        "Équipe A"
-      ]) ||
-      getByContains(row, [
-        "domicile",
-        "recevant",
-        "hometeam"
-      ]);
-
-    let away =
-      getValue(row, [
-        "Exterieur",
-        "Extérieur",
-        "Equipe exterieur",
-        "Équipe extérieur",
-        "Club exterieur",
-        "Club extérieur",
-        "Visiteur",
-        "Away",
-        "Away Team",
-        "Equipe 2",
-        "Équipe 2",
-        "Club 2",
-        "Equipe B",
-        "Équipe B"
-      ]) ||
-      getByContains(row, [
-        "exterieur",
-        "exterieur",
-        "visiteur",
-        "awayteam"
-      ]);
-
-    if (!home || !away) {
-      const matchText =
-        getValue(row, ["Match", "Rencontre", "Affiche", "Fixture", "Game", "Libelle", "Libellé"]) ||
-        getByContains(row, ["match", "rencontre", "affiche", "libelle"]);
-
-      const split = splitMatchText(matchText);
-      home = home || split.home;
-      away = away || split.away;
-    }
-
-    if (!home || !away) return;
-
-    const date = excelDateToText(
-      getValue(row, ["Date", "Jour", "Date match", "Date du match"])
-    );
-
-    const time =
-      getValue(row, ["Heure", "Horaire", "Time", "Hour", "Coup d'envoi", "Coup d’envoi"]) ||
-      getByContains(row, ["heure", "horaire"]);
-
-    const competition =
-      getValue(row, ["Competition", "Compétition", "Ligue", "League", "Championnat"]) ||
-      getByContains(row, ["competition", "ligue", "league", "championnat"]);
-
-    const type =
-      getValue(row, ["Type", "Categorie", "Catégorie"]) ||
-      getByContains(row, ["type", "categorie"]);
-
-    const normalizedType = normalize(`${type} ${competition}`);
-
-    const isBonus =
-      normalizedType.includes("bonus") ||
-      normalizedType.includes("premierleague") ||
-      normalizedType.includes("liga") ||
-      normalizedType.includes("seriea") ||
-      normalizedType.includes("bundesliga");
-
-    if (!grouped[journee]) {
-      grouped[journee] = {
-        id: journee.toLowerCase(),
-        number: Number(journee.replace(/\D/g, "")) || index + 1,
-        title: journee,
-        matches: [],
-        bonus: []
-      };
-    }
-
-    if (isBonus) {
-      grouped[journee].bonus.push({
-        id: makeMatchId(journee, "b", grouped[journee].bonus.length),
-        league: competition || type || "Bonus",
-        home,
-        away,
-        date,
-        time
-      });
-    } else {
-      grouped[journee].matches.push({
-        id: makeMatchId(journee, "m", grouped[journee].matches.length),
+      journee.matches.push({
+        id: id + "-m" + matchNumber,
         home,
         away,
         date,
         time,
         status: "Ouvert",
         homeScore: "",
-        awayScore: ""
+        awayScore: "",
+        adminValidated: false
       });
-    }
+    });
   });
 
-  return Object.values(grouped).sort((a, b) => a.number - b.number);
+  return Array.from(map.values()).sort((a, b) => a.number - b.number);
 }
 
-export function parseExcelWorkbookToJournees(workbook) {
-  const allRows = [];
-
-  workbook.SheetNames.forEach((sheetName) => {
-    const sheet = workbook.Sheets[sheetName];
-    const rows = rowsFromSheet(sheet);
-    allRows.push(...rows);
-  });
-
-  return parseRows(allRows);
-}
+export default parseExcelWorkbookToJournees;

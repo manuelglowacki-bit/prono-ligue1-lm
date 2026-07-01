@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import HomePage from "./pages/HomePage.jsx";
 import PronosPage from "./pages/PronosPage.jsx";
 import RankingPage from "./pages/RankingPage.jsx";
+import GazettePage from "./pages/GazettePage.jsx";
 import StatsPage from "./pages/StatsPage.jsx";
 import TrophiesPage from "./pages/TrophiesPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
@@ -13,10 +14,78 @@ import FavoriteDeadlineAdmin from "./components/FavoriteDeadlineAdmin.jsx";
 
 import "./styles/layout.css";
 
+
+function cleanFavoriteTeamValue(value) {
+  if (!value) return value;
+
+  if (typeof value === "string") {
+    const raw = value.trim();
+
+    if (raw.startsWith("{") && raw.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(raw);
+        return cleanFavoriteTeamValue(parsed);
+      } catch {
+        return raw;
+      }
+    }
+
+    return raw;
+  }
+
+  if (typeof value === "object") {
+    return (
+      value.favoriteTeam ||
+      value.club ||
+      value.clubFavori ||
+      value.team ||
+      value.Manu ||
+      Object.values(value).find((item) => typeof item === "string" && item.trim()) ||
+      ""
+    );
+  }
+
+  return String(value);
+}
+
+function cleanFavoriteTeamStorage() {
+  try {
+    const keys = [];
+
+    for (let i = 0; i < localStorage.length; i++) {
+      keys.push(localStorage.key(i));
+    }
+
+    keys.forEach((key) => {
+      const lower = key.toLowerCase();
+
+      const isFavoriteKey =
+        lower.includes("favorite") ||
+        lower.includes("favori") ||
+        lower.includes("club") ||
+        lower.includes("team");
+
+      if (!isFavoriteKey) return;
+
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+
+      const cleaned = cleanFavoriteTeamValue(raw);
+
+      if (cleaned && cleaned !== raw && !String(cleaned).trim().startsWith("{")) {
+        localStorage.setItem(key, cleaned);
+      }
+    });
+  } catch {
+    // ignore
+  }
+}
+
 const NAV_ITEMS = [
   { id: "home", label: "Accueil", short: "AC" },
   { id: "pronos", label: "Pronos", short: "PR" },
   { id: "ranking", label: "Classement", short: "CL" },
+  { id: "gazette", label: "Gazette", short: "GZ" },
   { id: "stats", label: "Stats", short: "ST" },
   { id: "trophies", label: "Trophees", short: "TR" },
   { id: "profile", label: "Profil", short: "PF" },
@@ -25,6 +94,50 @@ const NAV_ITEMS = [
 
 export default function App() {
   const [activePage, setActivePage] = useState("home");
+
+  useEffect(() => {
+    function handleNameSaveVisible(event) {
+      const button = event.target.closest?.("button");
+      if (!button) return;
+
+      const label = button.textContent.trim().toLowerCase();
+
+      if (label !== "enregistrer") return;
+
+      const card =
+        button.closest(".profile-pref-card") ||
+        button.closest(".profile-card") ||
+        button.closest("article") ||
+        button.closest("div");
+
+      const zoneText = card?.textContent?.toLowerCase() || "";
+
+      if (!zoneText.includes("nom affiché") && !zoneText.includes("nom affiche")) return;
+
+      const oldText = button.textContent;
+
+      button.classList.add("name-save-confirmed");
+      button.textContent = "Nom validé ✓";
+
+      card.classList.add("name-card-confirmed");
+
+      setTimeout(() => {
+        button.classList.remove("name-save-confirmed");
+        button.textContent = oldText;
+        card.classList.remove("name-card-confirmed");
+      }, 1800);
+    }
+
+    document.addEventListener("click", handleNameSaveVisible);
+
+    return () => {
+      document.removeEventListener("click", handleNameSaveVisible);
+    };
+  }, []);
+
+  useEffect(() => {
+    cleanFavoriteTeamStorage();
+  }, []);
 
   function renderPage() {
     switch (activePage) {
@@ -41,6 +154,9 @@ export default function App() {
 
       case "ranking":
         return <RankingPage />;
+
+      case "gazette":
+        return <GazettePage />;
 
       case "stats":
         return <StatsPage />;

@@ -694,6 +694,31 @@ function buildPlayerRecap(player) {
     }
   );
 }
+function cleanFavoriteClubDisplay(value) {
+  if (!value) return "Non choisi";
+
+  if (typeof value === "string") {
+    const raw = value.trim();
+
+    if (raw.startsWith("{") && raw.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed.favoriteTeam || parsed.club || parsed.Manu || Object.values(parsed).find(Boolean) || "Non choisi";
+      } catch {
+        return raw;
+      }
+    }
+
+    return raw;
+  }
+
+  if (typeof value === "object") {
+    return value.favoriteTeam || value.club || value.Manu || Object.values(value).find(Boolean) || "Non choisi";
+  }
+
+  return String(value);
+}
+
 export default function HomePage() {
   const [refresh, setRefresh] = useState(0);
   const [message, setMessage] = useState("");
@@ -802,7 +827,7 @@ export default function HomePage() {
     }
 
     saveFavoriteTeam(data.player, data.club, true);
-    setMessage(`Equipe favorite validee : ${data.club}`);
+    setMessage(`Equipe favorite validee : ${cleanFavoriteClubDisplay(data.club)}`);
     setRefresh((value) => value + 1);
   }
 
@@ -1275,8 +1300,8 @@ export default function HomePage() {
 
           <div className={data.validated ? "home-status ok" : "home-status wait"}>
             {data.validated
-              ? `Equipe favorite validee : ${data.club}`
-              : `Equipe favorite non validee : ${data.club}`}
+              ? `Equipe favorite validee : ${cleanFavoriteClubDisplay(data.club)}`
+              : `Equipe favorite non validee : ${cleanFavoriteClubDisplay(data.club)}`}
           </div>
 
           <div className="home-deadline">
@@ -1289,41 +1314,7 @@ export default function HomePage() {
 
           {message && <div className="home-message">{message}</div>}
 
-          {data.profilePhoto && (
-            <div className="home-photo-settings">
-              <h3>Centrage photo</h3>
-
-              <label className="home-photo-range">
-                <span>Horizontal</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={data.photoPosition.x}
-                  onChange={(event) => {
-                    savePhotoPosition(data.player, "x", event.target.value);
-                    setRefresh((value) => value + 1);
-                  }}
-                />
-                <strong>{data.photoPosition.x}%</strong>
-              </label>
-
-              <label className="home-photo-range">
-                <span>Vertical</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={data.photoPosition.y}
-                  onChange={(event) => {
-                    savePhotoPosition(data.player, "y", event.target.value);
-                    setRefresh((value) => value + 1);
-                  }}
-                />
-                <strong>{data.photoPosition.y}%</strong>
-              </label>
-            </div>
-          )}
+          
         </section>
 
         <section className="home-panel-clean">

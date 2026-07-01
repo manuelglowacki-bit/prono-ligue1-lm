@@ -207,3 +207,49 @@ input {
   color: #aaa;
   padding: 30px;
 }
+
+
+/* FIX ECRITURE PROFIL */
+.profile-page *,
+.profil-page *,
+.home-page *,
+.player-profile *,
+.profile-card *,
+.stats-card * {
+  text-shadow: none;
+}
+
+.profile-page h1,
+.profile-page h2,
+.profile-page h3,
+.profile-page p,
+.profile-page span,
+.profile-page strong,
+.profile-page label,
+.profile-page small,
+.profil-page h1,
+.profil-page h2,
+.profil-page h3,
+.profil-page p,
+.profil-page span,
+.profil-page strong,
+.profil-page label,
+.profil-page small,
+.home-page h1,
+.home-page h2,
+.home-page h3,
+.home-page p,
+.home-page span,
+.home-page strong,
+.home-page label,
+.home-page small {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.profile-page ::selection,
+.profil-page ::selection,
+.home-page ::selection {
+  background: rgba(186, 255, 0, 0.25);
+  color: #ffffff;
+}
