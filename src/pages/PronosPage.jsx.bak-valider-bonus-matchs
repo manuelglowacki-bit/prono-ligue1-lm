@@ -675,30 +675,6 @@ export default function PronosPage() {
             border-color: rgba(163, 230, 53, 0.95) !important;
             box-shadow: 0 0 22px rgba(34, 197, 94, 0.45);
           }
-          .bonus-valid-btn {
-            width: 100%;
-            margin-top: 12px;
-            height: 46px;
-            border-radius: 14px;
-            border: 1px solid rgba(163, 230, 53, 0.35);
-            background: rgba(8, 35, 27, 0.85);
-            color: #ffffff;
-            font-size: 13px;
-            font-weight: 900;
-            cursor: pointer;
-            transition: 0.2s ease;
-          }
-
-          .bonus-valid-btn:hover {
-            transform: translateY(-1px);
-          }
-
-          .bonus-valid-btn.is-valid {
-            background: linear-gradient(135deg, #22c55e, #a3e635) !important;
-            color: #052e16 !important;
-            border-color: rgba(163, 230, 53, 0.95) !important;
-            box-shadow: 0 0 22px rgba(34, 197, 94, 0.45);
-          }
 
         @media (max-width: 760px) {
           .prono-top-clean {
@@ -912,18 +888,6 @@ export default function PronosPage() {
                   {selected ? "Bonus selectionne" : "Choisir ce bonus"}
                 </button>
 
-            <button
-              className="bonus-valid-btn"
-              type="button"
-              onClick={(e) => {
-                const button = e.currentTarget;
-                const isValid = button.classList.toggle("is-valid");
-                button.textContent = isValid ? "Bonus valide" : "Valider bonus";
-              }}
-            >
-              Valider bonus
-            </button>
-
                 <div className="teams">
                   <div className="team">
                     <span>{match.home}</span>
@@ -988,5 +952,4 @@ export default function PronosPage() {
     </div>
   );
 }
-
 

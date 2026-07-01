@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const DEFAULT_JOURNEES = [
   {
@@ -351,7 +351,7 @@ export default function PronosPage() {
     return (
       journeeLocked ||
       match.status === "Bloque" ||
-      match.status === "FermÃƒÂ©" ||
+      match.status === "FermÃƒÆ’Ã‚Â©" ||
       match.status === "Ferme" ||
       isAutoMatchLocked(match)
     );
@@ -359,7 +359,7 @@ export default function PronosPage() {
 
   function getBlockReason(match) {
     if (journeeLocked) return "Journee bloquee";
-    if (match.status === "Bloque" || match.status === "FermÃƒÂ©" || match.status === "Ferme") return "Bloque manuel";
+    if (match.status === "Bloque" || match.status === "FermÃƒÆ’Ã‚Â©" || match.status === "Ferme") return "Bloque manuel";
     if (isAutoMatchLocked(match)) return "Bloque auto";
     return "Ouvert";
   }
@@ -651,54 +651,6 @@ export default function PronosPage() {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
-          .match-valid-btn {
-            width: 100%;
-            margin-top: 14px;
-            height: 46px;
-            border-radius: 14px;
-            border: 1px solid rgba(163, 230, 53, 0.35);
-            background: rgba(8, 35, 27, 0.85);
-            color: #ffffff;
-            font-size: 13px;
-            font-weight: 900;
-            cursor: pointer;
-            transition: 0.2s ease;
-          }
-
-          .match-valid-btn:hover {
-            transform: translateY(-1px);
-          }
-
-          .match-valid-btn.is-valid {
-            background: linear-gradient(135deg, #22c55e, #a3e635) !important;
-            color: #052e16 !important;
-            border-color: rgba(163, 230, 53, 0.95) !important;
-            box-shadow: 0 0 22px rgba(34, 197, 94, 0.45);
-          }
-          .bonus-valid-btn {
-            width: 100%;
-            margin-top: 12px;
-            height: 46px;
-            border-radius: 14px;
-            border: 1px solid rgba(163, 230, 53, 0.35);
-            background: rgba(8, 35, 27, 0.85);
-            color: #ffffff;
-            font-size: 13px;
-            font-weight: 900;
-            cursor: pointer;
-            transition: 0.2s ease;
-          }
-
-          .bonus-valid-btn:hover {
-            transform: translateY(-1px);
-          }
-
-          .bonus-valid-btn.is-valid {
-            background: linear-gradient(135deg, #22c55e, #a3e635) !important;
-            color: #052e16 !important;
-            border-color: rgba(163, 230, 53, 0.95) !important;
-            box-shadow: 0 0 22px rgba(34, 197, 94, 0.45);
-          }
 
         @media (max-width: 760px) {
           .prono-top-clean {
@@ -731,6 +683,10 @@ export default function PronosPage() {
         </div>
 
         <div className="prono-actions-clean">
+          <button className="prono-btn-clean" type="button" onClick={() => setRefreshKey((v) => v + 1)}>
+            Actualiser
+          </button>
+
           <button className="prono-btn-clean" type="button" onClick={previousJournee}>
             Journee avant
           </button>
@@ -751,6 +707,17 @@ export default function PronosPage() {
             Journee apres
           </button>
 
+          <select
+            className="prono-select-clean"
+            value={clubFavori}
+            onChange={(e) => setClubFavori(e.target.value)}
+          >
+            {CLUBS.map((club) => (
+              <option key={club} value={club}>
+                {club}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -861,17 +828,6 @@ export default function PronosPage() {
                   </div>
                 </>
               )}
-              <button
-                className="match-valid-btn"
-                type="button"
-                onClick={(e) => {
-                  const button = e.currentTarget;
-                  const isValid = button.classList.toggle("is-valid");
-                  button.textContent = isValid ? "Match valide" : "Valider match";
-                }}
-              >
-                Valider match
-              </button>
             </div>
           );
         })}
@@ -906,23 +862,69 @@ export default function PronosPage() {
                   className={`bonus-btn ${selected ? "active" : ""}`}
                   disabled={blocked}
                   onClick={() => {
-                    if (!blocked) setBonusSelected(match.id);
-                  }}
+  if (!blocked) {
+    const rawJournee =
+      (typeof selectedJournee !== "undefined" && selectedJournee
+        ? selectedJournee.number || selectedJournee.journee || selectedJournee.id
+        : "") ||
+      match.journee ||
+      localStorage.getItem("selected_prono_journee") ||
+      localStorage.getItem("prono_ligue1_lm_selected_journee") ||
+      "1";
+
+    const journeeNumber = String(rawJournee).match(/\d+/)?.[0] || "1";
+
+    const bonusId = String(
+      match.id ||
+      match.matchId ||
+      match.match_id ||
+      `bonus-${journeeNumber}-${match.home || match.domicile || ""}-${match.away || match.exterieur || ""}`
+    );
+
+    const player =
+      localStorage.getItem("prono_ligue1_lm_current_player") ||
+      localStorage.getItem("currentPlayer") ||
+      localStorage.getItem("player") ||
+      "Manu";
+
+    const payload = {
+      ...match,
+      id: bonusId,
+      journee: journeeNumber,
+      type: match.type || "BONUS",
+      selectedBy: player,
+      selectedAt: new Date().toISOString()
+    };
+
+    setBonusSelected(bonusId);
+
+    localStorage.setItem("prono_lm_bonus_selected", bonusId);
+    localStorage.setItem("prono_ligue1_lm_selected_bonus", JSON.stringify(payload));
+    localStorage.setItem("prono_ligue1_lm_bonus_selected_home", JSON.stringify(payload));
+
+    try {
+      const saved = JSON.parse(localStorage.getItem("prono_ligue1_lm_bonus_choices") || "{}");
+
+      saved[`${player}-J${journeeNumber}`] = bonusId;
+      saved[`${player}-${journeeNumber}`] = bonusId;
+      saved[`J${journeeNumber}`] = bonusId;
+      saved[journeeNumber] = bonusId;
+
+      localStorage.setItem("prono_ligue1_lm_bonus_choices", JSON.stringify(saved));
+    } catch {
+      localStorage.setItem(
+        "prono_ligue1_lm_bonus_choices",
+        JSON.stringify({ [`${player}-J${journeeNumber}`]: bonusId })
+      );
+    }
+
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new CustomEvent("bonus-choice-updated"));
+  }
+}}
                 >
                   {selected ? "Bonus selectionne" : "Choisir ce bonus"}
                 </button>
-
-            <button
-              className="bonus-valid-btn"
-              type="button"
-              onClick={(e) => {
-                const button = e.currentTarget;
-                const isValid = button.classList.toggle("is-valid");
-                button.textContent = isValid ? "Bonus valide" : "Valider bonus";
-              }}
-            >
-              Valider bonus
-            </button>
 
                 <div className="teams">
                   <div className="team">
@@ -988,5 +990,3 @@ export default function PronosPage() {
     </div>
   );
 }
-
-

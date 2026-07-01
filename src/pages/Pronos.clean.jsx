@@ -14,7 +14,7 @@ const DEFAULT_MATCHS = [
 
 const DEFAULT_BONUS = [
   { id: "b1", league: "Premier League", home: "Liverpool", away: "Arsenal", day: "Samedi", hour: "18:30" },
-  { id: "b2", league: "Liga", home: "Real Madrid", away: "Atlético Madrid", day: "Dimanche", hour: "21:00" },
+  { id: "b2", league: "Liga", home: "Real Madrid", away: "AtlÃƒÂ©tico Madrid", day: "Dimanche", hour: "21:00" },
   { id: "b3", league: "Serie A", home: "Inter", away: "Juventus", day: "Dimanche", hour: "20:45" }
 ];
 
@@ -138,13 +138,13 @@ export default function Pronos() {
     <div className="pronos-page">
       <div className="prono-top">
         <div className="prono-title">
-          <h1>📝 Mes pronos</h1>
-          <p>3 matchs par ligne. Ligue 1 d'abord, puis les 3 bonus à la fin.</p>
+          <h1>Ã°Å¸â€œÂ Mes pronos</h1>
+          <p>3 matchs par ligne. Ligue 1 d'abord, puis les 3 bonus ÃƒÂ  la fin.</p>
         </div>
 
         <div className="prono-actions">
           <select className="prono-select" defaultValue="j1">
-            <option value="j1">Journée 1</option>
+            <option value="j1">JournÃƒÂ©e 1</option>
           </select>
 
           <select
@@ -180,7 +180,7 @@ export default function Pronos() {
           return (
             <div key={match.id} className={`match-card ${favorite ? "favorite" : ""}`}>
               <div className="match-meta">
-                <span>{match.day || "Date"} • {match.hour || "Heure"}</span>
+                <span>{match.day || "Date"} Ã¢â‚¬Â¢ {match.hour || "Heure"}</span>
                 {favorite && <span className="badge">Club favori</span>}
               </div>
 
@@ -249,15 +249,73 @@ export default function Pronos() {
           return (
             <div key={match.id} className={`match-card ${selected ? "selected" : ""}`}>
               <div className="match-meta">
-                <span>{match.day || "Date"} • {match.hour || "Heure"}</span>
+                <span>{match.day || "Date"} Ã¢â‚¬Â¢ {match.hour || "Heure"}</span>
                 <span className="badge green">{match.league}</span>
               </div>
 
               <button
                 className={`bonus-btn ${selected ? "active" : ""}`}
-                onClick={() => setBonusSelected(match.id)}
+                onClick={() => {
+  const rawJournee =
+    (typeof selectedJournee !== "undefined" && selectedJournee
+      ? selectedJournee.number || selectedJournee.journee || selectedJournee.id
+      : "") ||
+    match.journee ||
+    localStorage.getItem("selected_prono_journee") ||
+    localStorage.getItem("prono_ligue1_lm_selected_journee") ||
+    "1";
+
+  const journeeNumber = String(rawJournee).match(/\d+/)?.[0] || "1";
+
+  const bonusId = String(
+    match.id ||
+    match.matchId ||
+    match.match_id ||
+    `bonus-${journeeNumber}-${match.home || match.domicile || ""}-${match.away || match.exterieur || ""}`
+  );
+
+  const player =
+    localStorage.getItem("prono_ligue1_lm_current_player") ||
+    localStorage.getItem("currentPlayer") ||
+    localStorage.getItem("player") ||
+    "Manu";
+
+  const payload = {
+    ...match,
+    id: bonusId,
+    journee: journeeNumber,
+    type: match.type || "BONUS",
+    selectedBy: player,
+    selectedAt: new Date().toISOString()
+  };
+
+  setBonusSelected(bonusId);
+
+  localStorage.setItem("prono_lm_bonus_selected", bonusId);
+  localStorage.setItem("prono_ligue1_lm_selected_bonus", JSON.stringify(payload));
+  localStorage.setItem("prono_ligue1_lm_bonus_selected_home", JSON.stringify(payload));
+
+  try {
+    const saved = JSON.parse(localStorage.getItem("prono_ligue1_lm_bonus_choices") || "{}");
+
+    saved[`${player}-J${journeeNumber}`] = bonusId;
+    saved[`${player}-${journeeNumber}`] = bonusId;
+    saved[`J${journeeNumber}`] = bonusId;
+    saved[journeeNumber] = bonusId;
+
+    localStorage.setItem("prono_ligue1_lm_bonus_choices", JSON.stringify(saved));
+  } catch {
+    localStorage.setItem(
+      "prono_ligue1_lm_bonus_choices",
+      JSON.stringify({ [`${player}-J${journeeNumber}`]: bonusId })
+    );
+  }
+
+  window.dispatchEvent(new Event("storage"));
+  window.dispatchEvent(new CustomEvent("bonus-choice-updated"));
+}}
               >
-                {selected ? "Bonus sélectionné" : "Choisir ce bonus"}
+                {selected ? "Bonus sÃƒÂ©lectionnÃƒÂ©" : "Choisir ce bonus"}
               </button>
 
               <div className="teams">

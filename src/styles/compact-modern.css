@@ -1,0 +1,445 @@
+/* =========================================================
+   PRONO LIGUE 1 LM - STYLE PLUS MODERNE ET PLUS COMPACT
+   ========================================================= */
+
+:root {
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
+  font-size: 14px;
+}
+
+html,
+body,
+#root {
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif !important;
+  font-size: 14px !important;
+  letter-spacing: -0.01em;
+}
+
+/* Titres moins enormes */
+h1,
+.home-hero-clean h1 {
+  font-size: 30px !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.045em !important;
+}
+
+h2,
+.home-panel-clean h2 {
+  font-size: 20px !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.035em !important;
+}
+
+h3 {
+  font-size: 15px !important;
+}
+
+/* Textes generaux */
+p,
+span,
+small,
+label,
+input,
+select,
+button {
+  font-family: inherit !important;
+}
+
+/* Cartes accueil */
+.home-card-clean {
+  min-height: 92px !important;
+  padding: 16px !important;
+  border-radius: 18px !important;
+}
+
+.home-card-clean span {
+  font-size: 11px !important;
+  letter-spacing: 0.07em !important;
+}
+
+.home-card-clean strong {
+  font-size: 20px !important;
+  line-height: 1.08 !important;
+}
+
+.home-card-clean small {
+  font-size: 12px !important;
+}
+
+/* Blocs accueil */
+.home-panel-clean {
+  padding: 18px !important;
+  border-radius: 20px !important;
+}
+
+.home-line-clean {
+  padding: 10px 0 !important;
+  font-size: 13px !important;
+}
+
+.home-line-clean strong {
+  font-size: 13px !important;
+}
+
+/* Hero accueil plus compact */
+.home-hero-clean {
+  padding: 22px !important;
+  border-radius: 22px !important;
+}
+
+.home-hero-clean p {
+  font-size: 13px !important;
+}
+
+/* Photo profil un peu plus elegante */
+.home-player-photo {
+  width: 72px !important;
+  height: 72px !important;
+  border-radius: 22px !important;
+  font-size: 22px !important;
+}
+
+/* Boutons / select plus modernes */
+button,
+.home-btn,
+.home-small-btn,
+.home-validate-btn {
+  font-size: 13px !important;
+  font-weight: 850 !important;
+  border-radius: 13px !important;
+}
+
+select,
+input,
+.home-select {
+  font-size: 13px !important;
+  min-height: 42px !important;
+  border-radius: 13px !important;
+}
+
+/* Podium */
+.home-podium-row {
+  padding: 12px !important;
+  border-radius: 15px !important;
+}
+
+.home-podium-rank {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 12px !important;
+  font-size: 16px !important;
+}
+
+.home-podium-name {
+  font-size: 14px !important;
+}
+
+.home-podium-exact {
+  font-size: 11px !important;
+}
+
+.home-podium-points {
+  font-size: 16px !important;
+}
+
+/* Resume journee */
+.home-mini-box {
+  padding: 14px !important;
+  border-radius: 15px !important;
+}
+
+.home-mini-box span {
+  font-size: 12px !important;
+}
+
+.home-mini-box strong {
+  font-size: 24px !important;
+}
+
+/* Badges / pastilles */
+.home-pill-clean,
+.home-status {
+  font-size: 12px !important;
+  padding: 8px 11px !important;
+}
+
+/* Menus et navigation */
+.sidebar,
+.side-nav,
+.menu,
+.nav,
+nav {
+  font-size: 13px !important;
+}
+
+.sidebar button,
+.side-nav button,
+.menu button,
+.nav button,
+nav button,
+.sidebar a,
+.side-nav a,
+.menu a,
+.nav a,
+nav a {
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+/* Pages pronos/admin/stats plus compactes */
+.pronos-page,
+.admin-page,
+.stats-page,
+.profile-page,
+.classement-page {
+  font-size: 13px !important;
+}
+
+.pronos-page h1,
+.admin-page h1,
+.stats-page h1,
+.profile-page h1,
+.classement-page h1 {
+  font-size: 28px !important;
+}
+
+.pronos-page h2,
+.admin-page h2,
+.stats-page h2,
+.profile-page h2,
+.classement-page h2 {
+  font-size: 19px !important;
+}
+
+.card,
+.panel,
+.box,
+.match-card,
+.prono-card,
+.admin-card,
+.stat-card {
+  border-radius: 18px !important;
+}
+
+/* Mobile */
+@media (max-width: 720px) {
+  :root {
+    font-size: 13px;
+  }
+
+  h1,
+  .home-hero-clean h1 {
+    font-size: 26px !important;
+  }
+
+  h2,
+  .home-panel-clean h2 {
+    font-size: 18px !important;
+  }
+
+  .home-card-clean strong {
+    font-size: 18px !important;
+  }
+
+  .home-player-photo {
+    width: 62px !important;
+    height: 62px !important;
+    border-radius: 18px !important;
+  }
+}
+/* Correction grille accueil */
+.home-grid-clean {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 1100px) {
+  .home-grid-clean {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .home-grid-clean {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Accueil - grille 4 cartes */
+.home-grid-clean {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 1100px) {
+  .home-grid-clean {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .home-grid-clean {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* =========================================================
+   FIX ACCUEIL - PHOTO + CARTES QUI DEBORDENT
+   ========================================================= */
+
+.home-page-clean {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.home-page-clean * {
+  box-sizing: border-box !important;
+}
+
+.home-hero-clean {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.home-hero-top {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 18px !important;
+  width: 100% !important;
+}
+
+.home-player-photo {
+  width: 68px !important;
+  height: 68px !important;
+  min-width: 68px !important;
+  max-width: 68px !important;
+  border-radius: 20px !important;
+  justify-self: end !important;
+  margin-right: 0 !important;
+  overflow: hidden !important;
+}
+
+.home-player-photo img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.home-grid-clean {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+
+.home-card-clean {
+  min-width: 0 !important;
+  width: 100% !important;
+  overflow: hidden !important;
+}
+
+.home-card-clean strong,
+.home-card-clean small,
+.home-card-clean span {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+@media (max-width: 1350px) {
+  .home-grid-clean {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .home-grid-clean {
+    grid-template-columns: 1fr !important;
+  }
+
+  .home-hero-top {
+    grid-template-columns: 1fr !important;
+  }
+
+  .home-player-photo {
+    justify-self: start !important;
+    margin-top: 12px !important;
+  }
+}
+
+/* Accueil - grille 3 cartes sans bonus choisi */
+.home-grid-clean {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 1100px) {
+  .home-grid-clean {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .home-grid-clean {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Pronos - validation */
+.prono-validate-btn {
+  background: linear-gradient(135deg, #baff00, #7cff00) !important;
+  color: #06110a !important;
+  border: 1px solid rgba(186, 255, 0, .55) !important;
+  min-height: 48px !important;
+  padding: 0 26px !important;
+  font-weight: 950 !important;
+  box-shadow: 0 14px 28px rgba(186, 255, 0, .12) !important;
+}
+
+.prono-validated-status {
+  min-height: 48px !important;
+  padding: 0 20px !important;
+  border-radius: 16px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(255, 80, 80, .10) !important;
+  border: 1px solid rgba(255, 120, 120, .30) !important;
+  color: #ffb4b4 !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+  white-space: nowrap !important;
+}
+
+.prono-validated-status.ok {
+  background: rgba(34, 197, 94, .12) !important;
+  border-color: rgba(34, 197, 94, .35) !important;
+  color: #7dffae !important;
+}
+
+@media (max-width: 760px) {
+  .prono-validate-btn,
+  .prono-validated-status {
+    width: 100% !important;
+  }
+}

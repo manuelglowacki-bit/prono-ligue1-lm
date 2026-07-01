@@ -12,9 +12,7 @@ const FAVORITE_DEADLINE_ALT_KEY = "prono_ligue1_lm_favorite_deadline";
 const MATCHS_KEY = "prono_ligue1_lm_matchs_admin";
 const JOURNEES_KEY = "admin_journees";
 const PLAYER_KEY = "prono_ligue1_lm_current_player";
-const BONUS_CHOICES_KEY = "prono_ligue1_lm_bonus_choices";
 const SELECTED_JOURNEE_KEY = "selected_prono_journee";
-const BONUS_SELECTED_KEY = "prono_lm_bonus_selected";
 
 const DEFAULT_TEAM = "RC Lens";
 const DEFAULT_DEADLINE = "2026-07-12T23:23";
@@ -67,33 +65,6 @@ function cleanText(value) {
     .trim();
 }
 
-function hideOldFavoritePanel() {
-  try {
-    const elements = Array.from(document.querySelectorAll("section, article, div"));
-
-    elements.forEach((element) => {
-      if (element.closest(".home-page-clean")) return;
-
-      const text = cleanText(element.textContent);
-
-      const isOldFavoriteBlock =
-        text.includes("club favori") &&
-        (
-          text.includes("choisis ton equipe favorite") ||
-          text.includes("valider mon equipe") ||
-          text.includes("equipe favorite non validee") ||
-          text.includes("equipe favorite validee")
-        );
-
-      if (isOldFavoriteBlock) {
-        element.style.display = "none";
-      }
-    });
-  } catch {
-    // Ne bloque jamais l'accueil.
-  }
-}
-
 function getCurrentPlayer() {
   return (
     localStorage.getItem(PLAYER_KEY) ||
@@ -101,6 +72,90 @@ function getCurrentPlayer() {
     localStorage.getItem("player") ||
     "Manu"
   );
+}
+
+function getProfilePhoto(player) {
+  const directKeys = [
+    "profilePhoto",
+    "profile_photo",
+    "avatar",
+    "playerAvatar",
+    "prono_ligue1_lm_profile_photo",
+    "prono_ligue1_lm_avatar"
+  ];
+
+  for (const key of directKeys) {
+    const value = localStorage.getItem(key);
+    if (value && String(value).startsWith("data:image")) return value;
+    if (value && String(value).startsWith("http")) return value;
+  }
+
+  const maps = [
+    "profilePhotos",
+    "profile_photos",
+    "playerPhotos",
+    "playersPhotos",
+    "avatars",
+    "prono_ligue1_lm_profile_photos",
+    "prono_ligue1_lm_player_photos"
+  ];
+
+  for (const key of maps) {
+    const saved = loadJson(key, {});
+    if (saved && typeof saved === "object") {
+      const value =
+        saved[player] ||
+        saved[String(player).toLowerCase()] ||
+        saved.current ||
+        saved.photo ||
+        saved.avatar;
+
+      if (value && String(value).startsWith("data:image")) return value;
+      if (value && String(value).startsWith("http")) return value;
+    }
+  }
+
+  return "";
+}
+
+function getInitials(name) {
+  return String(name || "Joueur")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function getPhotoPosition(player) {
+  const saved = loadJson("prono_ligue1_lm_profile_photo_position", {});
+  const playerPos = saved && typeof saved === "object" ? saved[player] : null;
+
+  return {
+    x: Number(playerPos?.x ?? saved?.x ?? localStorage.getItem("profilePhotoX") ?? 50),
+    y: Number(playerPos?.y ?? saved?.y ?? localStorage.getItem("profilePhotoY") ?? 50)
+  };
+}
+
+function savePhotoPosition(player, axis, value) {
+  const saved = loadJson("prono_ligue1_lm_profile_photo_position", {});
+  const current = saved[player] || getPhotoPosition(player);
+
+  const next = {
+    ...saved,
+    [player]: {
+      ...current,
+      [axis]: Number(value)
+    }
+  };
+
+  localStorage.setItem("prono_ligue1_lm_profile_photo_position", JSON.stringify(next));
+
+  if (axis === "x") localStorage.setItem("profilePhotoX", String(value));
+  if (axis === "y") localStorage.setItem("profilePhotoY", String(value));
+
+  window.dispatchEvent(new Event("storage"));
 }
 
 function getDeadline() {
@@ -121,7 +176,7 @@ function formatDeadline(deadline) {
   const date = new Date(deadline);
 
   if (Number.isNaN(date.getTime())) {
-    return "Date non définie";
+    return "Date non definie";
   }
 
   return date.toLocaleString("fr-FR", {
@@ -231,6 +286,7 @@ function getHome(match) {
     match?.homeTeam ||
     match?.club1 ||
     match?.equipe1 ||
+    match?.homeName ||
     ""
   );
 }
@@ -239,12 +295,12 @@ function getAway(match) {
   return (
     match?.away ||
     match?.exterieur ||
-    match?.extérieur ||
     match?.equipeExterieur ||
     match?.teamAway ||
     match?.awayTeam ||
     match?.club2 ||
     match?.equipe2 ||
+    match?.awayName ||
     ""
   );
 }
@@ -254,9 +310,7 @@ function getLeague(match) {
     match?.championnat ||
     match?.league ||
     match?.competition ||
-    match?.compétition ||
     match?.categorie ||
-    match?.catégorie ||
     ""
   );
 }
@@ -264,7 +318,6 @@ function getLeague(match) {
 function getJourneeRaw(match) {
   return (
     match?.journee ||
-    match?.journée ||
     match?.round ||
     match?.matchday ||
     match?.j ||
@@ -296,9 +349,15 @@ function getMatchTitle(match) {
     match.affiche ||
     match.match ||
     match.rencontre ||
+    match.name ||
+    match.title ||
     "";
 
-  if (label && String(label).includes("vs")) return String(label);
+  const cleanLabel = String(label || "").trim();
+
+  if (cleanLabel && cleanText(cleanLabel) !== "vs") {
+    return cleanLabel;
+  }
 
   const home = getHome(match);
   const away = getAway(match);
@@ -309,23 +368,28 @@ function getMatchTitle(match) {
 }
 
 function isBonus(match) {
-  const type = cleanText(match?.type || match?.categorie || match?.catégorie || "");
+  const type = cleanText(match?.type || match?.categorie || "");
   const league = cleanText(getLeague(match));
 
-  return (
-    type === "bonus" ||
-    type.includes("bonus") ||
-    type === "b" ||
-    (!league.includes("ligue 1") && !league.includes("ligue1") && league !== "")
-  );
+  if (type === "bonus" || type.includes("bonus") || type === "b") return true;
+
+  if (!league) return false;
+
+  return !league.includes("ligue 1") && !league.includes("ligue1");
 }
 
 function readFlatMatches() {
   const flat = loadJson(MATCHS_KEY, []);
-  if (Array.isArray(flat) && flat.length > 0) return flat;
+
+  if (Array.isArray(flat) && flat.length > 0) {
+    return flat;
+  }
 
   const journees = loadJson(JOURNEES_KEY, []);
-  if (!Array.isArray(journees)) return [];
+
+  if (!Array.isArray(journees)) {
+    return [];
+  }
 
   return journees.flatMap((j, index) => {
     const round = j.journee || j.numero || index + 1;
@@ -365,81 +429,150 @@ function buildJournees(matches) {
   return Object.values(byRound).sort((a, b) => a.number - b.number);
 }
 
-function getChoiceValue(choices, player, journeeNumber) {
-  const keys = [
+function getBonusChoiceCandidates(player, journeeNumber) {
+  const candidates = [];
+
+  const directKeys = [
+    "prono_ligue1_lm_bonus_choices",
+    "prono_lm_bonus_selected",
+    "prono_ligue1_lm_selected_bonus",
+    "prono_ligue1_lm_bonus_selected_home",
+    "selectedBonus",
+    "bonusSelected",
+    "selected_bonus",
+    "bonus_choice",
+    "bonusChoice",
+    "matchBonus",
+    "selectedMatchBonus"
+  ];
+
+  const wantedKeys = [
     `${player}-J${journeeNumber}`,
     `${player}-${journeeNumber}`,
     `${player}-j${journeeNumber}`,
+    `${player}_${journeeNumber}`,
+    `${player}_J${journeeNumber}`,
     `J${journeeNumber}`,
     `j${journeeNumber}`,
     String(journeeNumber)
   ];
 
-  for (const key of keys) {
-    if (choices && choices[key]) return choices[key];
+  function pushValue(value) {
+    if (!value) return;
+
+    candidates.push(value);
+
+    if (typeof value === "object" && !Array.isArray(value)) {
+      wantedKeys.forEach((key) => {
+        if (value[key]) candidates.push(value[key]);
+      });
+
+      if (value[player]) {
+        candidates.push(value[player]);
+
+        if (typeof value[player] === "object") {
+          wantedKeys.forEach((key) => {
+            if (value[player][key]) candidates.push(value[player][key]);
+          });
+        }
+      }
+
+      [
+        "selectedBonus",
+        "bonus",
+        "matchBonus",
+        "selectedMatch",
+        "match",
+        "choice",
+        "value",
+        "id",
+        "matchId",
+        "match_id"
+      ].forEach((key) => {
+        if (value[key]) candidates.push(value[key]);
+      });
+    }
   }
 
-  return "";
+  directKeys.forEach((key) => {
+    pushValue(loadJson(key, localStorage.getItem(key)));
+  });
+
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index) || "";
+    const cleanKey = cleanText(key);
+
+    if (
+      cleanKey.includes("bonus") ||
+      cleanKey.includes("matchbonus") ||
+      cleanKey.includes("selectedmatch")
+    ) {
+      pushValue(loadJson(key, localStorage.getItem(key)));
+    }
+  }
+
+  return candidates;
 }
 
 function normalizeChoice(value) {
   if (!value) return "";
 
   if (typeof value === "string" || typeof value === "number") {
-    return String(value);
+    return String(value).trim();
   }
 
   if (typeof value === "object") {
-    return (
+    return String(
       value.id ||
       value.matchId ||
       value.match_id ||
+      value.bonusId ||
+      value.selectedBonusId ||
       value.label ||
       value.affiche ||
       value.match ||
+      value.name ||
+      value.title ||
       getMatchTitle(value) ||
       ""
-    );
+    ).trim();
   }
 
   return "";
 }
 
+function sameBonus(candidate, match) {
+  const candidateText = cleanText(normalizeChoice(candidate));
+  const matchId = cleanText(getMatchId(match));
+  const matchTitle = cleanText(getMatchTitle(match));
+  const matchLabel = cleanText(match?.label || match?.affiche || match?.match || match?.title || "");
+
+  if (!candidateText) return false;
+
+  return (
+    candidateText === matchId ||
+    candidateText === matchTitle ||
+    candidateText === matchLabel ||
+    matchTitle.includes(candidateText) ||
+    candidateText.includes(matchTitle)
+  );
+}
+
 function findBonusMatch(player, journeeNumber, bonusList, allMatches) {
-  const choices = loadJson(BONUS_CHOICES_KEY, {});
-  const direct = loadJson(BONUS_SELECTED_KEY, "");
-
-  const choiceFromJournee = getChoiceValue(choices, player, journeeNumber);
-  const choiceId = normalizeChoice(choiceFromJournee || direct);
-
-  if (!choiceId) return null;
-
+  const candidates = getBonusChoiceCandidates(player, journeeNumber);
   const allBonus = allMatches.filter(isBonus);
   const pool = [...bonusList, ...allBonus];
 
-  const byId = pool.find((match) => {
-    const id = getMatchId(match);
-    return id && String(id) === String(choiceId);
-  });
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === "object" && getMatchTitle(candidate)) {
+      return candidate;
+    }
 
-  if (byId) return byId;
+    const found = pool.find((match) => sameBonus(candidate, match));
 
-  const wanted = cleanText(choiceId);
-
-  const byLabel = pool.find((match) => {
-    const title = cleanText(getMatchTitle(match));
-    const label = cleanText(match?.label || match?.affiche || match?.match || "");
-    return title === wanted || label === wanted;
-  });
-
-  if (byLabel) return byLabel;
-
-  if (typeof choiceFromJournee === "object" && getMatchTitle(choiceFromJournee)) {
-    return choiceFromJournee;
-  }
-
-  if (typeof direct === "object" && getMatchTitle(direct)) {
-    return direct;
+    if (found) {
+      return found;
+    }
   }
 
   return null;
@@ -516,19 +649,59 @@ function buildPodium() {
     .slice(0, 3);
 }
 
+function buildFullRanking() {
+  let ranking = [];
+
+  for (const key of RANKING_KEYS) {
+    const data = normalizeRankingData(loadJson(key, []));
+
+    if (Array.isArray(data) && data.length > 0) {
+      ranking = data;
+      break;
+    }
+  }
+
+  return ranking
+    .map((item) => ({
+      name: getPlayerName(item),
+      points: getPlayerPoints(item),
+      exact: getPlayerExact(item)
+    }))
+    .filter((item) => item.name && item.name !== "Joueur")
+    .sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      return b.exact - a.exact;
+    })
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1
+    }));
+}
+
+function buildPlayerRecap(player) {
+  const ranking = buildFullRanking();
+
+  const found = ranking.find((item) => {
+    return cleanText(item.name) === cleanText(player);
+  });
+
+  return (
+    found || {
+      name: player,
+      points: 0,
+      exact: 0,
+      rank: "-"
+    }
+  );
+}
 export default function HomePage() {
   const [refresh, setRefresh] = useState(0);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     function update() {
-      hideOldFavoritePanel();
       setRefresh((value) => value + 1);
     }
-
-    hideOldFavoritePanel();
-    setTimeout(hideOldFavoritePanel, 200);
-    setTimeout(hideOldFavoritePanel, 1000);
 
     window.addEventListener("storage", update);
     window.addEventListener("favorite-team-updated", update);
@@ -550,8 +723,10 @@ export default function HomePage() {
     const player = getCurrentPlayer();
     const deadline = getDeadline();
     const deadlinePassed = isDeadlinePassed(deadline);
-    const validated = getValidatedStatus(player);
     const club = getFavoriteTeam(player, deadline);
+    const playerRecap = buildPlayerRecap(player);
+    const profilePhoto = getProfilePhoto(player);
+    const photoPosition = getPhotoPosition(player);
 
     const allMatches = readFlatMatches();
     const journees = buildJournees(allMatches);
@@ -588,6 +763,8 @@ export default function HomePage() {
     return {
       player,
       club,
+      profilePhoto,
+      photoPosition,
       deadline,
       deadlinePassed,
       validated: getValidatedStatus(player),
@@ -598,7 +775,8 @@ export default function HomePage() {
       selectedBonusTitle,
       selectedBonusLeague: hasSelectedBonus ? getLeague(selectedBonus) || "Bonus" : "",
       hasSelectedBonus,
-      podium: buildPodium()
+      podium: buildPodium(),
+      playerRecap
     };
   }, [refresh]);
 
@@ -612,19 +790,19 @@ export default function HomePage() {
 
   function handleValidateClub() {
     if (!data.club) {
-      setMessage("Choisis une équipe avant de valider.");
+      setMessage("Choisis une equipe avant de valider.");
       return;
     }
 
     if (data.deadlinePassed) {
       saveFavoriteTeam(data.player, DEFAULT_TEAM, true);
-      setMessage("Date limite passée : RC Lens est automatiquement validé.");
+      setMessage("Date limite passee : RC Lens est automatiquement valide.");
       setRefresh((value) => value + 1);
       return;
     }
 
     saveFavoriteTeam(data.player, data.club, true);
-    setMessage(`Équipe favorite validée : ${data.club}`);
+    setMessage(`Equipe favorite validee : ${data.club}`);
     setRefresh((value) => value + 1);
   }
 
@@ -660,9 +838,39 @@ export default function HomePage() {
           font-weight: 750;
         }
 
+        .home-hero-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+        }
+
+        .home-player-photo {
+          width: 86px;
+          height: 86px;
+          border-radius: 28px;
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          background: linear-gradient(135deg, rgba(186,255,0,.22), rgba(29,78,216,.18));
+          border: 1px solid rgba(186,255,0,.38);
+          box-shadow: 0 16px 34px rgba(0,0,0,.28);
+          overflow: hidden;
+          color: #baff00;
+          font-size: 28px;
+          font-weight: 950;
+        }
+
+        .home-player-photo img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
         .home-grid-clean {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: 1fr;
           gap: 16px;
           margin-bottom: 18px;
         }
@@ -780,10 +988,6 @@ export default function HomePage() {
           box-shadow: 0 12px 26px rgba(186,255,0,.18);
         }
 
-        .home-btn:hover {
-          filter: brightness(1.05);
-        }
-
         .home-status {
           display: inline-flex;
           margin-top: 14px;
@@ -818,6 +1022,42 @@ export default function HomePage() {
           border: 1px solid rgba(186,255,0,.22);
           color: #ecfccb;
           font-weight: 900;
+        }
+
+        .home-photo-settings {
+          margin-top: 16px;
+          padding: 14px;
+          border-radius: 18px;
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.10);
+        }
+
+        .home-photo-settings h3 {
+          margin: 0 0 12px;
+          font-size: 15px;
+          color: #fff;
+          font-weight: 950;
+        }
+
+        .home-photo-range {
+          display: grid;
+          grid-template-columns: 90px 1fr 42px;
+          align-items: center;
+          gap: 10px;
+          margin-top: 10px;
+          color: #cbd5e1;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .home-photo-range input {
+          width: 100%;
+          accent-color: #baff00;
+        }
+
+        .home-photo-range strong {
+          color: #baff00;
+          text-align: right;
         }
 
         .home-pill-clean {
@@ -924,7 +1164,7 @@ export default function HomePage() {
 
         @media (max-width: 1100px) {
           .home-grid-clean {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: 1fr;
           }
 
           .home-wide-clean {
@@ -958,40 +1198,45 @@ export default function HomePage() {
             font-size: 17px;
           }
         }
-      `}</style>
+      `}
+      </style>
 
       <section className="home-hero-clean">
-        <h1>Accueil</h1>
-        <p>Tableau de bord de la saison Prono Ligue 1 LM.</p>
+        <div className="home-hero-top">
+          <div>
+            <h1>Accueil</h1>
+            <p>Tableau de bord de la saison Prono Ligue 1 LM.</p>
+          </div>
+
+          <div className="home-player-photo" title={data.player}>
+            {data.profilePhoto ? (
+              <img src={data.profilePhoto} alt={data.player} style={{ objectPosition: `${data.photoPosition.x}% ${data.photoPosition.y}%` }} />
+            ) : (
+              <span>{getInitials(data.player)}</span>
+            )}
+          </div>
+        </div>
       </section>
 
-      <div className="home-grid-clean">
+                  <div className="home-grid-clean">
         <div className="home-card-clean">
           <span>Club favori</span>
           <strong>{data.club || "Aucun club"}</strong>
-          <small>{data.validated ? "Équipe validée" : "En attente de validation"}</small>
+          <small>{data.validated ? "Equipe validee" : "En attente de validation"}</small>
         </div>
 
         <div className="home-card-clean">
-          <span>Journée active</span>
+          <span>Journee active</span>
           <strong>{data.selectedJournee?.title || "Aucune"}</strong>
           <small>{data.matchesCount} match(s) Ligue 1</small>
         </div>
-
-        <div className={data.hasSelectedBonus ? "home-card-clean" : "home-card-clean warning"}>
-          <span>Bonus choisi</span>
-          <strong>
-            {data.hasSelectedBonus ? data.selectedBonusTitle : "Aucun bonus"}
-          </strong>
-          <small>
-            {data.hasSelectedBonus
-              ? data.selectedBonusLeague
-              : `${data.bonusCount} bonus proposé(s)`}
-          </small>
+<div className="home-card-clean">
+          <span>Mes points</span>
+          <strong>{data.playerRecap.points} pts</strong>
+          <small>Rang : {data.playerRecap.rank} | Exact : {data.playerRecap.exact}</small>
         </div>
       </div>
-
-      <div className="home-wide-clean">
+<div className="home-wide-clean">
         <section className="home-panel-clean">
           <h2>Mon choix</h2>
 
@@ -1001,7 +1246,7 @@ export default function HomePage() {
           </div>
 
           <div className="home-line-clean">
-            <span>Équipe favorite</span>
+            <span>Equipe favorite</span>
             <strong>{data.club || "Non choisie"}</strong>
           </div>
 
@@ -1030,8 +1275,8 @@ export default function HomePage() {
 
           <div className={data.validated ? "home-status ok" : "home-status wait"}>
             {data.validated
-              ? `Équipe favorite validée : ${data.club}`
-              : `Équipe favorite non validée : ${data.club}`}
+              ? `Equipe favorite validee : ${data.club}`
+              : `Equipe favorite non validee : ${data.club}`}
           </div>
 
           <div className="home-deadline">
@@ -1039,10 +1284,46 @@ export default function HomePage() {
           </div>
 
           <div className="home-deadline">
-            Si aucune équipe n’est validée avant la date limite, RC Lens sera sélectionné automatiquement.
+            Si aucune equipe est validee avant la date limite, RC Lens sera selectionne automatiquement.
           </div>
 
           {message && <div className="home-message">{message}</div>}
+
+          {data.profilePhoto && (
+            <div className="home-photo-settings">
+              <h3>Centrage photo</h3>
+
+              <label className="home-photo-range">
+                <span>Horizontal</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={data.photoPosition.x}
+                  onChange={(event) => {
+                    savePhotoPosition(data.player, "x", event.target.value);
+                    setRefresh((value) => value + 1);
+                  }}
+                />
+                <strong>{data.photoPosition.x}%</strong>
+              </label>
+
+              <label className="home-photo-range">
+                <span>Vertical</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={data.photoPosition.y}
+                  onChange={(event) => {
+                    savePhotoPosition(data.player, "y", event.target.value);
+                    setRefresh((value) => value + 1);
+                  }}
+                />
+                <strong>{data.photoPosition.y}%</strong>
+              </label>
+            </div>
+          )}
         </section>
 
         <section className="home-panel-clean">
@@ -1053,7 +1334,7 @@ export default function HomePage() {
               {data.podium.map((player, index) => (
                 <div className="home-podium-row" key={`${player.name}-${index}`}>
                   <div className="home-podium-rank">
-                    {index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}
+                    {index === 0 ? "1" : index === 1 ? "2" : "3"}
                   </div>
 
                   <div>
@@ -1071,49 +1352,12 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="home-empty">
-              Le podium apparaîtra quand le classement sera enregistré.
+              Le podium apparaitra quand le classement sera enregistre.
             </div>
           )}
         </section>
       </div>
 
-      <div className="home-wide-clean">
-        <section className="home-panel-clean">
-          <h2>Résumé journée</h2>
-
-          <div className="home-summary-mini">
-            <div className="home-mini-box">
-              <span>Matchs Ligue 1</span>
-              <strong>{data.matchesCount}</strong>
-            </div>
-
-            <div className="home-mini-box">
-              <span>Bonus proposés</span>
-              <strong>{data.bonusCount}</strong>
-            </div>
-          </div>
-        </section>
-
-        <section className="home-panel-clean">
-          <h2>Match bonus</h2>
-
-          <div className="home-line-clean">
-            <span>Bonus sélectionné</span>
-            <strong>
-              {data.hasSelectedBonus ? data.selectedBonusTitle : "Aucun"}
-            </strong>
-          </div>
-
-          <div className="home-line-clean">
-            <span>Compétition</span>
-            <strong>{data.hasSelectedBonus ? data.selectedBonusLeague : "-"}</strong>
-          </div>
-
-          <div className={data.hasSelectedBonus ? "home-pill-clean" : "home-pill-clean gold"}>
-            {data.hasSelectedBonus ? "Bonus choisi" : "Bonus pas encore choisi"}
-          </div>
-        </section>
-      </div>
     </div>
   );
 }
