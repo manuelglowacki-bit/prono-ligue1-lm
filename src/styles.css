@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
 @import './styles/layout.css';
 @import './styles/dashboard.css';
 @import './styles/pronos.css';
@@ -1334,3 +1334,4 @@ nav button.active {
   .prediction-buttons { justify-content: center; }
   .pronos-summary { margin-top: 4px; }
 }
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import '../styles/auth.css';
 import { ensureFavoriteTeam } from '../utils/favoriteTeam';
 
@@ -59,7 +59,7 @@ export default function AuthPage({ onLogin }) {
     }
 
     if (cleanPassword.length < 6) {
-      setMessage('Mot de passe trop court : minimum 6 caractères.');
+      setMessage('Mot de passe trop court : minimum 6 caractÃ¨res.');
       return;
     }
 
@@ -76,12 +76,12 @@ export default function AuthPage({ onLogin }) {
     const accounts = safeJson(ACCOUNTS_KEY, []);
 
     if (accounts.some((account) => account.email === cleanEmail)) {
-      setMessage('Cette adresse mail est déjà utilisée.');
+      setMessage('Cette adresse mail est dÃ©jÃ  utilisÃ©e.');
       return;
     }
 
     if (accounts.some((account) => account.player.toLowerCase() === cleanPlayer.toLowerCase())) {
-      setMessage('Ce pseudo existe déjà.');
+      setMessage('Ce pseudo existe dÃ©jÃ .');
       return;
     }
 
@@ -111,8 +111,8 @@ export default function AuthPage({ onLogin }) {
 
     setMessage(
       isFirstAccount
-        ? 'Compte admin créé. Tu peux te connecter.'
-        : 'Compte joueur créé. Tu peux te connecter.'
+        ? 'Compte admin crÃ©Ã©. Tu peux te connecter.'
+        : 'Compte joueur crÃ©Ã©. Tu peux te connecter.'
     );
   }
 
@@ -183,7 +183,7 @@ export default function AuthPage({ onLogin }) {
             <span>
               {mode === 'login'
                 ? 'Connecte-toi avec ton adresse mail.'
-                : 'Crée ton compte joueur avec ton pseudo.'}
+                : 'CrÃ©e ton compte joueur avec ton pseudo.'}
             </span>
           </div>
         </div>
@@ -243,7 +243,7 @@ export default function AuthPage({ onLogin }) {
               placeholder="Ex : Manu2026"
             />
                       <small className="auth-password-rule">
-              Minimum 6 caractères, 1 majuscule et 1 chiffre.
+              Minimum 6 caractÃ¨res, 1 majuscule et 1 chiffre.
             </small>
           </label>
 
@@ -255,7 +255,7 @@ export default function AuthPage({ onLogin }) {
             </button>
           ) : (
             <button type="button" className="auth-submit" onClick={createAccount} disabled={loading}>
-              {loading ? 'Création...' : 'Créer mon compte'}
+              {loading ? 'CrÃ©ation...' : 'CrÃ©er mon compte'}
             </button>
           )}
         </div>
@@ -263,6 +263,7 @@ export default function AuthPage({ onLogin }) {
     </div>
   );
 }
+
 
 
 

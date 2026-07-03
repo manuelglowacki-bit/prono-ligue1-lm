@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { getRegisteredPlayers } from '../utils/players';
 import '../styles/stats.css';
 
@@ -433,7 +433,7 @@ export default function StatsPage() {
           <div>
             <p>STATS</p>
             <h1>Statistiques</h1>
-            <span>Aucun match chargé pour le moment.</span>
+            <span>Aucun match chargÃ© pour le moment.</span>
           </div>
         </section>
 
@@ -451,12 +451,12 @@ export default function StatsPage() {
           <p>STATS</p>
           <h1>Analyse des performances</h1>
           <span>
-            {scoredJournees.length} journée(s) avec résultats · {DEFAULT_PLAYERS.length} joueurs
+            {scoredJournees.length} journÃ©e(s) avec rÃ©sultats Â· {DEFAULT_PLAYERS.length} joueurs
           </span>
         </div>
 
         <div className="stats-player-select">
-          <span>Joueur analysé</span>
+          <span>Joueur analysÃ©</span>
           <select value={selectedPlayer} onChange={(e) => setSelectedPlayer(e.target.value)}>
             {DEFAULT_PLAYERS.map((player) => (
               <option key={player} value={player}>
@@ -483,11 +483,11 @@ export default function StatsPage() {
         <article>
           <span>Points bonus</span>
           <strong>{selectedStats?.bonusPoints || 0}</strong>
-          <small>{selectedStats?.bonusCorrect || 0} bonus réussi(s)</small>
+          <small>{selectedStats?.bonusCorrect || 0} bonus rÃ©ussi(s)</small>
         </article>
 
         <article>
-          <span>Réussite</span>
+          <span>RÃ©ussite</span>
           <strong>{selectedStats?.successRate || 0}%</strong>
           <small>{selectedStats?.corrects || 0}/{selectedStats?.attempts || 0} pronos</small>
         </article>
@@ -496,7 +496,7 @@ export default function StatsPage() {
       <section className="stats-main-grid">
         <article className="stats-panel stats-evolution-minimal">
           <div className="stats-panel-title">
-            <h2>Évolution des points</h2>
+            <h2>Ã‰volution des points</h2>
             <span>minimal</span>
           </div>
 
@@ -516,8 +516,8 @@ export default function StatsPage() {
 
           <div className="stats-mini-summary">
             <div>
-              <span>Meilleure journée</span>
-              <strong>{bestDay ? `J${bestDay.journee} · +${bestDay.points} pts` : '-'}</strong>
+              <span>Meilleure journÃ©e</span>
+              <strong>{bestDay ? `J${bestDay.journee} Â· +${bestDay.points} pts` : '-'}</strong>
             </div>
 
             <div>
@@ -529,7 +529,7 @@ export default function StatsPage() {
 
         <article className="stats-panel">
           <div className="stats-panel-title">
-            <h2>Répartition des points</h2>
+            <h2>RÃ©partition des points</h2>
             <span>{selectedStats?.total || 0} pts</span>
           </div>
 
@@ -546,7 +546,7 @@ export default function StatsPage() {
 
             <div>
               <div className="stats-breakdown-top">
-                <span>Équipe favorite</span>
+                <span>Ã‰quipe favorite</span>
                 <strong>{selectedStats?.favoritePoints || 0} pts</strong>
               </div>
               <div className="stats-breakdown-track">
@@ -570,8 +570,8 @@ export default function StatsPage() {
       <section className="stats-tops stats-badge-board">
         <article className="stats-badge-ranking">
           <div className="stats-badge-head">
-            <span>Machine à points</span>
-            <strong>🏆</strong>
+            <span>Machine Ã  points</span>
+            <strong>ðŸ†</strong>
           </div>
 
           <div className="mini-badge-list">
@@ -588,7 +588,7 @@ export default function StatsPage() {
         <article className="stats-badge-ranking">
           <div className="stats-badge-head">
             <span>Roi du bonus</span>
-            <strong>🎯</strong>
+            <strong>ðŸŽ¯</strong>
           </div>
 
           <div className="mini-badge-list">
@@ -605,7 +605,7 @@ export default function StatsPage() {
         <article className="stats-badge-ranking">
           <div className="stats-badge-head">
             <span>Expert exact</span>
-            <strong>💎</strong>
+            <strong>ðŸ’Ž</strong>
           </div>
 
           <div className="mini-badge-list">
@@ -622,7 +622,7 @@ export default function StatsPage() {
         <article className="stats-badge-ranking">
           <div className="stats-badge-head">
             <span>Meilleur 1N2</span>
-            <strong>⚽</strong>
+            <strong>âš½</strong>
           </div>
 
           <div className="mini-badge-list">
@@ -650,7 +650,7 @@ export default function StatsPage() {
 
             <div>
               <h3>{selectedStats?.player}</h3>
-              <p>{selectedStats?.favoriteTeam || 'Club favori non renseigné'}</p>
+              <p>{selectedStats?.favoriteTeam || 'Club favori non renseignÃ©'}</p>
             </div>
           </div>
 
@@ -661,7 +661,7 @@ export default function StatsPage() {
             </div>
 
             <div>
-              <span>Réussite globale</span>
+              <span>RÃ©ussite globale</span>
               <strong>{selectedStats?.successRate || 0}%</strong>
             </div>
 
@@ -671,7 +671,7 @@ export default function StatsPage() {
             </div>
 
             <div>
-              <span>Bonus réussis</span>
+              <span>Bonus rÃ©ussis</span>
               <strong>{selectedStats?.bonusCorrect || 0}</strong>
             </div>
           </div>
@@ -679,15 +679,15 @@ export default function StatsPage() {
 
         <article className="stats-profile-card">
           <div className="stats-panel-title">
-            <h2>Efficacité par type</h2>
-            <span>réussite</span>
+            <h2>EfficacitÃ© par type</h2>
+            <span>rÃ©ussite</span>
           </div>
 
           <div className="stats-profile-lines">
             <div>
               <span>1N2 classique</span>
               <strong>
-                {selectedStats?.normalCorrect || 0}/{selectedStats?.normalAttempts || 0} ·{' '}
+                {selectedStats?.normalCorrect || 0}/{selectedStats?.normalAttempts || 0} Â·{' '}
                 {selectedStats?.normalAttempts
                   ? Math.round(((selectedStats?.normalCorrect || 0) / selectedStats.normalAttempts) * 100)
                   : 0}%
@@ -695,9 +695,9 @@ export default function StatsPage() {
             </div>
 
             <div>
-              <span>Équipe favorite</span>
+              <span>Ã‰quipe favorite</span>
               <strong>
-                {selectedStats?.favoriteCorrect || 0}/{selectedStats?.favoriteAttempts || 0} ·{' '}
+                {selectedStats?.favoriteCorrect || 0}/{selectedStats?.favoriteAttempts || 0} Â·{' '}
                 {selectedStats?.favoriteAttempts
                   ? Math.round(((selectedStats?.favoriteCorrect || 0) / selectedStats.favoriteAttempts) * 100)
                   : 0}%
@@ -707,7 +707,7 @@ export default function StatsPage() {
             <div>
               <span>Match bonus</span>
               <strong>
-                {selectedStats?.bonusCorrect || 0}/{selectedStats?.bonusAttempts || 0} ·{' '}
+                {selectedStats?.bonusCorrect || 0}/{selectedStats?.bonusAttempts || 0} Â·{' '}
                 {selectedStats?.bonusAttempts
                   ? Math.round(((selectedStats?.bonusCorrect || 0) / selectedStats.bonusAttempts) * 100)
                   : 0}%
@@ -715,7 +715,7 @@ export default function StatsPage() {
             </div>
 
             <div className="highlight">
-              <span>Réussite globale</span>
+              <span>RÃ©ussite globale</span>
               <strong>{selectedStats?.successRate || 0}%</strong>
             </div>
           </div>
@@ -723,18 +723,18 @@ export default function StatsPage() {
 
         <article className="stats-profile-card">
           <div className="stats-panel-title">
-            <h2>Repères</h2>
+            <h2>RepÃ¨res</h2>
             <span>forme</span>
           </div>
 
           <div className="stats-profile-lines">
             <div>
-              <span>Pronos joués</span>
+              <span>Pronos jouÃ©s</span>
               <strong>{selectedStats?.attempts || 0}</strong>
             </div>
 
             <div>
-              <span>Bons résultats</span>
+              <span>Bons rÃ©sultats</span>
               <strong>{selectedStats?.corrects || 0}</strong>
             </div>
 
@@ -753,6 +753,7 @@ export default function StatsPage() {
 </div>
   );
 }
+
 
 
 

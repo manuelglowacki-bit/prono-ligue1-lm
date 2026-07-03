@@ -1,4 +1,4 @@
-import { CalendarDays, Clock3 } from 'lucide-react';
+﻿import { CalendarDays, Clock3 } from 'lucide-react';
 
 export default function MatchPredictionCard({ match }) {
   return (
@@ -39,3 +39,4 @@ export default function MatchPredictionCard({ match }) {
     </article>
   );
 }
+

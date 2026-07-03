@@ -1,4 +1,6 @@
+﻿import AdminOnly from "./components/AdminOnly.jsx";
 import React, { useEffect, useState } from "react";
+import { supabase } from "./lib/supabaseClient";
 
 import HomePage from "./pages/HomePage.jsx";
 import PronosPage from "./pages/PronosPage.jsx";
@@ -11,9 +13,13 @@ import AdminPage from "./pages/AdminPage.jsx";
 
 import FavoriteTeamBox from "./components/FavoriteTeamBox.jsx";
 import FavoriteDeadlineAdmin from "./components/FavoriteDeadlineAdmin.jsx";
+import CalendarAutoSync from "./components/CalendarAutoSync.jsx";
+import CalendarOnlineAdmin from "./components/CalendarOnlineAdmin.jsx";
+import RegisteredPlayersAdmin from "./components/RegisteredPlayersAdmin.jsx";
 
 import "./styles/layout.css";
 
+const ADMIN_EMAIL = "manuelglowacki@gmail.com";
 
 function cleanFavoriteTeamValue(value) {
   if (!value) return value;
@@ -94,60 +100,69 @@ const NAV_ITEMS = [
 
 export default function App() {
   const [activePage, setActivePage] = useState("home");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    function handleNameSaveVisible(event) {
-      const button = event.target.closest?.("button");
-      if (!button) return;
+    let mounted = true;
 
-      const label = button.textContent.trim().toLowerCase();
+    async function checkAdmin() {
+      try {
+        if (!supabase) {
+          if (mounted) setIsAdmin(false);
+          return;
+        }
 
-      if (label !== "enregistrer") return;
+        const { data } = await supabase.auth.getUser();
+        const email = data?.user?.email?.toLowerCase().trim();
 
-      const card =
-        button.closest(".profile-pref-card") ||
-        button.closest(".profile-card") ||
-        button.closest("article") ||
-        button.closest("div");
-
-      const zoneText = card?.textContent?.toLowerCase() || "";
-
-      if (!zoneText.includes("nom affiché") && !zoneText.includes("nom affiche")) return;
-
-      const oldText = button.textContent;
-
-      button.classList.add("name-save-confirmed");
-      button.textContent = "Nom validé ✓";
-
-      card.classList.add("name-card-confirmed");
-
-      setTimeout(() => {
-        button.classList.remove("name-save-confirmed");
-        button.textContent = oldText;
-        card.classList.remove("name-card-confirmed");
-      }, 1800);
+        if (mounted) {
+          setIsAdmin(email === ADMIN_EMAIL);
+        }
+      } catch {
+        if (mounted) setIsAdmin(false);
+      }
     }
 
-    document.addEventListener("click", handleNameSaveVisible);
+    checkAdmin();
+
+    const sub = supabase?.auth?.onAuthStateChange?.((_event, session) => {
+      const email = session?.user?.email?.toLowerCase().trim();
+      setIsAdmin(email === ADMIN_EMAIL);
+    });
 
     return () => {
-      document.removeEventListener("click", handleNameSaveVisible);
+      mounted = false;
+      sub?.data?.subscription?.unsubscribe?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (activePage === "admin" && !isAdmin) {
+      setActivePage("home");
+    }
+  }, [activePage, isAdmin]);
 
   useEffect(() => {
     cleanFavoriteTeamStorage();
   }, []);
 
+  const visibleNavItems = isAdmin
+    ? NAV_ITEMS
+    : NAV_ITEMS.filter((item) => item.id !== "admin");
+
+  function renderHome() {
+    return (
+      <>
+        <FavoriteTeamBox />
+        <HomePage />
+      </>
+    );
+  }
+
   function renderPage() {
     switch (activePage) {
       case "home":
-        return (
-          <>
-            <FavoriteTeamBox />
-            <HomePage />
-          </>
-        );
+        return renderHome();
 
       case "pronos":
         return <PronosPage />;
@@ -168,25 +183,25 @@ export default function App() {
         return <ProfilePage />;
 
       case "admin":
+        if (!isAdmin) return renderHome();
+
         return (
-          <>
+          <AdminOnly>
+            <RegisteredPlayersAdmin />
+            <CalendarOnlineAdmin />
             <FavoriteDeadlineAdmin />
             <AdminPage />
-          </>
+          </AdminOnly>
         );
 
       default:
-        return (
-          <>
-            <FavoriteTeamBox />
-            <HomePage />
-          </>
-        );
+        return renderHome();
     }
   }
 
   return (
     <div className="app-shell">
+      <CalendarAutoSync />
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-logo">LM</div>
@@ -197,7 +212,7 @@ export default function App() {
         </div>
 
         <nav className="nav-menu">
-          {NAV_ITEMS.map((item) => (
+          {visibleNavItems.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -217,3 +232,8 @@ export default function App() {
     </div>
   );
 }
+
+
+
+
+

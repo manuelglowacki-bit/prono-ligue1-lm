@@ -1,4 +1,4 @@
-.profile-avatar-mini {
+﻿.profile-avatar-mini {
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
@@ -19,3 +19,4 @@
 .profile-avatar-mini span {
   line-height: 1;
 }
+

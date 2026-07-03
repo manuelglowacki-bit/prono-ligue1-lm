@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 
 import { getApiUrl } from '../utils/apiUrl';
 const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';
@@ -49,11 +49,11 @@ export default function AdminBonusAI() {
       try {
         data = JSON.parse(text);
       } catch {
-        throw new Error('La route bonus IA ne répond pas en JSON. Vérifie que npm run api est bien relancé.');
+        throw new Error('La route bonus IA ne rÃ©pond pas en JSON. VÃ©rifie que npm run api est bien relancÃ©.');
       }
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.message || 'Impossible de récupérer les bonus IA.');
+        throw new Error(data.message || 'Impossible de rÃ©cupÃ©rer les bonus IA.');
       }
 
       const suggestions = data.suggestions || [];
@@ -119,7 +119,7 @@ export default function AdminBonusAI() {
       JSON.stringify([...withoutOldBonusForDay, ...preparedBonus])
     );
 
-    alert(`3 matchs bonus enregistrés pour la journée ${journee}.`);
+    alert(`3 matchs bonus enregistrÃ©s pour la journÃ©e ${journee}.`);
   }
 
   return (
@@ -168,7 +168,7 @@ export default function AdminBonusAI() {
               fontSize: '13px',
             }}
           >
-            Angleterre · Italie · Espagne · Allemagne. Tu peux modifier les choix avant validation.
+            Angleterre Â· Italie Â· Espagne Â· Allemagne. Tu peux modifier les choix avant validation.
           </p>
         </div>
 
@@ -188,7 +188,7 @@ export default function AdminBonusAI() {
           >
             {journees.map((j) => (
               <option key={j} value={j} style={{ color: '#111827' }}>
-                Journée {j}
+                JournÃ©e {j}
               </option>
             ))}
           </select>
@@ -266,14 +266,14 @@ export default function AdminBonusAI() {
             <input
               value={match.domicile || ''}
               onChange={(e) => updateBonus(index, 'domicile', e.target.value)}
-              placeholder="Équipe domicile"
+              placeholder="Ã‰quipe domicile"
               style={inputStyle}
             />
 
             <input
               value={match.exterieur || ''}
               onChange={(e) => updateBonus(index, 'exterieur', e.target.value)}
-              placeholder="Équipe extérieur"
+              placeholder="Ã‰quipe extÃ©rieur"
               style={inputStyle}
             />
 
@@ -311,5 +311,6 @@ const inputStyle = {
   fontWeight: 800,
   outline: 'none',
 };
+
 
 

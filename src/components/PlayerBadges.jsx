@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { getPlayerOwnedBadges } from '../utils/badgeOwners';
 import '../styles/playerBadges.css';
 
@@ -26,3 +26,4 @@ export default function PlayerBadges({ player, compact = false }) {
     </div>
   );
 }
+

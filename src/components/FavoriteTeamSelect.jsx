@@ -1,3 +1,3 @@
-export default function FavoriteTeamSelect() {
+﻿export default function FavoriteTeamSelect() {
   return null;
 }

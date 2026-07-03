@@ -1,5 +1,5 @@
-/* =========================
-   MOTEUR BADGES ATTRIBUÉS
+﻿/* =========================
+   MOTEUR BADGES ATTRIBUÃ‰S
 ========================= */
 
 import { getRegisteredPlayers } from './players';
@@ -13,9 +13,9 @@ const PLAYER_KEY = 'prono_ligue1_lm_current_player';
 export const BADGES = [
   {
     id: 'machine-points',
-    label: 'Machine à points',
+    label: 'Machine Ã  points',
     shortLabel: 'Points',
-    icon: '🏆',
+    icon: 'ðŸ†',
     stat: 'totalPoints',
     unit: 'pts',
   },
@@ -23,7 +23,7 @@ export const BADGES = [
     id: 'roi-bonus',
     label: 'Roi du bonus',
     shortLabel: 'Bonus',
-    icon: '🎯',
+    icon: 'ðŸŽ¯',
     stat: 'bonusPoints',
     unit: 'pts',
   },
@@ -31,7 +31,7 @@ export const BADGES = [
     id: 'expert-exact',
     label: 'Expert exact',
     shortLabel: 'Exact',
-    icon: '💎',
+    icon: 'ðŸ’Ž',
     stat: 'scoresExacts',
     unit: 'exact',
   },
@@ -39,7 +39,7 @@ export const BADGES = [
     id: 'meilleur-1n2',
     label: 'Meilleur 1N2',
     shortLabel: '1N2',
-    icon: '⚽',
+    icon: 'âš½',
     stat: 'points1N2',
     unit: 'pts',
   },
@@ -218,4 +218,5 @@ export function getBadgeOwners() {
 export function getPlayerOwnedBadges(player) {
   return getBadgeOwners().filter((badge) => badge.owner === player);
 }
+
 

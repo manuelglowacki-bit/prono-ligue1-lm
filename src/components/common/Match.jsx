@@ -1,11 +1,12 @@
-export default function Match({ a, b }) {
+﻿export default function Match({ a, b }) {
   return (
     <div className="match">
-      <span className="crest">âš½</span>
+      <span className="crest">Ã¢Å¡Â½</span>
       <b>{a}</b>
       <strong>VS</strong>
       <b>{b}</b>
-      <span className="crest">âš½</span>
+      <span className="crest">Ã¢Å¡Â½</span>
     </div>
   );
 }
+

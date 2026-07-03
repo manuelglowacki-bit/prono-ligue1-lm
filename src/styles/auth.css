@@ -1,4 +1,4 @@
-.auth-page {
+﻿.auth-page {
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -193,7 +193,7 @@
   }
 }
 
-/* === BOUTON DÉCONNEXION VISIBLE === */
+/* === BOUTON DÃ‰CONNEXION VISIBLE === */
 
 .auth-logout-fixed {
   position: fixed;
@@ -259,7 +259,7 @@
 }
 
 
-/* === BOUTON DÉCONNEXION FORCÉ === */
+/* === BOUTON DÃ‰CONNEXION FORCÃ‰ === */
 
 .auth-logout-fixed {
   position: fixed !important;
@@ -306,7 +306,7 @@
 }
 
 
-/* === ACCÈS ADMIN REFUSÉ === */
+/* === ACCÃˆS ADMIN REFUSÃ‰ === */
 
 .admin-denied {
   padding: 22px;
@@ -337,7 +337,7 @@
 }
 
 
-/* === ACCÈS ADMIN REFUSÉ === */
+/* === ACCÃˆS ADMIN REFUSÃ‰ === */
 
 .admin-denied {
   padding: 22px;
@@ -377,7 +377,7 @@
 }
 
 
-/* === CLUB FAVORI RC LENS PAR DÉFAUT === */
+/* === CLUB FAVORI RC LENS PAR DÃ‰FAUT === */
 
 .favorite-team-card {
   margin-bottom: 16px;
@@ -513,4 +513,5 @@
   border-color: rgba(239,68,68,0.26);
   color: #fca5a5;
 }
+
 

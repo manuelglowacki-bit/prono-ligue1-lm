@@ -1,4 +1,4 @@
-export function FavoriteTeamBox() {
+﻿export function FavoriteTeamBox() {
   return null;
 }
 

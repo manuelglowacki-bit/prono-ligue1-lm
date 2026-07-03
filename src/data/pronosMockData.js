@@ -1,4 +1,4 @@
-const teamPairs = [
+﻿const teamPairs = [
   ['RC Lens', 'PSG'],
   ['OM', 'Lyon'],
   ['Lille', 'Monaco'],
@@ -7,7 +7,7 @@ const teamPairs = [
   ['Toulouse', 'Brest'],
   ['Le Havre', 'Auxerre'],
   ['Angers', 'Montpellier'],
-  ['Reims', 'Saint-Étienne'],
+  ['Reims', 'Saint-Ã‰tienne'],
   ['Marseille', 'Clermont'],
 ];
 
@@ -34,10 +34,10 @@ const buildDayMatches = (dayNumber) =>
 
 const buildBonusChoices = () => [
   {
-    label: 'Real Madrid vs Atlético',
-    value: 'Real Madrid - Atlético',
+    label: 'Real Madrid vs AtlÃ©tico',
+    value: 'Real Madrid - AtlÃ©tico',
     home: 'Real Madrid',
-    away: 'Atlético',
+    away: 'AtlÃ©tico',
     correctResult: '1',
     correctScore: { home: 2, away: 1 },
   },
@@ -76,3 +76,4 @@ export const pronosDaysData = Array.from({ length: 34 }, (_, index) => ({
 export const pronosRounds = pronosDaysData.map(({ day }) => `J${day}`);
 export const pronosMatches = pronosDaysData[0].matches;
 export const pronosBonusChoices = pronosDaysData[0].bonusChoices;
+

@@ -1,4 +1,4 @@
-
+﻿
 import * as XLSX from "xlsx";
 
 function cleanHeader(value) {
@@ -89,13 +89,13 @@ function toTimeInputValue(value) {
 
 function getJourneeNumber(row, sheetName, rowIndex) {
   const value = getCell(row, [
-    "Journée",
+    "JournÃ©e",
     "Journee",
     "J",
     "Round",
-    "N° journée",
+    "NÂ° journÃ©e",
     "Numero journee",
-    "Numéro journée",
+    "NumÃ©ro journÃ©e",
     "Matchday"
   ]);
 
@@ -118,13 +118,13 @@ function getHome(row) {
   return getCell(row, [
     "Domicile",
     "Equipe domicile",
-    "Équipe domicile",
+    "Ã‰quipe domicile",
     "Club domicile",
     "Home",
     "Home Team",
     "HomeTeam",
     "Equipe 1",
-    "Équipe 1",
+    "Ã‰quipe 1",
     "Team 1",
     "Local"
   ]);
@@ -132,16 +132,16 @@ function getHome(row) {
 
 function getAway(row) {
   return getCell(row, [
-    "Extérieur",
+    "ExtÃ©rieur",
     "Exterieur",
     "Equipe exterieur",
-    "Équipe extérieur",
-    "Club extérieur",
+    "Ã‰quipe extÃ©rieur",
+    "Club extÃ©rieur",
     "Away",
     "Away Team",
     "AwayTeam",
     "Equipe 2",
-    "Équipe 2",
+    "Ã‰quipe 2",
     "Team 2",
     "Visiteur"
   ]);
@@ -258,3 +258,4 @@ export function parseExcelWorkbookToJournees(workbook) {
 }
 
 export default parseExcelWorkbookToJournees;
+

@@ -1,96 +1,136 @@
-import React, { useEffect, useState } from 'react';
-import AuthPage from '../pages/AuthPage';
-import '../styles/auth.css';
-import { ensureFavoriteTeam, ensureFavoriteTeamsForAccounts } from '../utils/favoriteTeam';
+﻿import React, { useEffect, useState } from "react";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import AuthPage from "./AuthPage";
+import UserPronosCloudSync from "./UserPronosCloudSync.jsx";
 
-const SESSION_KEY = 'prono_ligue1_lm_session';
-
-function safeJson(key, fallback) {
-  try {
-    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
-  } catch {
-    return fallback;
-  }
-}
-
-function cleanFavoriteClubDisplay(value) {
-  if (!value) return "Non choisi";
-
-  if (typeof value === "string") {
-    const raw = value.trim();
-
-    if (raw.startsWith("{") && raw.endsWith("}")) {
-      try {
-        const parsed = JSON.parse(raw);
-        return parsed.favoriteTeam || parsed.club || parsed.Manu || Object.values(parsed).find(Boolean) || "Non choisi";
-      } catch {
-        return raw;
-      }
-    }
-
-    return raw;
-  }
-
-  if (typeof value === "object") {
-    return value.favoriteTeam || value.club || value.Manu || Object.values(value).find(Boolean) || "Non choisi";
-  }
-
-  return String(value);
-}
+const ADMIN_EMAIL = "manuelglowacki@gmail.com";
 
 export default function AuthGate({ children }) {
   const [session, setSession] = useState(null);
-  const [ready, setReady] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [blockedStatus, setBlockedStatus] = useState(null);
 
-  useEffect(() => {
-    ensureFavoriteTeamsForAccounts();
+  async function checkAccountStatus(currentSession) {
+    const user = currentSession?.user;
 
-    const savedSession = safeJson(SESSION_KEY, null);
-
-    if (savedSession) {
-      ensureFavoriteTeam(savedSession.player);
-
-      const fixedSession = {
-        ...savedSession,
-        role: savedSession.role || (savedSession.player === 'Manu' ? 'admin' : 'player'),
-      };
-
-      localStorage.setItem(SESSION_KEY, JSON.stringify(fixedSession));
-      setSession(fixedSession);
+    if (!user?.id) {
+      setBlockedStatus(null);
+      return;
     }
 
-    setReady(true);
+    const email = user.email?.toLowerCase().trim();
+
+    if (email === ADMIN_EMAIL) {
+      setBlockedStatus(null);
+      return;
+    }
+
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("account_status")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const status = data?.account_status || "active";
+
+      if (status === "blocked" || status === "deleted") {
+        setBlockedStatus(status);
+      } else {
+        setBlockedStatus(null);
+      }
+    } catch {
+      setBlockedStatus(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) {
+      setAuthLoading(false);
+      return;
+    }
+
+    async function initAuth() {
+      const { data } = await supabase.auth.getSession();
+      const currentSession = data.session;
+
+      setSession(currentSession);
+      await checkAccountStatus(currentSession);
+      setAuthLoading(false);
+    }
+
+    initAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+      setSession(currentSession);
+      await checkAccountStatus(currentSession);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  function handleLogin(nextSession) {
-    ensureFavoriteTeam(nextSession.player);
-    setSession(nextSession);
+  if (authLoading) {
+    return <div className="loading-screen">Chargement...</div>;
   }
-
-  function logout() {
-    localStorage.removeItem(SESSION_KEY);
-    setSession(null);
-  }
-
-  if (!ready) return null;
 
   if (!session) {
-    return <AuthPage onLogin={handleLogin} />;
+    return <AuthPage />;
   }
+
+  if (blockedStatus) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <div className="auth-logo">🔒</div>
+          <h1>
+            {blockedStatus === "deleted" ? "Compte supprime" : "Compte bloque"}
+          </h1>
+          <p className="auth-subtitle">
+            Ton compte n'a plus acces au concours.
+          </p>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await supabase.auth.signOut();
+            }}
+            style={{
+              border: 0,
+              borderRadius: "999px",
+              padding: "12px 16px",
+              background: "#facc15",
+              color: "#111827",
+              fontWeight: 900,
+              cursor: "pointer"
+            }}
+          >
+            Deconnexion
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const playerName =
+    session?.user?.user_metadata?.player_name ||
+    session?.user?.email ||
+    "Joueur";
 
   return (
     <>
-      <div className="auth-logout-fixed">
-        <div>
-          <strong>
-            {session.displayName || session.player}
-            {session.role === 'admin' ? ' · Admin' : ''}
-          </strong>
-          <span>{session.email}</span>
-        </div>
-
-        <button type="button" onClick={logout}>
-          Déconnexion
+      <UserPronosCloudSync session={session} />
+      <div className="auth-userbar">
+        <span>{playerName}</span>
+        <button
+          type="button"
+          onClick={async () => {
+            await supabase.auth.signOut();
+          }}
+        >
+          Deconnexion
         </button>
       </div>
 
@@ -98,3 +138,6 @@ export default function AuthGate({ children }) {
     </>
   );
 }
+
+
+

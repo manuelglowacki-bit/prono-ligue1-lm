@@ -1,4 +1,4 @@
-import { CalendarDays, Clock3 } from 'lucide-react';
+﻿import { CalendarDays, Clock3 } from 'lucide-react';
 import PredictionButtons from './PredictionButtons';
 
 export default function MatchCard({ match, selectedValue, onSelect }) {
@@ -36,3 +36,4 @@ export default function MatchCard({ match, selectedValue, onSelect }) {
     </article>
   );
 }
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import '../styles/trophies.css';
 
 const TROPHY_ADMIN_JOURNEES_KEY = "admin_journees";
@@ -243,8 +243,8 @@ export default function TrophiesPage() {
   const trophies = useMemo(() => {
     const list = [
       {
-        icon: '🏆',
-        title: 'Machine à points',
+        icon: 'ðŸ†',
+        title: 'Machine Ã  points',
         category: 'Points',
         description: 'Accumuler des points sur la saison.',
         value: stats.totalPoints,
@@ -253,26 +253,26 @@ export default function TrophiesPage() {
           { name: 'Bronze', value: 200 },
           { name: 'Argent', value: 600 },
           { name: 'Or', value: 1200 },
-          { name: 'Légende', value: 2500 },
+          { name: 'LÃ©gende', value: 2500 },
         ],
       },
       {
-        icon: '🔥',
-        title: 'Grosse journée',
+        icon: 'ðŸ”¥',
+        title: 'Grosse journÃ©e',
         category: 'Points',
-        description: 'Faire plusieurs grosses journées à 8 points ou plus.',
+        description: 'Faire plusieurs grosses journÃ©es Ã  8 points ou plus.',
         value: stats.grossesJournees,
         unit: 'J',
         levels: [
           { name: 'Bronze', value: 3 },
           { name: 'Argent', value: 10 },
           { name: 'Or', value: 25 },
-          { name: 'Légende', value: 60 },
+          { name: 'LÃ©gende', value: 60 },
         ],
       },
       {
-        icon: '💎',
-        title: 'Œil de lynx',
+        icon: 'ðŸ’Ž',
+        title: 'Å’il de lynx',
         category: 'Scores exacts',
         description: 'Trouver des scores exacts.',
         value: stats.scoresExacts,
@@ -281,41 +281,41 @@ export default function TrophiesPage() {
           { name: 'Bronze', value: 5 },
           { name: 'Argent', value: 25 },
           { name: 'Or', value: 60 },
-          { name: 'Légende', value: 150 },
+          { name: 'LÃ©gende', value: 150 },
         ],
       },
       {
-        icon: '⚽',
-        title: 'Maître du 1N2',
+        icon: 'âš½',
+        title: 'MaÃ®tre du 1N2',
         category: '1N2',
-        description: 'Trouver les bons résultats classiques.',
+        description: 'Trouver les bons rÃ©sultats classiques.',
         value: stats.bonsResultats,
         unit: 'OK',
         levels: [
           { name: 'Bronze', value: 50 },
           { name: 'Argent', value: 200 },
           { name: 'Or', value: 500 },
-          { name: 'Légende', value: 1200 },
+          { name: 'LÃ©gende', value: 1200 },
         ],
       },
       {
-        icon: '✅',
-        title: 'Toujours présent',
-        category: 'Régularité',
-        description: 'Participer aux journées de pronostics.',
+        icon: 'âœ…',
+        title: 'Toujours prÃ©sent',
+        category: 'RÃ©gularitÃ©',
+        description: 'Participer aux journÃ©es de pronostics.',
         value: stats.journeesJouees,
         unit: 'J',
         levels: [
           { name: 'Bronze', value: 10 },
           { name: 'Argent', value: 34 },
           { name: 'Or', value: 102 },
-          { name: 'Légende', value: 204 },
+          { name: 'LÃ©gende', value: 204 },
         ],
       },
       {
-        icon: '📋',
-        title: 'Pronos joués',
-        category: 'Régularité',
+        icon: 'ðŸ“‹',
+        title: 'Pronos jouÃ©s',
+        category: 'RÃ©gularitÃ©',
         description: 'Remplir un maximum de pronostics.',
         value: stats.pronosJoues,
         unit: 'pronos',
@@ -323,7 +323,7 @@ export default function TrophiesPage() {
           { name: 'Bronze', value: 100 },
           { name: 'Argent', value: 500 },
           { name: 'Or', value: 1000 },
-          { name: 'Légende', value: 2500 },
+          { name: 'LÃ©gende', value: 2500 },
         ],
       },
     ];
@@ -340,13 +340,13 @@ export default function TrophiesPage() {
   const totalLevels = trophies.length * 4;
   const globalProgress = totalLevels ? Math.round((unlockedLevels / totalLevels) * 100) : 0;
 
-  const filters = ['Tous', 'Points', 'Scores exacts', '1N2', 'Régularité', 'Débloqués', 'En cours', 'Verrouillés'];
+  const filters = ['Tous', 'Points', 'Scores exacts', '1N2', 'RÃ©gularitÃ©', 'DÃ©bloquÃ©s', 'En cours', 'VerrouillÃ©s'];
 
   const filteredTrophies = trophies.filter((trophy) => {
     if (filter === 'Tous') return true;
-    if (filter === 'Débloqués') return trophy.currentLevel;
+    if (filter === 'DÃ©bloquÃ©s') return trophy.currentLevel;
     if (filter === 'En cours') return trophy.status === 'progress';
-    if (filter === 'Verrouillés') return trophy.status === 'locked';
+    if (filter === 'VerrouillÃ©s') return trophy.status === 'locked';
     return trophy.category === filter;
   });
 
@@ -354,9 +354,9 @@ export default function TrophiesPage() {
     <div className="trophies-page">
       <section className="trophies-header">
         <div className="trophies-header-left">
-          <p>TROPHÉES</p>
+          <p>TROPHÃ‰ES</p>
           <h1>Collection de {currentPlayer}</h1>
-          <span>Badges évolutifs : Bronze / Argent / Or / Légende</span>
+          <span>Badges Ã©volutifs : Bronze / Argent / Or / LÃ©gende</span>
 
           <div className="trophies-header-badges">
             {earnedTrophies.length > 0 ? (
@@ -373,7 +373,7 @@ export default function TrophiesPage() {
               ))
             ) : (
               <div className="header-trophy-empty">
-                Aucun trophée gagné pour le moment.
+                Aucun trophÃ©e gagnÃ© pour le moment.
               </div>
             )}
           </div>
@@ -392,7 +392,7 @@ export default function TrophiesPage() {
         <article>
           <span>Points actuels</span>
           <strong>{stats.totalPoints} pts</strong>
-          <small>Points gagnés sur la saison</small>
+          <small>Points gagnÃ©s sur la saison</small>
         </article>
 
         <article>
@@ -402,7 +402,7 @@ export default function TrophiesPage() {
         </article>
 
         <article>
-          <span>Meilleure journée</span>
+          <span>Meilleure journÃ©e</span>
           <strong>{stats.meilleureJournee} pts</strong>
           <small>Record actuel</small>
         </article>
@@ -431,7 +431,7 @@ export default function TrophiesPage() {
             <div className="trophy-top">
               <div className="trophy-icon">{trophy.icon}</div>
               <div className="trophy-level">
-                {trophy.currentLevel ? trophy.currentLevel.name : 'Verrouillé'}
+                {trophy.currentLevel ? trophy.currentLevel.name : 'VerrouillÃ©'}
               </div>
             </div>
 
@@ -500,6 +500,7 @@ export default function TrophiesPage() {
     </div>
   );
 }
+
 
 
 

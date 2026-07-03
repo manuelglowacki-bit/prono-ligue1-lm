@@ -1,4 +1,4 @@
-import { isAdminSession } from '../utils/authSecurity';
+﻿import { isAdminSession } from '../utils/authSecurity';
 import React from 'react';
 
 const menuItems = [
@@ -7,7 +7,7 @@ const menuItems = [
   { label: 'Classement', short: 'CLS' },
   { label: 'Stats', short: 'STA' },
   { label: 'La Gazette', short: 'GAZ' },
-  { label: 'Trophées', short: 'TRP' },
+  { label: 'TrophÃ©es', short: 'TRP' },
   { label: 'Profil', short: 'PRF' },
   { label: 'Admin', short: 'ADM' },
 ];
@@ -526,6 +526,7 @@ export default function AppLayout({ page, setPage, children }) {
     </div>
   );
 }
+
 
 
 

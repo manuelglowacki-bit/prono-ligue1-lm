@@ -1,4 +1,4 @@
-const CLUB_ALIASES = {
+﻿const CLUB_ALIASES = {
   psg: ["psg", "paris", "paris sg", "paris saint germain", "paris saint-germain"],
   marseille: ["marseille", "om", "olympique de marseille"],
   lyon: ["lyon", "ol", "olympique lyonnais"],
@@ -17,7 +17,7 @@ const CLUB_ALIASES = {
   angers: ["angers", "angers sco", "sco angers"],
   lehavre: ["le havre", "havre", "le havre ac", "hac"],
   parisfc: ["paris fc", "pfc"],
-  saintetienne: ["saint etienne", "saint-étienne", "saint-etienne", "asse", "as saint etienne"],
+  saintetienne: ["saint etienne", "saint-Ã©tienne", "saint-etienne", "asse", "as saint etienne"],
   montpellier: ["montpellier", "mhsc", "montpellier hsc"],
   reims: ["reims", "stade de reims"],
   clermont: ["clermont", "clermont foot", "clermont foot 63"],
@@ -49,7 +49,7 @@ export const CLUB_OPTIONS = [
   "Angers",
   "Le Havre",
   "Paris FC",
-  "Saint-Étienne",
+  "Saint-Ã‰tienne",
   "Montpellier",
   "Reims",
   "Clermont",
@@ -67,7 +67,7 @@ function cleanClubName(value) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[’']/g, " ")
+    .replace(/[â€™']/g, " ")
     .replace(/-/g, " ")
     .replace(/\bfootball club\b/g, "")
     .replace(/\bfc\b/g, "")
@@ -94,7 +94,7 @@ export function getMatchHomeName(match) {
     match?.domicile ||
     match?.home ||
     match?.equipeDomicile ||
-    match?.équipeDomicile ||
+    match?.Ã©quipeDomicile ||
     match?.teamHome ||
     match?.homeTeam ||
     match?.clubDomicile ||
@@ -105,14 +105,14 @@ export function getMatchHomeName(match) {
 export function getMatchAwayName(match) {
   return (
     match?.exterieur ||
-    match?.extérieur ||
+    match?.extÃ©rieur ||
     match?.away ||
     match?.equipeExterieur ||
-    match?.equipeExtérieur ||
+    match?.equipeExtÃ©rieur ||
     match?.teamAway ||
     match?.awayTeam ||
     match?.clubExterieur ||
-    match?.clubExtérieur ||
+    match?.clubExtÃ©rieur ||
     ""
   );
 }
@@ -126,3 +126,4 @@ export function isFavoriteClubMatch(match, favoriteClub) {
 
   return home === fav || away === fav;
 }
+

@@ -51,6 +51,17 @@ function loadJson(key, fallback) {
   }
 }
 
+function getRawScore(match, names) {
+  for (const name of names) {
+    const value = match?.[name];
+
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+
+  return "";
+}
 function normalizeJournees(data) {
   if (!Array.isArray(data) || data.length === 0) return DEFAULT_JOURNEES;
 
@@ -67,7 +78,9 @@ function normalizeJournees(data) {
           away: m.away || "",
           date: m.date || "",
           time: m.time || "",
-          status: m.status || "Ouvert"
+          status: m.status || "Ouvert",
+          scoreDomicile: getRawScore(m, ["scoreDomicile", "scoreHome", "homeScore", "score1", "resultHome", "resultatDomicile"]),
+          scoreExterieur: getRawScore(m, ["scoreExterieur", "scoreAway", "awayScore", "score2", "resultAway", "resultatExterieur"])
         }))
       : [],
     bonus: Array.isArray(j.bonus)
@@ -78,7 +91,9 @@ function normalizeJournees(data) {
           away: b.away || "",
           date: b.date || "",
           time: b.time || "",
-          status: b.status || "Ouvert"
+          status: b.status || "Ouvert",
+          scoreDomicile: getRawScore(b, ["scoreDomicile", "scoreHome", "homeScore", "score1", "resultHome", "resultatDomicile"]),
+          scoreExterieur: getRawScore(b, ["scoreExterieur", "scoreAway", "awayScore", "score2", "resultAway", "resultatExterieur"])
         }))
       : []
   }));
@@ -298,6 +313,114 @@ function cleanFavoriteClubDisplay(value) {
   return String(value);
 }
 
+function hasRealScore(match) {
+  const home = getRawScore(match, ["scoreDomicile", "scoreHome", "homeScore", "score1", "resultHome", "resultatDomicile"]);
+  const away = getRawScore(match, ["scoreExterieur", "scoreAway", "awayScore", "score2", "resultAway", "resultatExterieur"]);
+
+  return home !== "" && away !== "";
+}
+
+function getResult1N2FromScores(home, away) {
+  const h = Number(home);
+  const a = Number(away);
+
+  if (Number.isNaN(h) || Number.isNaN(a)) return null;
+  if (h > a) return "1";
+  if (h < a) return "2";
+  return "N";
+}
+
+function getPronoPointsDisplay(match, prono, type) {
+  if (!hasRealScore(match)) {
+    return {
+      className: "waiting",
+      label: "Resultat en attente",
+      detail: "Le score reel n'est pas encore saisi."
+    };
+  }
+
+  const realHome = getRawScore(match, ["scoreDomicile", "scoreHome", "homeScore", "score1", "resultHome", "resultatDomicile"]);
+  const realAway = getRawScore(match, ["scoreExterieur", "scoreAway", "awayScore", "score2", "resultAway", "resultatExterieur"]);
+  const realResult = getResult1N2FromScores(realHome, realAway);
+
+  if (type === "normal") {
+    if (!prono?.result) {
+      return {
+        className: "waiting",
+        label: `Resultat reel : ${realHome}-${realAway}`,
+        detail: "Aucun prono valide."
+      };
+    }
+
+    const ok = prono.result === realResult;
+
+    return {
+      className: ok ? "good" : "miss",
+      label: ok ? "✅ Bon 1N2 +1 pt" : "❌ Rate 0 pt",
+      detail: `Resultat reel : ${realHome}-${realAway}`
+    };
+  }
+
+  const ph = Number(prono?.homeScore);
+  const pa = Number(prono?.awayScore);
+
+  if (Number.isNaN(ph) || Number.isNaN(pa)) {
+    return {
+      className: "waiting",
+      label: `Resultat reel : ${realHome}-${realAway}`,
+      detail: "Aucun score prono."
+    };
+  }
+
+  const exact = ph === Number(realHome) && pa === Number(realAway);
+  const good1N2 = getResult1N2FromScores(ph, pa) === realResult;
+
+  if (type === "bonus") {
+    if (exact) {
+      return {
+        className: "exact",
+        label: "🔥 Score exact bonus +3 pts",
+        detail: `Resultat reel : ${realHome}-${realAway}`
+      };
+    }
+
+    if (good1N2) {
+      return {
+        className: "good",
+        label: "✅ Bon bonus +2 pts",
+        detail: `Resultat reel : ${realHome}-${realAway}`
+      };
+    }
+
+    return {
+      className: "miss",
+      label: "❌ Bonus rate 0 pt",
+      detail: `Resultat reel : ${realHome}-${realAway}`
+    };
+  }
+
+  if (exact) {
+    return {
+      className: "exact",
+      label: "🎯 Score exact favori +2 pts",
+      detail: `Resultat reel : ${realHome}-${realAway}`
+    };
+  }
+
+  if (good1N2) {
+    return {
+      className: "good",
+      label: "✅ Bon favori +1 pt",
+      detail: `Resultat reel : ${realHome}-${realAway}`
+    };
+  }
+
+  return {
+    className: "miss",
+    label: "❌ Favori rate 0 pt",
+    detail: `Resultat reel : ${realHome}-${realAway}`
+  };
+}
 export default function PronosPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -420,6 +543,12 @@ export default function PronosPage() {
   return (
     <div className="pronos-page-clean">
       <style>{`
+
+        /* validation-buttons-disabled-final */
+        .match-valid-btn,
+        .bonus-valid-btn {
+          display: none !important;
+        }
         .pronos-page-clean {
           color: #ffffff;
         }
@@ -671,6 +800,61 @@ export default function PronosPage() {
           color: #052e16;
         }
 
+        .prono-result-clean {
+          margin-top: 12px;
+          padding: 11px 12px;
+          border-radius: 14px;
+          font-size: 13px;
+          font-weight: 950;
+          border: 1px solid rgba(255,255,255,.12);
+        }
+
+        .prono-result-clean small {
+          display: block;
+          margin-top: 4px;
+          font-size: 11px;
+          font-weight: 800;
+          opacity: .86;
+        }
+
+        .prono-result-clean.waiting {
+          background: rgba(148,163,184,.12);
+          color: #cbd5e1;
+          border-color: rgba(148,163,184,.22);
+        }
+
+        .prono-result-clean.good {
+          background: rgba(34,197,94,.15);
+          color: #bbf7d0;
+          border-color: rgba(34,197,94,.35);
+        }
+
+        .prono-result-clean.exact {
+          background: rgba(250,204,21,.16);
+          color: #fde68a;
+          border-color: rgba(250,204,21,.45);
+        }
+
+        .prono-result-clean.miss {
+          background: rgba(239,68,68,.15);
+          color: #fecaca;
+          border-color: rgba(239,68,68,.35);
+        }
+
+        /* hide-validated-buttons */
+        .match-card.blocked .match-valid-btn,
+        .match-card.blocked .bonus-valid-btn {
+          display: none !important;
+        }
+
+        .match-card:has(.prono-result-clean.good) .match-valid-btn,
+        .match-card:has(.prono-result-clean.exact) .match-valid-btn,
+        .match-card:has(.prono-result-clean.miss) .match-valid-btn,
+        .match-card:has(.prono-result-clean.good) .bonus-valid-btn,
+        .match-card:has(.prono-result-clean.exact) .bonus-valid-btn,
+        .match-card:has(.prono-result-clean.miss) .bonus-valid-btn {
+          display: none !important;
+        }
         @media (max-width: 1100px) {
           .match-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -886,8 +1070,18 @@ export default function PronosPage() {
                   </div>
                 </>
               )}
-              <button
-                className="match-valid-btn"
+              {(() => {
+                const evaluation = getPronoPointsDisplay(match, prono, favorite ? "favorite" : "normal");
+
+                return (
+                  <div className={`prono-result-clean ${evaluation.className}`}>
+                    {evaluation.label}
+                    <small>{evaluation.detail}</small>
+                  </div>
+                );
+              })()}
+
+              <button                className="match-valid-btn"
                 type="button"
                 onClick={(e) => {
                   const button = e.currentTarget;
@@ -1013,5 +1207,10 @@ export default function PronosPage() {
     </div>
   );
 }
+
+
+
+
+
 
 

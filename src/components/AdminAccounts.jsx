@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import '../styles/adminAccounts.css';
 
 const ACCOUNTS_KEY = 'prono_ligue1_lm_accounts';
@@ -49,7 +49,7 @@ export default function AdminAccounts() {
         <div>
           <p>COMPTES JOUEURS</p>
           <h2>Joueurs inscrits</h2>
-          <span>Les joueurs sont ajoutés automatiquement après inscription.</span>
+          <span>Les joueurs sont ajoutÃ©s automatiquement aprÃ¨s inscription.</span>
         </div>
       </div>
 
@@ -64,7 +64,7 @@ export default function AdminAccounts() {
               <div>
                 <strong>
                   {account.displayName || account.player}
-                  {account.role === 'admin' ? ' · Admin' : ''}
+                  {account.role === 'admin' ? ' Â· Admin' : ''}
                 </strong>
                 <span>{account.email}</span>
               </div>
@@ -87,3 +87,4 @@ export default function AdminAccounts() {
     </section>
   );
 }
+

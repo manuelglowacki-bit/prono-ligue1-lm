@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import '../styles/profileAvatar.css';
 
 const PROFILE_PHOTOS_KEY = 'prono_ligue1_lm_profile_photos';
@@ -36,3 +36,4 @@ export default function ProfileAvatar({ player = 'Manu', size = 34 }) {
     </div>
   );
 }
+

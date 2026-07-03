@@ -1,4 +1,4 @@
-import { getApiUrl } from './utils/apiUrl';
+﻿import { getApiUrl } from './utils/apiUrl';
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import './AdminJournees.css';
@@ -32,8 +32,8 @@ function splitMatchText(value) {
     /\s+v\s+/i,
     /\s+contre\s+/i,
     /\s+-\s+/,
-    /\s+–\s+/,
-    /\s+—\s+/,
+    /\s+â€“\s+/,
+    /\s+â€”\s+/,
   ];
 
   for (const separator of separators) {
@@ -155,10 +155,10 @@ function rowIsEmpty(row) {
 function createMatchFromHeader(row, headers, fileName, sheetName, index) {
   const iJournee = getIndex(headers, [
     'journee',
-    'journée',
+    'journÃ©e',
     'j',
     'numero journee',
-    'numéro journée',
+    'numÃ©ro journÃ©e',
   ]);
 
   const iDate = getIndex(headers, [
@@ -178,23 +178,23 @@ function createMatchFromHeader(row, headers, fileName, sheetName, index) {
   const iDomicile = getIndex(headers, [
     'domicile',
     'equipe domicile',
-    'équipe domicile',
+    'Ã©quipe domicile',
     'home',
     'recevant',
     'equipe 1',
-    'équipe 1',
+    'Ã©quipe 1',
     'club 1',
   ]);
 
   const iExterieur = getIndex(headers, [
     'exterieur',
-    'extérieur',
+    'extÃ©rieur',
     'equipe exterieur',
-    'équipe extérieur',
+    'Ã©quipe extÃ©rieur',
     'away',
     'visiteur',
     'equipe 2',
-    'équipe 2',
+    'Ã©quipe 2',
     'club 2',
   ]);
 
@@ -209,9 +209,9 @@ function createMatchFromHeader(row, headers, fileName, sheetName, index) {
   const iType = getIndex(headers, [
     'type',
     'competition',
-    'compétition',
+    'compÃ©tition',
     'categorie',
-    'catégorie',
+    'catÃ©gorie',
   ]);
 
   const iBlocageDate = getIndex(headers, [
@@ -354,7 +354,7 @@ export default function AdminJournees() {
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.message || 'Impossible de récupérer les matchs Ligue 1.');
+        throw new Error(data.message || 'Impossible de rÃ©cupÃ©rer les matchs Ligue 1.');
       }
 
       const apiMatches = (data.matchs || []).map((match) => ({
@@ -377,7 +377,7 @@ export default function AdminJournees() {
         setSelectedJournee(premiereJournee);
       }
 
-      alert(`${apiMatches.length} match(s) Ligue 1 synchronisé(s).`);
+      alert(`${apiMatches.length} match(s) Ligue 1 synchronisÃ©(s).`);
     } catch (error) {
       alert(`Erreur synchronisation API : ${error.message}`);
     } finally {
@@ -393,7 +393,7 @@ if (files.length === 0) return;
     );
 
     if (excelFiles.length === 0) {
-      alert('Aucun fichier Excel trouvé.');
+      alert('Aucun fichier Excel trouvÃ©.');
       event.target.value = '';
       return;
     }
@@ -451,7 +451,7 @@ if (premiereJourneeImportee) {
 
     event.target.value = '';
 
-    alert(`${nouveauxMatchs.length} match(s) importé(s). Lignes lues : ${totalLignesLues}`);
+    alert(`${nouveauxMatchs.length} match(s) importÃ©(s). Lignes lues : ${totalLignesLues}`);
 }
 
   function ajouterMatch() {
@@ -520,11 +520,11 @@ if (premiereJourneeImportee) {
 
   function supprimerJournee() {
     if (selectedJournee === 'all') {
-      alert('Choisis une journée avant de supprimer.');
+      alert('Choisis une journÃ©e avant de supprimer.');
       return;
     }
 
-    if (!confirm(`Supprimer tous les matchs de la journée ${selectedJournee} ?`)) return;
+    if (!confirm(`Supprimer tous les matchs de la journÃ©e ${selectedJournee} ?`)) return;
 
     setMatches((old) => old.filter((match) => cleanText(match.journee) !== selectedJournee));
     setSelectedJournee('all');
@@ -532,7 +532,7 @@ if (premiereJourneeImportee) {
 
   function appliquerBlocageJournee() {
     if (selectedJournee === 'all') {
-      alert('Choisis une journée avant d’appliquer un blocage.');
+      alert('Choisis une journÃ©e avant dâ€™appliquer un blocage.');
       return;
     }
 
@@ -555,7 +555,7 @@ if (premiereJourneeImportee) {
   }
 
   function toutSupprimer() {
-    if (!confirm('Supprimer tous les matchs importés ?')) return;
+    if (!confirm('Supprimer tous les matchs importÃ©s ?')) return;
 setMatches([]);
     setSelectedJournee('all');
   }
@@ -574,8 +574,8 @@ setMatches([]);
       <div className="aj-card">
         <div className="aj-header">
           <div>
-            <h1>Gestion des journées</h1>
-            <p>Import Excel, modification des horaires et blocage des matchs journée par journée.</p>
+            <h1>Gestion des journÃ©es</h1>
+            <p>Import Excel, modification des horaires et blocage des matchs journÃ©e par journÃ©e.</p>
           </div>
 
           <div className="aj-actions">
@@ -611,7 +611,7 @@ setMatches([]);
             </label>
 
             <button type="button" className="aj-button" onClick={creerJournee}>
-              + Journée
+              + JournÃ©e
             </button>
 
             <button type="button" className="aj-button" onClick={ajouterMatch}>
@@ -632,38 +632,38 @@ setMatches([]);
 
           <div>
             <strong>{stats.journees}</strong>
-            <span>Journées</span>
+            <span>JournÃ©es</span>
           </div>
 
           <div>
             <strong>{stats.bloques}</strong>
-            <span>Bloqués total</span>
+            <span>BloquÃ©s total</span>
           </div>
 
           <div>
             <strong>{stats.totalJournee}</strong>
-            <span>Matchs affichés</span>
+            <span>Matchs affichÃ©s</span>
           </div>
         </div>
 
         <div className="aj-control-card">
           <div>
-            <label>Voir la journée</label>
+            <label>Voir la journÃ©e</label>
             <select
               value={selectedJournee}
               onChange={(event) => setSelectedJournee(event.target.value)}
             >
-              <option value="all">Toutes les journées</option>
+              <option value="all">Toutes les journÃ©es</option>
               {journees.map((journee) => (
                 <option key={journee} value={journee}>
-                  Journée {journee}
+                  JournÃ©e {journee}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label>Date blocage journée</label>
+            <label>Date blocage journÃ©e</label>
             <input
               type="date"
               value={blocageJourneeDate}
@@ -672,7 +672,7 @@ setMatches([]);
           </div>
 
           <div>
-            <label>Heure blocage journée</label>
+            <label>Heure blocage journÃ©e</label>
             <input
               type="time"
               value={blocageJourneeHeure}
@@ -681,11 +681,11 @@ setMatches([]);
           </div>
 
           <button type="button" className="aj-small-button" onClick={appliquerBlocageJournee}>
-            Appliquer à la journée
+            Appliquer Ã  la journÃ©e
           </button>
 
           <button type="button" className="aj-small-danger" onClick={supprimerJournee}>
-            Supprimer journée
+            Supprimer journÃ©e
           </button>
         </div>
 
@@ -712,8 +712,8 @@ setMatches([]);
 
         <div className="aj-table-title">
           {selectedJournee === 'all'
-            ? 'Toutes les journées'
-            : `Journée ${selectedJournee}`}
+            ? 'Toutes les journÃ©es'
+            : `JournÃ©e ${selectedJournee}`}
         </div>
 
         <div className="aj-table-wrap">
@@ -724,7 +724,7 @@ setMatches([]);
                 <th>Date</th>
                 <th>Heure</th>
                 <th>Domicile</th>
-                <th>Extérieur</th>
+                <th>ExtÃ©rieur</th>
                 <th>Type</th>
                 <th>Date blocage</th>
                 <th>Heure blocage</th>
@@ -737,7 +737,7 @@ setMatches([]);
               {matchesTries.length === 0 && (
                 <tr>
                   <td colSpan="10" className="aj-empty">
-                    Aucun match pour cette journée.
+                    Aucun match pour cette journÃ©e.
                   </td>
                 </tr>
               )}
@@ -827,7 +827,7 @@ return (
 
                     <td>
                       <span className={blocked ? 'aj-badge aj-red' : 'aj-badge aj-green'}>
-                        {blocked ? 'Bloqué' : 'Ouvert'}
+                        {blocked ? 'BloquÃ©' : 'Ouvert'}
                       </span>
                     </td>
 
@@ -850,6 +850,7 @@ return (
     </section>
   );
 }
+
 
 
 

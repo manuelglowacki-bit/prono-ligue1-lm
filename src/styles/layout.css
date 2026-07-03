@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #050914;
   --panel: #0b1220;
   --panel-2: #101827;
@@ -497,4 +497,19 @@ button {
 .admin-bonus-date-filter input:focus {
   border-color: #22c55e;
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+
+
+/* Cache les messages admin vides */
+[class*="message"]:empty,
+[class*="alert"]:empty,
+[class*="notice"]:empty,
+[class*="success"]:empty,
+[class*="status"]:empty {
+  display: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  min-height: 0 !important;
+  height: 0 !important;
 }

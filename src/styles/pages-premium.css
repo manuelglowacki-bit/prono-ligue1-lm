@@ -1,4 +1,4 @@
-:root{--navy:#050b16;--navy2:#07122a;--gold:#ffd400;--electric:#2d7cff;--cyan:#4cd7de;--danger:#ff4d6d;--text:#f4f8ff;--muted:#8aa3c1;--card:rgba(8,19,35,.76);--card2:rgba(255,255,255,.035);--border:rgba(255,255,255,.10);--border2:rgba(255,255,255,.07);--shadow:0 18px 40px rgba(0,0,0,.22);--radius:24px;--radius2:18px;--glow:0 0 0 1px rgba(255,212,0,.18),0 0 28px rgba(45,124,255,.22);}
+﻿:root{--navy:#050b16;--navy2:#07122a;--gold:#ffd400;--electric:#2d7cff;--cyan:#4cd7de;--danger:#ff4d6d;--text:#f4f8ff;--muted:#8aa3c1;--card:rgba(8,19,35,.76);--card2:rgba(255,255,255,.035);--border:rgba(255,255,255,.10);--border2:rgba(255,255,255,.07);--shadow:0 18px 40px rgba(0,0,0,.22);--radius:24px;--radius2:18px;--glow:0 0 0 1px rgba(255,212,0,.18),0 0 28px rgba(45,124,255,.22);}
 
 /* Premium page scaffolding */
 .premium-page{padding:6px 2px;}
@@ -162,7 +162,7 @@
 
 
 /* ============================================
-   STATS PAGE — premium dark navy / jaune / bleu
+   STATS PAGE â€” premium dark navy / jaune / bleu
    ============================================ */
 .stats-page{display:flex;flex-direction:column;gap:18px;}
 
@@ -199,7 +199,7 @@
 .stats-badge-row.blue .stats-badge-value{color:var(--electric);}
 .stats-badge-row.cyan .stats-badge-value{color:var(--cyan);}
 
-/* Taux de réussite */
+/* Taux de rÃ©ussite */
 .stats-rates{display:flex;flex-direction:column;gap:14px;}
 .stats-rate-row{display:grid;grid-template-columns:92px 1fr 120px;align-items:center;gap:16px;padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);}
 .stats-rate-row.gold{border-color:rgba(255,212,0,.18);}
@@ -233,22 +233,22 @@
 
 
 /* ============================================
-   TROPHIES PAGE — minimaliste & premium
+   TROPHIES PAGE â€” minimaliste & premium
    ============================================ */
 .trophies-page{display:flex;flex-direction:column;gap:18px;}
 
 .trophies-header{display:flex;flex-direction:column;gap:6px;padding:6px 2px;}
 .trophies-subtitle{margin:0;color:var(--muted);font-weight:700;font-size:14px;letter-spacing:.01em;}
 
-/* 3 cartes résumé */
+/* 3 cartes rÃ©sumÃ© */
 .trophies-summary{gap:14px;}
 .trophies-summary .premium-kpi{padding:18px 18px;}
 
-/* Conteneur de la grille de trophées */
+/* Conteneur de la grille de trophÃ©es */
 .trophies-card{padding:20px 20px;}
 .trophies-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:4px;}
 
-/* Carte trophée */
+/* Carte trophÃ©e */
 .trophy-card{display:flex;flex-direction:column;gap:10px;padding:16px 16px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);transition:transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;}
 .trophy-card:hover{transform:translateY(-2px);border-color:rgba(255,212,0,.22);box-shadow:0 18px 36px rgba(0,0,0,.22);}
 
@@ -286,7 +286,7 @@
 
 
 /* ============================================
-   TROPHIES PAGE — système de niveaux
+   TROPHIES PAGE â€” systÃ¨me de niveaux
    ============================================ */
 .trophies-page{display:flex;flex-direction:column;gap:18px;}
 .trophies-header{display:flex;flex-direction:column;gap:6px;padding:6px 2px;}
@@ -299,7 +299,7 @@
 
 .trophy-empty{color:var(--muted);font-weight:800;font-size:13px;padding:8px 4px;}
 
-/* Carte trophée avec niveaux */
+/* Carte trophÃ©e avec niveaux */
 .trophy-lcard{display:flex;flex-direction:column;gap:10px;padding:14px 14px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);transition:transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;}
 .trophy-lcard:hover{transform:translateY(-2px);box-shadow:0 16px 30px rgba(0,0,0,.22);}
 
@@ -309,7 +309,7 @@
 .trophy-lcard.tier-gold{border-color:rgba(255,212,0,.30);background:linear-gradient(135deg,rgba(255,212,0,.12),rgba(255,255,255,.02));}
 .trophy-lcard.tier-legend{border-color:rgba(124,92,255,.34);background:linear-gradient(135deg,rgba(124,92,255,.16),rgba(45,124,255,.10));}
 
-/* Trophée verrouillé : gris / sobre, texte lisible */
+/* TrophÃ©e verrouillÃ© : gris / sobre, texte lisible */
 .trophy-lcard.locked{border-color:rgba(180,190,205,.22);background:linear-gradient(135deg,rgba(120,130,150,.10),rgba(255,255,255,.02));box-shadow:none;}
 .trophy-lcard.locked:hover{transform:none;box-shadow:none;}
 .trophy-lcard.locked .trophy-lcard-icon{color:#8aa0bc;background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.06);}
@@ -374,7 +374,7 @@
 
 
 /* ============================================
-   TROPHIES — info-bulles (tooltip)
+   TROPHIES â€” info-bulles (tooltip)
    ============================================ */
 .trophy-lcard{position:relative;cursor:help;}
 
@@ -396,7 +396,7 @@
 
 
 /* ============================================
-   PROFILE PAGE — premium player space
+   PROFILE PAGE â€” premium player space
    ============================================ */
 .profile-page{display:flex;flex-direction:column;gap:18px;}
 
@@ -441,7 +441,7 @@
 .profile-badge-state{font-size:10.5px;font-weight:1000;letter-spacing:.10em;text-transform:uppercase;color:var(--muted);}
 .profile-badge:not(.locked) .profile-badge-state{color:#8ee6b7;}
 
-/* Dernières journées */
+/* DerniÃ¨res journÃ©es */
 .profile-days{display:flex;flex-direction:column;gap:8px;}
 .profile-day-row{display:grid;grid-template-columns:54px 70px 1fr 1fr;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);font-size:13px;}
 .profile-day-j{font-weight:1000;color:var(--gold);letter-spacing:.04em;}
@@ -451,7 +451,7 @@
 .profile-day-bonus.yes{color:#8ee6b7;}
 .profile-day-bonus.no{color:#ff7f9c;}
 
-/* Préférences */
+/* PrÃ©fÃ©rences */
 .profile-prefs{display:flex;flex-direction:column;gap:8px;}
 .profile-pref-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);}
 .profile-pref-left{display:flex;align-items:center;gap:10px;min-width:0;}
@@ -500,3 +500,4 @@
   .profile-hero-meta{grid-template-columns:1fr 1fr;}
   .profile-badges-grid{grid-template-columns:1fr;}
 }
+

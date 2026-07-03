@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { getRegisteredPlayers } from '../utils/players';
 import '../styles/ranking.css';
 import { getDisplayName } from '../utils/displayNames';
@@ -112,16 +112,16 @@ function isFavoriteMatch(match, favoriteTeam) {
 }
 
 function getRankIcon(index) {
-  if (index === 0) return '🥇';
-  if (index === 1) return '🥈';
-  if (index === 2) return '🥉';
+  if (index === 0) return 'ðŸ¥‡';
+  if (index === 1) return 'ðŸ¥ˆ';
+  if (index === 2) return 'ðŸ¥‰';
   return index + 1;
 }
 
 function getEvolutionLabel(evo) {
-  if (evo > 0) return `↑ +${evo}`;
-  if (evo < 0) return `↓ ${evo}`;
-  return '→ 0';
+  if (evo > 0) return `â†‘ +${evo}`;
+  if (evo < 0) return `â†“ ${evo}`;
+  return 'â†’ 0';
 }
 
 function getEvolutionClass(evo) {
@@ -277,8 +277,8 @@ export default function RankingPage() {
         <section className="ranking-header">
           <div>
             <p>CLASSEMENT</p>
-            <h1>Classement général</h1>
-            <span>Aucun match chargé pour le moment.</span>
+            <h1>Classement gÃ©nÃ©ral</h1>
+            <span>Aucun match chargÃ© pour le moment.</span>
           </div>
         </section>
 
@@ -294,14 +294,14 @@ export default function RankingPage() {
       <section className="ranking-header">
         <div>
           <p>CLASSEMENT</p>
-          <h1>Classement général</h1>
+          <h1>Classement gÃ©nÃ©ral</h1>
           <span>
-            Journée analysée : J{lastJournee} · {ranking.length} joueurs
+            JournÃ©e analysÃ©e : J{lastJournee} Â· {ranking.length} joueurs
           </span>
         </div>
 
         <div className="ranking-header-badge">
-          {leader ? `👑 Leader : ${leader.player}` : 'Aucun leader'}
+          {leader ? `ðŸ‘‘ Leader : ${leader.player}` : 'Aucun leader'}
         </div>
       </section>
 
@@ -344,18 +344,18 @@ export default function RankingPage() {
       <section className="ranking-table-card">
         <div className="ranking-table-title">
           <h2>Tableau complet</h2>
-          <span>Départage : points puis scores exacts</span>
+          <span>Departage : points puis exacts bonus/favori</span>
         </div>
 
         <div className="ranking-table">
           <div className="ranking-row ranking-row-head">
             <span>Place</span>
-            <span>Évo</span>
+            <span>Ã‰vo</span>
             <span>Joueur</span>
             <span>Points</span>
-            <span>Exact</span>
+            <span>Exacts bonus/favori</span>
             <span>J{lastJournee}</span>
-            <span>Écart</span>
+            <span>Ã‰cart</span>
           </div>
 
           {ranking.map((player, index) => {
@@ -396,6 +396,10 @@ export default function RankingPage() {
     </div>
   );
 }
+
+
+
+
 
 
 

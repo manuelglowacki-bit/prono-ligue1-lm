@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import * as XLSX from "xlsx";
 
 function normalizeKey(value) {
@@ -157,13 +157,13 @@ export default function AdminExcelImportMatches() {
         .map((row, index) => {
           const journee =
             getValue(row, [
-              "journée",
+              "journÃ©e",
               "journee",
               "j",
               "round",
               "matchday",
               "numero journee",
-              "numéro journée",
+              "numÃ©ro journÃ©e",
             ]) || 1;
 
           const date = formatExcelDate(
@@ -178,7 +178,7 @@ export default function AdminExcelImportMatches() {
             getValue(row, [
               "domicile",
               "equipe domicile",
-              "équipe domicile",
+              "Ã©quipe domicile",
               "home",
               "home team",
               "club domicile",
@@ -188,12 +188,12 @@ export default function AdminExcelImportMatches() {
           const exterieur = String(
             getValue(row, [
               "exterieur",
-              "extérieur",
+              "extÃ©rieur",
               "equipe exterieur",
-              "équipe extérieur",
+              "Ã©quipe extÃ©rieur",
               "away",
               "away team",
-              "club extérieur",
+              "club extÃ©rieur",
             ])
           ).trim();
 
@@ -202,7 +202,7 @@ export default function AdminExcelImportMatches() {
               getValue(row, [
                 "championnat",
                 "competition",
-                "compétition",
+                "compÃ©tition",
                 "ligue",
                 "league",
               ])
@@ -210,7 +210,7 @@ export default function AdminExcelImportMatches() {
 
           const type =
             String(
-              getValue(row, ["type", "categorie", "catégorie", "bonus"])
+              getValue(row, ["type", "categorie", "catÃ©gorie", "bonus"])
             ).trim() || (championnat === "Ligue 1" ? "LIGUE1" : "BONUS");
 
           if (!domicile || !exterieur) return null;
@@ -244,16 +244,16 @@ export default function AdminExcelImportMatches() {
 
       if (!matches.length) {
         throw new Error(
-          "Aucun match reconnu. Vérifie les colonnes : Journée, Date, Heure, Domicile, Extérieur."
+          "Aucun match reconnu. VÃ©rifie les colonnes : JournÃ©e, Date, Heure, Domicile, ExtÃ©rieur."
         );
       }
 
       const total = saveMatches(matches, mode);
 
       setPreview(matches.slice(0, 10));
-      setMessage(`${matches.length} match(s) importé(s). Total enregistré : ${total}.`);
+      setMessage(`${matches.length} match(s) importÃ©(s). Total enregistrÃ© : ${total}.`);
 
-      alert(`${matches.length} match(s) importé(s) ✅`);
+      alert(`${matches.length} match(s) importÃ©(s) âœ…`);
     } catch (error) {
       console.error(error);
       setMessage(error.message);
@@ -266,12 +266,12 @@ export default function AdminExcelImportMatches() {
   return (
     <div className="admin-excel-only-card">
       <div>
-        <h3>📥 Import Excel des matchs</h3>
+        <h3>ðŸ“¥ Import Excel des matchs</h3>
         <p>
-          Gestion des journées simplifiée : importe uniquement les matchs depuis Excel.
+          Gestion des journÃ©es simplifiÃ©e : importe uniquement les matchs depuis Excel.
         </p>
         <p className="admin-excel-help">
-          Colonnes conseillées : Journée, Date, Heure, Domicile, Extérieur, Championnat, Type.
+          Colonnes conseillÃ©es : JournÃ©e, Date, Heure, Domicile, ExtÃ©rieur, Championnat, Type.
         </p>
       </div>
 
@@ -312,3 +312,4 @@ export default function AdminExcelImportMatches() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { getRegisteredPlayers } from '../utils/players';
 import '../styles/journal.css';
 
@@ -276,7 +276,7 @@ function generateArticle(report) {
   if (!report || !report.leader) {
     return {
       title: 'Analyse indisponible',
-      subtitle: 'Aucune donnée suffisante pour générer le journal de cette journée.',
+      subtitle: 'Aucune donnÃ©e suffisante pour gÃ©nÃ©rer le journal de cette journÃ©e.',
       sections: [],
     };
   }
@@ -294,61 +294,61 @@ function generateArticle(report) {
   const gapThird = third ? leader.totalPoints - third.totalPoints : 0;
 
   return {
-    title: `Analyse de l'évolution du classement – Journée ${report.journee}`,
-    subtitle: `${leader.name} garde la main avec ${leader.totalPoints} points et impose son rythme en tête du classement.`,
+    title: `Analyse de l'Ã©volution du classement â€“ JournÃ©e ${report.journee}`,
+    subtitle: `${leader.name} garde la main avec ${leader.totalPoints} points et impose son rythme en tÃªte du classement.`,
     sections: [
       {
-        emoji: '🥇',
+        emoji: 'ðŸ¥‡',
         title: `${leader.name} prend les commandes`,
-        text: `${leader.name} confirme sa régularité et conserve la ${rankText(leader.rank)} place avec ${leader.totalPoints} points. Avec ${leader.exacts} score(s) exact(s), il garde aussi un avantage précieux au départage.`,
+        text: `${leader.name} confirme sa rÃ©gularitÃ© et conserve la ${rankText(leader.rank)} place avec ${leader.totalPoints} points. Avec ${leader.exacts} score(s) exact(s), il garde aussi un avantage prÃ©cieux au dÃ©partage.`,
       },
       {
-        emoji: '🥈',
-        title: second ? `${second.name} reste au contact` : 'Le dauphin reste à définir',
+        emoji: 'ðŸ¥ˆ',
+        title: second ? `${second.name} reste au contact` : 'Le dauphin reste Ã  dÃ©finir',
         text: second
-          ? `${second.name} reste solide à la ${rankText(second.rank)} place avec ${second.totalPoints} points. L'écart avec le leader est désormais de ${gapSecond} point(s), ce qui laisse encore une vraie lutte pour la première place.`
-          : `Aucun poursuivant clair ne se détache encore derrière le leader.`,
+          ? `${second.name} reste solide Ã  la ${rankText(second.rank)} place avec ${second.totalPoints} points. L'Ã©cart avec le leader est dÃ©sormais de ${gapSecond} point(s), ce qui laisse encore une vraie lutte pour la premiÃ¨re place.`
+          : `Aucun poursuivant clair ne se dÃ©tache encore derriÃ¨re le leader.`,
       },
       {
-        emoji: '🥉',
+        emoji: 'ðŸ¥‰',
         title: third ? `${third.name} reste en embuscade` : 'Le podium reste ouvert',
         text: third
-          ? `Avec ${third.totalPoints} points, ${third.name} complète le podium. À ${gapThird} point(s) du leader, il reste pleinement dans la course.`
-          : `La troisième place reste encore très ouverte.`,
+          ? `Avec ${third.totalPoints} points, ${third.name} complÃ¨te le podium. Ã€ ${gapThird} point(s) du leader, il reste pleinement dans la course.`
+          : `La troisiÃ¨me place reste encore trÃ¨s ouverte.`,
       },
       {
-        emoji: '📈',
-        title: 'Les hommes forts de la journée',
+        emoji: 'ðŸ“ˆ',
+        title: 'Les hommes forts de la journÃ©e',
         text:
           bestProgress
-            ? `${bestProgress.name} signe la progression la plus marquante en gagnant ${bestProgress.evolution} place(s). ${bestDay && bestDay.dayPoints > 0 ? `${bestDay.name} réalise aussi la meilleure performance de la journée avec ${bestDay.dayPoints} point(s).` : ''}`
+            ? `${bestProgress.name} signe la progression la plus marquante en gagnant ${bestProgress.evolution} place(s). ${bestDay && bestDay.dayPoints > 0 ? `${bestDay.name} rÃ©alise aussi la meilleure performance de la journÃ©e avec ${bestDay.dayPoints} point(s).` : ''}`
             : bestDay && bestDay.dayPoints > 0
-              ? `${bestDay.name} réalise la meilleure performance de la journée avec ${bestDay.dayPoints} point(s).`
-              : `Aucune grosse progression ne se détache sur cette journée.`,
+              ? `${bestDay.name} rÃ©alise la meilleure performance de la journÃ©e avec ${bestDay.dayPoints} point(s).`
+              : `Aucune grosse progression ne se dÃ©tache sur cette journÃ©e.`,
       },
       {
-        emoji: '⚔️',
+        emoji: 'âš”ï¸',
         title: 'La bataille du classement',
         text: battleGroup
-          ? `${battleGroup.players.length} joueurs sont regroupés à ${battleGroup.points} points : ${listNames(battleGroup.players)}. La moindre erreur peut totalement rebattre les cartes.`
-          : `Les écarts commencent à se former, mais plusieurs joueurs restent encore proches les uns des autres.`,
+          ? `${battleGroup.players.length} joueurs sont regroupÃ©s Ã  ${battleGroup.points} points : ${listNames(battleGroup.players)}. La moindre erreur peut totalement rebattre les cartes.`
+          : `Les Ã©carts commencent Ã  se former, mais plusieurs joueurs restent encore proches les uns des autres.`,
       },
       {
-        emoji: '📉',
+        emoji: 'ðŸ“‰',
         title: 'Les joueurs sous pression',
         text: biggestDrop
-          ? `${biggestDrop.name} recule de ${Math.abs(biggestDrop.evolution)} place(s). Rien n'est perdu, mais il faudra rapidement réagir pour ne pas laisser filer le bon wagon.`
-          : `Aucune chute importante à signaler, signe d'une journée plutôt stable.`,
+          ? `${biggestDrop.name} recule de ${Math.abs(biggestDrop.evolution)} place(s). Rien n'est perdu, mais il faudra rapidement rÃ©agir pour ne pas laisser filer le bon wagon.`
+          : `Aucune chute importante Ã  signaler, signe d'une journÃ©e plutÃ´t stable.`,
       },
       {
-        emoji: '🔎',
+        emoji: 'ðŸ”Ž',
         title: 'Bas de classement',
-        text: `${bottomNames || 'Plusieurs joueurs'} doivent encore trouver le bon rythme pour revenir dans la course. Les écarts restent rattrapables, mais il faudra vite enchaîner les bonnes journées.`,
+        text: `${bottomNames || 'Plusieurs joueurs'} doivent encore trouver le bon rythme pour revenir dans la course. Les Ã©carts restent rattrapables, mais il faudra vite enchaÃ®ner les bonnes journÃ©es.`,
       },
       {
-        emoji: '🎙️',
-        title: 'Le commentaire de la journée',
-        text: `${leader.name} garde le contrôle, mais rien n'est encore joué. Avec les bonus, les scores exacts et les écarts encore serrés, une seule journée pleine peut provoquer un vrai bouleversement au classement. 🏆⚽`,
+        emoji: 'ðŸŽ™ï¸',
+        title: 'Le commentaire de la journÃ©e',
+        text: `${leader.name} garde le contrÃ´le, mais rien n'est encore jouÃ©. Avec les bonus, les scores exacts et les Ã©carts encore serrÃ©s, une seule journÃ©e pleine peut provoquer un vrai bouleversement au classement. ðŸ†âš½`,
       },
     ],
   };
@@ -389,7 +389,7 @@ export default function JournalPage() {
   useEffect(() => {
     const loadedMatches = safeJson(MATCHS_KEY, []);
 
-    const journéesAvecScore = [...new Set(
+    const journÃ©esAvecScore = [...new Set(
       loadedMatches
         .filter(hasScore)
         .map((match) => Number(match.journee || 0))
@@ -400,7 +400,7 @@ export default function JournalPage() {
     setPronos(safeJson(PRONOS_KEY, {}));
     setBonusChoices(safeJson(BONUS_CHOICES_KEY, {}));
     setCurrentPlayer(localStorage.getItem(PLAYER_KEY) || 'Manu');
-    setSelectedJournee(journéesAvecScore[0] || null);
+    setSelectedJournee(journÃ©esAvecScore[0] || null);
   }, []);
 
   const scoredJournees = useMemo(() => {
@@ -433,7 +433,7 @@ export default function JournalPage() {
 
       {reports.length === 0 ? (
         <section className="journal-empty">
-          Aucun article disponible pour le moment. Il faut au moins une journée avec des scores enregistrés.
+          Aucun article disponible pour le moment. Il faut au moins une journÃ©e avec des scores enregistrÃ©s.
         </section>
       ) : (
         <>
@@ -454,7 +454,7 @@ export default function JournalPage() {
           <section className="journal-paper">
             <div className="journal-paper-bar">
               <span>LA GAZETTE</span>
-              <strong>JOURNÉE {selectedReport?.journee}</strong>
+              <strong>JOURNÃ‰E {selectedReport?.journee}</strong>
             </div>
 
             <div className="journal-paper-title">
@@ -481,6 +481,7 @@ export default function JournalPage() {
     </div>
   );
 }
+
 
 
 

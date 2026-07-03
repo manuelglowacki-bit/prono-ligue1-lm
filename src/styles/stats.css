@@ -1,4 +1,4 @@
-.stats-page {
+﻿.stats-page {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -528,7 +528,7 @@
 }
 
 
-/* === ÉVOLUTION POINTS MINIMALISTE === */
+/* === Ã‰VOLUTION POINTS MINIMALISTE === */
 
 .stats-evolution-minimal {
   min-height: auto !important;
@@ -628,4 +628,5 @@
     grid-template-columns: 1fr;
   }
 }
+
 

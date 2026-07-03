@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import PlayerBadges from './PlayerBadges';
 import { getPlayerOwnedBadges } from '../utils/badgeOwners';
 import '../styles/playerBadges.css';
@@ -19,12 +19,12 @@ export default function BadgeProfilePanel() {
   return (
     <section className="profile-badge-panel">
       <div>
-        <p>BADGES ATTRIBUÉS</p>
+        <p>BADGES ATTRIBUÃ‰S</p>
         <h2>Badges de {currentPlayer}</h2>
         <span>
           {badges.length > 0
-            ? `${badges.length} badge(s) actuellement détenu(s)`
-            : 'Aucun badge détenu pour le moment'}
+            ? `${badges.length} badge(s) actuellement dÃ©tenu(s)`
+            : 'Aucun badge dÃ©tenu pour le moment'}
         </span>
       </div>
 
@@ -32,3 +32,4 @@ export default function BadgeProfilePanel() {
     </section>
   );
 }
+

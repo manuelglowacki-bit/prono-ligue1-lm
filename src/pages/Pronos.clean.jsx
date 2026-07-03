@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 
 const DEFAULT_MATCHS = [
   { id: "m1", home: "RC Lens", away: "OL", day: "Vendredi", hour: "20:45" },
@@ -14,7 +14,7 @@ const DEFAULT_MATCHS = [
 
 const DEFAULT_BONUS = [
   { id: "b1", league: "Premier League", home: "Liverpool", away: "Arsenal", day: "Samedi", hour: "18:30" },
-  { id: "b2", league: "Liga", home: "Real Madrid", away: "AtlÃƒÂ©tico Madrid", day: "Dimanche", hour: "21:00" },
+  { id: "b2", league: "Liga", home: "Real Madrid", away: "AtlÃƒÆ’Ã‚Â©tico Madrid", day: "Dimanche", hour: "21:00" },
   { id: "b3", league: "Serie A", home: "Inter", away: "Juventus", day: "Dimanche", hour: "20:45" }
 ];
 
@@ -163,13 +163,13 @@ export default function Pronos() {
     <div className="pronos-page">
       <div className="prono-top">
         <div className="prono-title">
-          <h1>Ã°Å¸â€œÂ Mes pronos</h1>
-          <p>3 matchs par ligne. Ligue 1 d'abord, puis les 3 bonus ÃƒÂ  la fin.</p>
+          <h1>ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â Mes pronos</h1>
+          <p>3 matchs par ligne. Ligue 1 d'abord, puis les 3 bonus ÃƒÆ’Ã‚Â  la fin.</p>
         </div>
 
         <div className="prono-actions">
           <select className="prono-select" defaultValue="j1">
-            <option value="j1">JournÃƒÂ©e 1</option>
+            <option value="j1">JournÃƒÆ’Ã‚Â©e 1</option>
           </select>
 
           <select
@@ -205,7 +205,7 @@ export default function Pronos() {
           return (
             <div key={match.id} className={`match-card ${favorite ? "favorite" : ""}`}>
               <div className="match-meta">
-                <span>{match.day || "Date"} Ã¢â‚¬Â¢ {match.hour || "Heure"}</span>
+                <span>{match.day || "Date"} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {match.hour || "Heure"}</span>
                 {favorite && <span className="badge">Club favori</span>}
               </div>
 
@@ -274,7 +274,7 @@ export default function Pronos() {
           return (
             <div key={match.id} className={`match-card ${selected ? "selected" : ""}`}>
               <div className="match-meta">
-                <span>{match.day || "Date"} Ã¢â‚¬Â¢ {match.hour || "Heure"}</span>
+                <span>{match.day || "Date"} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {match.hour || "Heure"}</span>
                 <span className="badge green">{match.league}</span>
               </div>
 
@@ -340,7 +340,7 @@ export default function Pronos() {
   window.dispatchEvent(new CustomEvent("bonus-choice-updated"));
 }}
               >
-                {selected ? "Bonus sÃƒÂ©lectionnÃƒÂ©" : "Choisir ce bonus"}
+                {selected ? "Bonus sÃƒÆ’Ã‚Â©lectionnÃƒÆ’Ã‚Â©" : "Choisir ce bonus"}
               </button>
 
               <div className="teams">
@@ -398,3 +398,4 @@ export default function Pronos() {
     </div>
   );
 }
+

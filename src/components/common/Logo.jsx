@@ -1,4 +1,4 @@
-export default function Logo() {
+﻿export default function Logo() {
   return (
     <div className="logo">
       <span className="mark">L1</span>
@@ -11,3 +11,4 @@ export default function Logo() {
     </div>
   );
 }
+

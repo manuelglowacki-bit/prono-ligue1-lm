@@ -1,4 +1,4 @@
-.pronos-page {
+﻿.pronos-page {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -342,7 +342,7 @@
   font-size: 9px;
 }
 
-/* Bloc bonus intégré sous la Ligue 1 */
+/* Bloc bonus intÃ©grÃ© sous la Ligue 1 */
 .bonus-panel {
   width: 928px;
   max-width: 100%;
@@ -538,7 +538,7 @@
 }
 
 
-/* === COULEURS VALIDATION / DÉVALIDATION === */
+/* === COULEURS VALIDATION / DÃ‰VALIDATION === */
 
 .validate-pronos.is-validate {
   background: #22c55e !important;
@@ -620,7 +620,7 @@
 }
 
 
-/* === BONUS À CÔTÉ DES MATCHS LIGUE 1 === */
+/* === BONUS Ã€ CÃ”TÃ‰ DES MATCHS LIGUE 1 === */
 
 .pronos-content-row {
   display: grid !important;
@@ -749,7 +749,7 @@
   min-height: 145px !important;
 }
 
-/* Si écran trop petit, ça repasse proprement */
+/* Si Ã©cran trop petit, Ã§a repasse proprement */
 @media (max-width: 1350px) {
   .pronos-content-row {
     grid-template-columns: 1fr !important;
@@ -812,7 +812,7 @@
   max-width: 928px !important;
 }
 
-/* Zone bonus : on enlève l'effet grosse boîte différente */
+/* Zone bonus : on enlÃ¨ve l'effet grosse boÃ®te diffÃ©rente */
 .bonus-panel.bonus-panel-side {
   width: 300px !important;
   max-width: 300px !important;
@@ -848,7 +848,7 @@
   display: none !important;
 }
 
-/* Bonus en 1 colonne, mêmes cases que Ligue 1 */
+/* Bonus en 1 colonne, mÃªmes cases que Ligue 1 */
 .bonus-panel-side .bonus-grid {
   display: grid !important;
   grid-template-columns: 300px !important;
@@ -881,7 +881,7 @@
   background: linear-gradient(145deg, #111827, #1e293b) !important;
 }
 
-/* Bonus non choisi pas trop différent */
+/* Bonus non choisi pas trop diffÃ©rent */
 .prono-card.is-disabled-bonus {
   opacity: 1 !important;
 }
@@ -935,7 +935,7 @@
 }
 
 
-/* === RETOUR MODÈLE AVANT : BONUS À DROITE EN BLOC === */
+/* === RETOUR MODÃˆLE AVANT : BONUS Ã€ DROITE EN BLOC === */
 
 .pronos-content-row {
   display: grid !important;
@@ -1033,7 +1033,7 @@
   max-height: none !important;
 }
 
-/* On enlève l'effet forcé identique */
+/* On enlÃ¨ve l'effet forcÃ© identique */
 .prono-card.is-selected-bonus {
   border-color: #22c55e !important;
   background: linear-gradient(145deg, #052e16, #111827) !important;
@@ -1078,4 +1078,5 @@
     grid-template-columns: 1fr !important;
   }
 }
+
 

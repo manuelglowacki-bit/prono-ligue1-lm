@@ -1,4 +1,4 @@
-.ranking-page {
+﻿.ranking-page {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -511,4 +511,5 @@
 .podium-card.rank-3 .podium-player-photo .profile-avatar-mini {
   box-shadow: 0 0 0 3px rgba(34,197,94,0.10);
 }
+
 

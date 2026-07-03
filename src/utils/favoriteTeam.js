@@ -1,4 +1,4 @@
-export const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
+﻿export const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
 export const ACCOUNTS_KEY = 'prono_ligue1_lm_accounts';
 export const DEFAULT_FAVORITE_TEAM = 'RC Lens';
 
@@ -54,3 +54,4 @@ export function getFavoriteTeam(player) {
     DEFAULT_FAVORITE_TEAM
   );
 }
+

@@ -1,4 +1,4 @@
-import MatchCard from './MatchCard';
+﻿import MatchCard from './MatchCard';
 
 export default function PredictionProgress({ value = 0, label = '0 / 0 pronos remplis', matches = [], selections = [], onSelect = () => {} }) {
   return (
@@ -20,7 +20,7 @@ export default function PredictionProgress({ value = 0, label = '0 / 0 pronos re
         <div className="section-heading">
           <div>
             <p className="eyebrow">Ligue 1</p>
-            <h2>Matchs Ã  pronostiquer</h2>
+            <h2>Matchs ÃƒÂ  pronostiquer</h2>
           </div>
         </div>
 
@@ -38,3 +38,4 @@ export default function PredictionProgress({ value = 0, label = '0 / 0 pronos re
     </>
   );
 }
+

@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    PRONO LIGUE 1 LM - STYLE PLUS MODERNE ET PLUS COMPACT
    ========================================================= */
 
@@ -443,3 +443,197 @@ nav a {
     width: 100% !important;
   }
 }
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at top, rgba(255, 204, 0, 0.18), transparent 35%),
+    linear-gradient(135deg, #0f172a, #020617);
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+  color: white;
+  text-align: center;
+}
+
+.auth-logo {
+  font-size: 46px;
+  margin-bottom: 10px;
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.auth-subtitle {
+  margin: 8px 0 22px;
+  color: #cbd5e1;
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.auth-form input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(2, 6, 23, 0.7);
+  color: white;
+  outline: none;
+}
+
+.auth-form input::placeholder {
+  color: #94a3b8;
+}
+
+.auth-form button {
+  margin-top: 6px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: #facc15;
+  color: #111827;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.auth-message {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+  font-size: 14px;
+}
+
+.auth-switch {
+  margin-top: 18px;
+  background: transparent;
+  border: 0;
+  color: #facc15;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.loading-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #020617;
+  color: white;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.auth-userbar {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(2, 6, 23, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: white;
+  padding: 8px 10px;
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.auth-userbar button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 10px;
+  background: #facc15;
+  color: #111827;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.admin-players-card {
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: white;
+}
+
+.admin-players-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.admin-players-head h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.admin-players-head p {
+  margin: 4px 0 0;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.admin-players-head button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: #facc15;
+  color: #111827;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.admin-players-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-players-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.admin-players-table th,
+.admin-players-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: left;
+}
+
+.admin-players-table th {
+  color: #facc15;
+  font-weight: 900;
+}
+
+.admin-players-error {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #fecaca;
+}
+

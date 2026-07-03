@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getRegisteredPlayers } from '../utils/players';
 import '../styles/profile.css';
 import {
@@ -9,7 +9,7 @@ import {
 } from '../utils/displayNames';
 
 /* =========================
-   CLÉS LOCALSTORAGE
+   CLÃ‰S LOCALSTORAGE
 ========================= */
 
 const PLAYER_KEY = 'prono_ligue1_lm_current_player';
@@ -272,25 +272,25 @@ function calculatePlayerStats(player, matches, pronos, bonusChoices, currentPlay
 function getOwnedLeaderBadges(currentPlayer, rankingStats) {
   const badgeRules = [
     {
-      icon: '🏆',
-      title: 'Machine à points',
+      icon: 'ðŸ†',
+      title: 'Machine Ã  points',
       stat: 'totalPoints',
       unit: 'pts',
     },
     {
-      icon: '🎯',
+      icon: 'ðŸŽ¯',
       title: 'Roi du bonus',
       stat: 'bonusPoints',
       unit: 'pts',
     },
     {
-      icon: '💎',
+      icon: 'ðŸ’Ž',
       title: 'Expert exact',
       stat: 'scoresExacts',
       unit: 'exact',
     },
     {
-      icon: '⚽',
+      icon: 'âš½',
       title: 'Meilleur 1N2',
       stat: 'points1N2',
       unit: 'pts',
@@ -449,7 +449,7 @@ export default function ProfilePage() {
         <div>
           <p>PROFIL</p>
           <h1>Fiche joueur</h1>
-          <span>Photo, statistiques, badges et préférences.</span>
+          <span>Photo, statistiques, badges et prÃ©fÃ©rences.</span>
         </div>
 
         
@@ -529,13 +529,13 @@ export default function ProfilePage() {
         </article>
 
         <article>
-          <span>Réussite</span>
+          <span>RÃ©ussite</span>
           <strong>{playerStats.successRate}%</strong>
           <small>{playerStats.bonsResultats || 0}/{playerStats.pronosJoues || 0} bons</small>
         </article>
 
         <article>
-          <span>Badges détenus</span>
+          <span>Badges dÃ©tenus</span>
           <strong>{ownedBadges.length}</strong>
           <small>Badges leader</small>
         </article>
@@ -544,8 +544,8 @@ export default function ProfilePage() {
       <section className="profile-bottom-grid">
         <article className="profile-panel">
           <div className="profile-panel-title">
-            <h3>Badges détenus</h3>
-            <span>attribués automatiquement</span>
+            <h3>Badges dÃ©tenus</h3>
+            <span>attribuÃ©s automatiquement</span>
           </div>
 
           <div className="profile-badges-list">
@@ -569,8 +569,8 @@ export default function ProfilePage() {
 
         <article className="profile-panel">
           <div className="profile-panel-title">
-            <h3>Dernières journées</h3>
-            <span>forme récente</span>
+            <h3>DerniÃ¨res journÃ©es</h3>
+            <span>forme rÃ©cente</span>
           </div>
 
           <div className="profile-recent-list">
@@ -583,7 +583,7 @@ export default function ProfilePage() {
               ))
             ) : (
               <div className="profile-empty">
-                Aucun résultat enregistré.
+                Aucun rÃ©sultat enregistrÃ©.
               </div>
             )}
           </div>
@@ -591,8 +591,8 @@ export default function ProfilePage() {
 
         <article className="profile-panel">
           <div className="profile-panel-title">
-            <h3>Préférences joueur</h3>
-            <span>identité</span>
+            <h3>PrÃ©fÃ©rences joueur</h3>
+            <span>identitÃ©</span>
           </div>
 
           <div className="profile-preferences">
@@ -601,12 +601,12 @@ export default function ProfilePage() {
             
 
             <div className="profile-name-editor">
-              <span>Nom affiché</span>
+              <span>Nom affichÃ©</span>
 
               <input
                 value={nameDraft}
                 onChange={(event) => setNameDraft(event.target.value)}
-                placeholder="Nom affiché"
+                placeholder="Nom affichÃ©"
               />
 
               <div className="profile-name-actions">
@@ -615,7 +615,7 @@ export default function ProfilePage() {
                 </button>
 
                 <button type="button" className="reset" onClick={resetCustomName}>
-                  Réinitialiser
+                  RÃ©initialiser
                 </button>
               </div>
             </div>
@@ -625,5 +625,6 @@ export default function ProfilePage() {
     </div>
   );
 }
+
 
 

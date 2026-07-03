@@ -236,7 +236,7 @@ export default function AdminPage() {
     return normalizeJournees(saved)[0]?.id || "j1";
   });
 
-  const [message, setMessage] = useState("Page admin prete.");
+  const [message, setMessage] = useState("");
   const [bonusRandomStartDate, setBonusRandomStartDate] = useState("");
   const [bonusRandomEndDate, setBonusRandomEndDate] = useState("");
 
@@ -1432,3 +1432,4 @@ export default function AdminPage() {
     </div>
   );
 }
+
