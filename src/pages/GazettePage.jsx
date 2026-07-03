@@ -1,316 +1,542 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
+import { getDisplayName } from "../utils/displayNames";
+import ProfileAvatar from "../components/ProfileAvatar";
 
-function readJson(key, fallback) {
+const CALENDAR_KEY = "admin_journees";
+const PRONOS_KEY = "prono_lm_clean_pronos";
+const BONUS_BY_JOURNEE_KEY = "prono_lm_bonus_selected_by_journee";
+const OLD_BONUS_KEY = "prono_lm_bonus_selected";
+const FAVORITE_TEAM_KEY = "favoriteTeam";
+
+function parseJson(value, fallback) {
   try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
+    if (!value) return fallback;
+    return typeof value === "string" ? JSON.parse(value) : value;
   } catch {
     return fallback;
   }
 }
 
-function asArray(value) {
-  if (Array.isArray(value)) return value;
-
-  if (Array.isArray(value?.ranking)) return value.ranking;
-  if (Array.isArray(value?.classement)) return value.classement;
-  if (Array.isArray(value?.players)) return value.players;
-  if (Array.isArray(value?.joueurs)) return value.joueurs;
-  if (Array.isArray(value?.users)) return value.users;
-  if (Array.isArray(value?.profiles)) return value.profiles;
-
-  return [];
+function clean(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
 }
 
-function getName(player) {
-  return (
-    player?.name ||
-    player?.displayName ||
-    player?.player ||
-    player?.joueur ||
-    player?.pseudo ||
-    player?.username ||
-    player?.nom ||
-    player?.p ||
-    ""
-  );
+function sameClub(a, b) {
+  const aliases = {
+    lens: "lens",
+    rclens: "lens",
+    racingclublens: "lens",
+    psg: "psg",
+    parissg: "psg",
+    parissaintgermain: "psg",
+    om: "marseille",
+    marseille: "marseille",
+    olympiquedemarseille: "marseille",
+    ol: "lyon",
+    lyon: "lyon",
+    olympiquelyonnais: "lyon",
+    losc: "lille",
+    lille: "lille",
+    lilleosc: "lille",
+    rcstrasbourg: "strasbourg",
+    strasbourg: "strasbourg"
+  };
+
+  const ca = clean(a);
+  const cb = clean(b);
+
+  return (aliases[ca] || ca) === (aliases[cb] || cb);
 }
 
-function getPoints(player) {
-  const value =
-    player?.points ??
-    player?.pts ??
-    player?.total ??
-    player?.totalPoints ??
-    player?.score ??
-    player?.seasonPoints ??
-    player?.pointsTotal ??
-    0;
+function getRawScore(match, names) {
+  for (const name of names) {
+    const value = match?.[name];
 
-  const number = Number(value);
-  return Number.isFinite(number) ? number : 0;
-}
-
-function getExact(player) {
-  const value =
-    player?.exact ??
-    player?.exacts ??
-    player?.scoresExact ??
-    player?.scoresExacts ??
-    player?.scoreExact ??
-    player?.exactScores ??
-    player?.perfectScores ??
-    0;
-
-  const number = Number(value);
-  return Number.isFinite(number) ? number : 0;
-}
-
-function getPreviousRank(player) {
-  const value =
-    player?.previousRank ??
-    player?.oldRank ??
-    player?.lastRank ??
-    player?.rankBefore ??
-    player?.previousPlace ??
-    player?.oldPlace ??
-    player?.anciennePlace ??
-    player?.lastPlace;
-
-  const number = Number(value);
-  return Number.isFinite(number) && number > 0 ? number : null;
-}
-
-function getRank(player) {
-  const value =
-    player?.rank ??
-    player?.place ??
-    player?.position ??
-    player?.classement ??
-    player?.currentRank ??
-    player?.currentPlace;
-
-  const number = Number(value);
-  return Number.isFinite(number) && number > 0 ? number : null;
-}
-
-function looksLikePlayer(item) {
-  if (!item || typeof item !== "object") return false;
-
-  const name = getName(item);
-  const hasPoints =
-    item.points !== undefined ||
-    item.pts !== undefined ||
-    item.total !== undefined ||
-    item.totalPoints !== undefined ||
-    item.score !== undefined ||
-    item.seasonPoints !== undefined ||
-    item.pointsTotal !== undefined;
-
-  return Boolean(name) && hasPoints;
-}
-
-function collectArraysFromObject(value, depth = 0) {
-  if (depth > 3 || !value || typeof value !== "object") return [];
-
-  let found = [];
-
-  if (Array.isArray(value)) {
-    if (value.some(looksLikePlayer)) found.push(value);
-    return found;
-  }
-
-  for (const key of Object.keys(value)) {
-    const child = value[key];
-
-    if (Array.isArray(child) && child.some(looksLikePlayer)) {
-      found.push(child);
-    } else if (child && typeof child === "object") {
-      found = found.concat(collectArraysFromObject(child, depth + 1));
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
     }
   }
 
-  return found;
-}
-
-function findRankingData() {
-  const priorityKeys = [
-    "ranking",
-    "classement",
-    "classement_joueurs",
-    "players_ranking",
-    "ranking_players",
-    "prono_ranking",
-    "admin_ranking",
-    "home_ranking",
-    "players",
-    "joueurs",
-    "prono_players",
-    "user_profiles",
-    "profiles",
-    "profile_players"
-  ];
-
-  for (const key of priorityKeys) {
-    const data = readJson(key, null);
-    const array = asArray(data);
-
-    if (array.some(looksLikePlayer)) {
-      return array;
-    }
-
-    const nested = collectArraysFromObject(data);
-    if (nested.length) return nested[0];
-  }
-
-  let best = [];
-
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    const data = readJson(key, null);
-    const direct = asArray(data);
-
-    if (direct.some(looksLikePlayer) && direct.length > best.length) {
-      best = direct;
-    }
-
-    const nested = collectArraysFromObject(data);
-    for (const array of nested) {
-      if (array.length > best.length) {
-        best = array;
-      }
-    }
-  }
-
-  return best;
-}
-
-function buildRanking() {
-  const raw = findRankingData();
-
-  const normalized = raw
-    .map((player) => ({
-      name: getName(player),
-      points: getPoints(player),
-      exact: getExact(player),
-      previousRank: getPreviousRank(player),
-      originalRank: getRank(player),
-      club: player?.club || player?.favoriteTeam || player?.team || player?.equipe || ""
-    }))
-    .filter((player) => player.name)
-    .sort((a, b) => b.points - a.points || b.exact - a.exact || a.name.localeCompare(b.name))
-    .map((player, index) => {
-      const rank = index + 1;
-      const previousRank = player.previousRank || player.originalRank || null;
-      const evolution = previousRank ? previousRank - rank : 0;
-
-      return {
-        ...player,
-        rank,
-        previousRank,
-        evolution
-      };
-    });
-
-  return normalized;
-}
-
-function moveText(value) {
-  if (value > 0) return "+" + value;
-  if (value < 0) return String(value);
-  return "0";
-}
-
-function moveClass(value) {
-  if (value > 0) return "up";
-  if (value < 0) return "down";
   return "";
 }
 
-function moveWord(value) {
-  if (value > 0) return "progresse";
-  if (value < 0) return "recule";
-  return "reste stable";
+function getScoreHome(match) {
+  return getRawScore(match, [
+    "scoreDomicile",
+    "scoreHome",
+    "homeScore",
+    "score1",
+    "resultHome",
+    "resultatDomicile"
+  ]);
 }
 
-function buildArticle(ranking) {
+function getScoreAway(match) {
+  return getRawScore(match, [
+    "scoreExterieur",
+    "scoreAway",
+    "awayScore",
+    "score2",
+    "resultAway",
+    "resultatExterieur"
+  ]);
+}
+
+function hasScore(match) {
+  return getScoreHome(match) !== "" && getScoreAway(match) !== "";
+}
+
+function getResult1N2(home, away) {
+  const h = Number(home);
+  const a = Number(away);
+
+  if (Number.isNaN(h) || Number.isNaN(a)) return null;
+  if (h > a) return "1";
+  if (h < a) return "2";
+  return "N";
+}
+
+function computeNormalPoints(match, prono) {
+  if (!prono?.result || !hasScore(match)) return 0;
+
+  const realResult = getResult1N2(getScoreHome(match), getScoreAway(match));
+
+  return prono.result === realResult ? 1 : 0;
+}
+
+function computeExactModePoints(match, prono, type) {
+  if (!prono || !hasScore(match)) {
+    return { points: 0, exact: 0 };
+  }
+
+  const realHome = Number(getScoreHome(match));
+  const realAway = Number(getScoreAway(match));
+  const pronoHome = Number(prono.homeScore ?? prono.home);
+  const pronoAway = Number(prono.awayScore ?? prono.away);
+
+  if ([realHome, realAway, pronoHome, pronoAway].some(Number.isNaN)) {
+    return { points: 0, exact: 0 };
+  }
+
+  const exact = realHome === pronoHome && realAway === pronoAway;
+  const good1N2 =
+    getResult1N2(realHome, realAway) === getResult1N2(pronoHome, pronoAway);
+
+  if (type === "bonus") {
+    if (exact) return { points: 3, exact: 1 };
+    if (good1N2) return { points: 2, exact: 0 };
+    return { points: 0, exact: 0 };
+  }
+
+  if (exact) return { points: 2, exact: 1 };
+  if (good1N2) return { points: 1, exact: 0 };
+
+  return { points: 0, exact: 0 };
+}
+
+function isFavoriteMatch(match, favoriteTeam) {
+  return (
+    favoriteTeam &&
+    favoriteTeam !== "Non choisi" &&
+    (sameClub(match.home, favoriteTeam) || sameClub(match.away, favoriteTeam))
+  );
+}
+
+function normalizeJournees(data) {
+  if (!Array.isArray(data)) return [];
+
+  return data.map((j, index) => ({
+    ...j,
+    id: j.id || `j${index + 1}`,
+    number: j.number || j.numero || index + 1,
+    title: j.title || `J${j.number || j.numero || index + 1}`,
+    matches: Array.isArray(j.matches) ? j.matches : Array.isArray(j.matchs) ? j.matchs : [],
+    bonus: Array.isArray(j.bonus) ? j.bonus : []
+  }));
+}
+
+function sortRanking(a, b) {
+  if (b.total !== a.total) return b.total - a.total;
+  if (b.specialExacts !== a.specialExacts) return b.specialExacts - a.specialExacts;
+  return String(a.playerName || "").localeCompare(String(b.playerName || ""), "fr");
+}
+
+function moveText(evo) {
+  if (evo > 0) return `+${evo}`;
+  if (evo < 0) return `${evo}`;
+  return "0";
+}
+
+function plural(value, word) {
+  return value > 1 ? `${word}s` : word;
+}
+
+function joinNames(players) {
+  if (!players.length) return "";
+  if (players.length === 1) return players[0].playerName;
+  if (players.length === 2) return `${players[0].playerName} et ${players[1].playerName}`;
+
+  return `${players.slice(0, -1).map((p) => p.playerName).join(", ")} et ${players[players.length - 1].playerName}`;
+}
+
+function buildGazetteText(ranking, lastJournee) {
   if (!ranking.length) {
     return {
-      title: "Aucun classement trouvé pour le moment",
-      lead:
-        "Dès que le classement sera alimenté, la Gazette affichera automatiquement le leader, le podium, les joueurs qui montent et ceux qui reculent.",
-      analysis:
-        "Va d'abord dans la page Classement ou sauvegarde les données joueurs."
+      title: "La Gazette attend les premiers résultats",
+      blocks: [
+        {
+          icon: "📈",
+          title: "Evolution du classement",
+          text: "Aucun classement n'est encore disponible. Dès que les résultats seront saisis dans l'espace Admin, la Gazette se mettra à raconter la course au titre automatiquement."
+        }
+      ],
+      summary: ["Aucun leader pour le moment.", "Aucun résultat saisi.", "La compétition va bientôt démarrer."]
     };
   }
 
   const leader = ranking[0];
   const second = ranking[1];
   const third = ranking[2];
+  const fourth = ranking[3];
+
+  const bestDay = ranking.reduce((best, player) => {
+    if (!best || player.lastPoints > best.lastPoints) return player;
+    return best;
+  }, null);
 
   const bestRise = ranking
     .filter((player) => player.evolution > 0)
     .sort((a, b) => b.evolution - a.evolution)[0];
 
-  const biggestFall = ranking
-    .filter((player) => player.evolution < 0)
-    .sort((a, b) => a.evolution - b.evolution)[0];
+  const top5 = ranking.slice(0, 5);
+  const top8 = ranking.slice(0, 8);
+  const middle = ranking.slice(5, 9);
 
-  const gap = second ? leader.points - second.points : 0;
+  const top5Gap = top5.length >= 2 ? top5[0].total - top5[top5.length - 1].total : 0;
+  const top8Gap = top8.length >= 2 ? top8[0].total - top8[top8.length - 1].total : 0;
 
-  let title = `${leader.name} garde la main sur la course au titre`;
-  let lead = `${leader.name} mène le classement avec ${leader.points} points.`;
+  const leaderTitle =
+    leader.evolution > 0
+      ? `🔥 ${leader.playerName} prend les commandes !`
+      : `🔥 ${leader.playerName} garde la main !`;
+
+  const leaderText =
+    leader.evolution > 0
+      ? `Grâce à une excellente journée, ${leader.playerName} s'empare de la 1ere place avec ${leader.total} points. Il devient le nouveau leader du championnat.`
+      : `${leader.playerName} conserve la tête du classement avec ${leader.total} points. Sa régularité lui permet de garder le contrôle de la compétition.`;
+
+  const blocks = [
+    {
+      icon: "📈",
+      title: "Evolution du classement",
+      text: `La journée J${lastJournee} a relancé la course au titre. Le classement se resserre et chaque point commence à compter.`
+    },
+    {
+      icon: "🔥",
+      title: leaderTitle,
+      text: leaderText
+    }
+  ];
 
   if (second) {
-    lead += ` Derrière, ${second.name} reste en embuscade à ${gap} point(s).`;
+    const gap = leader.total - second.total;
+
+    blocks.push({
+      icon: "🥈",
+      title: `${second.playerName} reste au contact`,
+      text: `${second.playerName} occupe la 2e place avec ${second.total} points. Il reste à seulement ${gap} ${plural(gap, "point")} du leader, avec ${second.specialExacts} score(s) exact(s) bonus/favori pour le départage.`
+    });
   }
 
   if (third) {
-    lead += ` Le podium est complété par ${third.name}, toujours bien placé.`;
+    const gap = leader.total - third.total;
+
+    blocks.push({
+      icon: "🥉",
+      title: `${third.playerName} ne lâche rien`,
+      text: `${third.playerName} complète le podium avec ${third.total} points. A ${gap} ${plural(gap, "point")} de la tête, il reste totalement dans la course.`
+    });
   }
 
-  let analysis = "La journée confirme que la régularité fait la différence.";
+  if (fourth) {
+    blocks.push({
+      icon: "🚀",
+      title: `${fourth.playerName} pousse derrière le podium`,
+      text: `Avec ${fourth.total} points, ${fourth.playerName} reste bien placé et peut revenir sur le podium dès la prochaine journée.`
+    });
+  }
 
   if (bestRise) {
-    analysis += ` Le gros coup vient de ${bestRise.name}, qui ${moveWord(bestRise.evolution)} de ${Math.abs(bestRise.evolution)} place(s).`;
+    blocks.push({
+      icon: "📈",
+      title: `${bestRise.playerName} signe la remontée du jour`,
+      text: `${bestRise.playerName} gagne ${bestRise.evolution} ${plural(bestRise.evolution, "place")} au classement. Une progression importante qui peut compter dans la suite de la saison.`
+    });
   }
 
-  if (biggestFall) {
-    analysis += ` Attention à ${biggestFall.name}, qui perd ${Math.abs(biggestFall.evolution)} place(s) et devra réagir vite.`;
+  if (bestDay && bestDay.lastPoints > 0) {
+    blocks.push({
+      icon: "⚡",
+      title: `${bestDay.playerName} est le joueur de la journée`,
+      text: `${bestDay.playerName} réalise la meilleure performance de la J${lastJournee} avec +${bestDay.lastPoints} points sur cette journée.`
+    });
   }
 
-  if (!bestRise && !biggestFall) {
-    analysis += " Pour le moment, aucune évolution de place n'est enregistrée, mais le prochain résultat peut déjà tout changer.";
+  if (top5.length >= 5) {
+    blocks.push({
+      icon: "⚔️",
+      title: "Une bataille intense pour le Top 5",
+      text: `${joinNames(top5)} composent le Top 5 actuel. Seulement ${top5Gap} ${plural(top5Gap, "point")} séparent le leader du 5e, ce qui laisse encore toutes les chances aux poursuivants.`
+    });
   }
 
-  return { title, lead, analysis };
+  if (middle.length) {
+    blocks.push({
+      icon: "📊",
+      title: "Milieu de tableau toujours aussi serré",
+      text: `${joinNames(middle)} restent en embuscade. Une seule grosse journée pourrait les relancer dans la course au Top 5.`
+    });
+  }
+
+  const exactTotal = ranking.reduce((sum, player) => sum + player.specialExacts, 0);
+
+  return {
+    title: `Gazette J${lastJournee}`,
+    blocks,
+    summary: [
+      `👑 Leader : ${leader.playerName}`,
+      second ? `🥈 ${second.playerName} reste à ${leader.total - second.total} point(s) de la tête.` : "🥈 Pas encore de dauphin.",
+      third ? `🥉 ${third.playerName} reste dans la course.` : "🥉 Podium encore ouvert.",
+      bestDay ? `🔥 Joueur de la journée : ${bestDay.playerName} (+${bestDay.lastPoints} pts).` : "🔥 Joueur de la journée : en attente.",
+      `🎯 Scores exacts bonus/favori : ${exactTotal}`,
+      top8.length >= 8
+        ? `⚔️ ${top8.length} joueurs se tiennent en ${top8Gap} point(s).`
+        : "⚔️ Le classement peut encore vite basculer."
+    ]
+  };
 }
 
+
+function buildChatGptCopyText(gazette, ranking, lastJournee) {
+  const podium = ranking
+    .slice(0, 3)
+    .map((p) => `${p.rank}. ${p.playerName} - ${p.total} pts - ${p.specialExacts} exact(s) bonus/favori`)
+    .join("\n");
+
+  const top10 = ranking
+    .slice(0, 10)
+    .map((p) => `${p.rank}. ${p.playerName} - ${p.total} pts - J${lastJournee}: +${p.lastPoints} pts - evolution ${moveText(p.evolution)}`)
+    .join("\n");
+
+  return [
+    `Voici les donnees de ma competition de pronostics apres la J${lastJournee}.`,
+    "",
+    "Ecris-moi une gazette sportive en francais, style journaliste foot, dynamique, avec emojis.",
+    "Je veux un texte dans ce style : evolution du classement, leader, podium, bataille pour le top 5, milieu de tableau, puis resume final.",
+    "Le ton doit etre vivant, competitif, comme un article de foot.",
+    "",
+    "ARTICLE ACTUEL :",
+    gazette.blocks.map((block) => `${block.icon} ${block.title}\n${block.text}`).join("\n\n"),
+    "",
+    "RESUME ACTUEL :",
+    gazette.summary.join("\n"),
+    "",
+    "PODIUM :",
+    podium || "Aucun podium",
+    "",
+    "TOP 10 :",
+    top10 || "Aucun top 10"
+  ].join("\n");
+}
 export default function GazettePage() {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [journees, setJournees] = useState([]);
+  const [profiles, setProfiles] = useState([]);
+  const [storageRows, setStorageRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  async function loadData() {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      let calendar = parseJson(localStorage.getItem(CALENDAR_KEY), []);
+
+      if ((!calendar || calendar.length === 0) && supabase) {
+        const { data } = await supabase
+          .from("app_settings")
+          .select("setting_value")
+          .eq("setting_key", CALENDAR_KEY)
+          .maybeSingle();
+
+        calendar = parseJson(data?.setting_value, []);
+      }
+
+      setJournees(normalizeJournees(calendar));
+
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("id,email,player_name,account_status")
+        .order("player_name", { ascending: true });
+
+      if (profileError) throw profileError;
+
+      const { data: pronoData, error: pronoError } = await supabase
+        .from("user_prono_storage")
+        .select("user_id,storage_key,storage_value");
+
+      if (pronoError) throw pronoError;
+
+      setProfiles(profileData || []);
+      setStorageRows(pronoData || []);
+    } catch (err) {
+      setMessage(err.message || "Erreur chargement Gazette.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    function refresh() {
-      setRefreshKey((value) => value + 1);
-    }
-
-    window.addEventListener("storage", refresh);
-    window.addEventListener("focus", refresh);
-
-    return () => {
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener("focus", refresh);
-    };
+    loadData();
   }, []);
 
-  const ranking = useMemo(() => buildRanking(), [refreshKey]);
-  const article = useMemo(() => buildArticle(ranking), [ranking]);
+  const scoredMatches = useMemo(() => {
+    const rows = [];
 
-  const leader = ranking[0];
+    journees.forEach((journee) => {
+      [...(journee.matches || []), ...(journee.bonus || [])].forEach((match) => {
+        if (hasScore(match)) {
+          rows.push({
+            ...match,
+            journeeId: journee.id,
+            journeeTitle: journee.title,
+            journeeNumber: journee.number
+          });
+        }
+      });
+    });
+
+    return rows;
+  }, [journees]);
+
+  const scoredJournees = useMemo(() => {
+    return [...new Set(scoredMatches.map((m) => Number(m.journeeNumber || 0)).filter(Boolean))]
+      .sort((a, b) => a - b);
+  }, [scoredMatches]);
+
+  const lastJournee = scoredJournees[scoredJournees.length - 1] || 1;
+
+  const storageByUser = useMemo(() => {
+    const map = {};
+
+    storageRows.forEach((row) => {
+      if (!map[row.user_id]) map[row.user_id] = {};
+      map[row.user_id][row.storage_key] = row.storage_value;
+    });
+
+    return map;
+  }, [storageRows]);
+
+  function calculatePlayer(profile, onlyBeforeLast = false) {
+    const store = storageByUser[profile.id] || {};
+    const pronos = parseJson(store[PRONOS_KEY], {});
+    const bonusByJournee = parseJson(store[BONUS_BY_JOURNEE_KEY], {});
+    const oldBonus = store[OLD_BONUS_KEY] || "";
+    const favoriteTeam = store[FAVORITE_TEAM_KEY] || "Non choisi";
+
+    let total = 0;
+    let favoriteExact = 0;
+    let bonusExact = 0;
+    let lastPoints = 0;
+
+    journees.forEach((journee) => {
+      const isLast = Number(journee.number) === Number(lastJournee);
+      if (onlyBeforeLast && isLast) return;
+
+      const playerJourneePronos = pronos[journee.id] || {};
+
+      (journee.matches || []).forEach((match) => {
+        if (!hasScore(match)) return;
+
+        const prono = playerJourneePronos[match.id];
+        const favorite = isFavoriteMatch(match, favoriteTeam);
+
+        let result;
+
+        if (favorite) {
+          result = computeExactModePoints(match, prono, "favorite");
+          favoriteExact += result.exact;
+        } else {
+          result = { points: computeNormalPoints(match, prono), exact: 0 };
+        }
+
+        total += result.points;
+        if (isLast) lastPoints += result.points;
+      });
+
+      (journee.bonus || []).forEach((match) => {
+        if (!hasScore(match)) return;
+
+        const selectedBonusId = bonusByJournee[journee.id] || oldBonus;
+        if (selectedBonusId !== match.id) return;
+
+        const prono = playerJourneePronos[match.id];
+        const result = computeExactModePoints(match, prono, "bonus");
+
+        total += result.points;
+        bonusExact += result.exact;
+        if (isLast) lastPoints += result.points;
+      });
+    });
+
+    const playerName = profile.player_name || profile.email?.split("@")[0] || "Joueur";
+
+    return {
+      playerName,
+      total,
+      favoriteExact,
+      bonusExact,
+      specialExacts: favoriteExact + bonusExact,
+      lastPoints,
+      favoriteTeam
+    };
+  }
+
+  const ranking = useMemo(() => {
+    const activeProfiles = profiles.filter((p) => {
+      const status = p.account_status || "active";
+      return status === "active";
+    });
+
+    const current = activeProfiles
+      .map((profile) => calculatePlayer(profile, false))
+      .sort(sortRanking)
+      .map((item, index) => ({ ...item, rank: index + 1 }));
+
+    const beforeLast = activeProfiles
+      .map((profile) => calculatePlayer(profile, true))
+      .sort(sortRanking)
+      .map((item, index) => ({ playerName: item.playerName, oldRank: index + 1 }));
+
+    return current.map((item) => {
+      const old = beforeLast.find((entry) => entry.playerName === item.playerName);
+      const oldRank = old?.oldRank || item.rank;
+      const evolution = oldRank - item.rank;
+
+      return { ...item, oldRank, evolution };
+    });
+  }, [profiles, storageByUser, journees, lastJournee]);
+
+  const gazette = useMemo(() => buildGazetteText(ranking, lastJournee), [ranking, lastJournee]);
   const podium = ranking.slice(0, 3);
-  const rises = ranking.filter((p) => p.evolution > 0).sort((a, b) => b.evolution - a.evolution).slice(0, 3);
-  const falls = ranking.filter((p) => p.evolution < 0).sort((a, b) => a.evolution - b.evolution).slice(0, 3);
-  const fullRanking = ranking.slice(0, 10);
+  const top10 = ranking.slice(0, 10);
+
 
   return (
     <div className="gazette-page">
@@ -322,7 +548,7 @@ export default function GazettePage() {
 
         .gazette-hero {
           margin-bottom: 22px;
-          padding: 30px;
+          padding: 28px;
           border-radius: 30px;
           background:
             radial-gradient(circle at top left, rgba(186,255,0,.18), transparent 34%),
@@ -369,7 +595,7 @@ export default function GazettePage() {
 
         .gazette-grid {
           display: grid;
-          grid-template-columns: 1.25fr .75fr;
+          grid-template-columns: 1.2fr .8fr;
           gap: 18px;
         }
 
@@ -388,21 +614,50 @@ export default function GazettePage() {
           letter-spacing: -.04em;
         }
 
-        .gazette-card p {
+        .gazette-article {
+          display: grid;
+          gap: 18px;
+        }
+
+        .gazette-block {
+          padding: 18px;
+          border-radius: 22px;
+          background: rgba(255,255,255,.055);
+          border: 1px solid rgba(255,255,255,.09);
+        }
+
+        .gazette-block h3 {
+          margin: 0 0 8px;
+          font-size: 21px;
+          line-height: 1.2;
+        }
+
+        .gazette-block p {
           margin: 0;
-          color: #cbd5e1;
-          line-height: 1.55;
+          color: #dbeafe;
+          line-height: 1.58;
           font-weight: 750;
         }
 
-        .gazette-big-title {
-          font-size: 32px !important;
-          line-height: 1.05;
+        .gazette-summary {
+          margin-top: 18px;
+          padding: 18px;
+          border-radius: 22px;
+          background: rgba(186,255,0,.09);
+          border: 1px solid rgba(186,255,0,.25);
         }
 
-        .gazette-lead {
-          margin-top: 14px !important;
-          font-size: 17px;
+        .gazette-summary h3 {
+          margin: 0 0 10px;
+          font-size: 22px;
+        }
+
+        .gazette-summary ul {
+          margin: 0;
+          padding-left: 20px;
+          color: #f8fafc;
+          font-weight: 850;
+          line-height: 1.8;
         }
 
         .gazette-rank-list {
@@ -412,7 +667,7 @@ export default function GazettePage() {
 
         .gazette-rank-row {
           display: grid;
-          grid-template-columns: 48px 1fr auto;
+          grid-template-columns: 46px 1fr auto;
           align-items: center;
           gap: 12px;
           padding: 12px;
@@ -422,20 +677,23 @@ export default function GazettePage() {
         }
 
         .gazette-place {
-          width: 48px;
-          height: 48px;
+          width: 46px;
+          height: 46px;
           border-radius: 16px;
           background: rgba(186,255,0,.15);
           color: #baff00;
           display: grid;
           place-items: center;
-          font-size: 20px;
+          font-size: 19px;
           font-weight: 950;
         }
 
         .gazette-player {
           font-weight: 950;
           color: #ffffff;
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
 
         .gazette-sub {
@@ -451,24 +709,26 @@ export default function GazettePage() {
           white-space: nowrap;
         }
 
-        .gazette-move {
+        .gazette-top10 {
+          margin-top: 18px;
+        }
+
+        .gazette-actions {
+          margin-top: 16px;
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .gazette-actions button {
+          border: 0;
           border-radius: 999px;
-          padding: 8px 11px;
+          padding: 11px 15px;
+          background: #baff00;
+          color: #07111f;
           font-weight: 950;
-          background: rgba(255,255,255,.08);
-          color: #cbd5e1;
-        }
-
-        .gazette-move.up {
-          color: #86efac;
-          background: rgba(34,197,94,.15);
-          border: 1px solid rgba(34,197,94,.28);
-        }
-
-        .gazette-move.down {
-          color: #fca5a5;
-          background: rgba(239,68,68,.14);
-          border: 1px solid rgba(239,68,68,.26);
+          cursor: pointer;
         }
 
         .gazette-empty {
@@ -480,20 +740,8 @@ export default function GazettePage() {
           font-weight: 900;
         }
 
-        .gazette-bottom {
-          margin-top: 18px;
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 18px;
-        }
-
-        .gazette-top10 {
-          margin-top: 18px;
-        }
-
         @media (max-width: 1000px) {
-          .gazette-grid,
-          .gazette-bottom {
+          .gazette-grid {
             grid-template-columns: 1fr;
           }
 
@@ -509,141 +757,124 @@ export default function GazettePage() {
       `}</style>
 
       <section className="gazette-hero">
-        <div className="gazette-kicker">Edition spéciale classement</div>
+        <div className="gazette-kicker">Edition speciale classement</div>
 
         <div className="gazette-hero-row">
           <div>
             <h1>La Gazette des Pronos</h1>
-            <p>Le journal sportif qui raconte l'évolution du classement journée après journée.</p>
+            <p>Le résumé automatique de la journée, façon article sportif.</p>
           </div>
 
           <div className="gazette-season">
             Saison 2026/2027<br />
-            Analyse sportive
+            Gazette J{lastJournee}
           </div>
+        </div>
+
+        <div className="gazette-actions">
+          <button type="button" onClick={loadData}>
+            Actualiser la Gazette
+          </button>
+
+
         </div>
       </section>
 
-      {!ranking.length ? (
+      {loading ? (
         <div className="gazette-card">
-          <h2 className="gazette-big-title">{article.title}</h2>
-          <p className="gazette-lead">{article.lead}</p>
-
-          <div className="gazette-empty" style={{ marginTop: 18 }}>
-            {article.analysis}
-          </div>
+          <h2>Chargement de la Gazette...</h2>
+          <p>Analyse du classement en cours.</p>
+        </div>
+      ) : message ? (
+        <div className="gazette-card">
+          <h2>Erreur Gazette</h2>
+          <p>{message}</p>
         </div>
       ) : (
         <>
           <div className="gazette-grid">
             <main className="gazette-card">
-              <h2 className="gazette-big-title">{article.title}</h2>
-              <p className="gazette-lead">{article.lead}</p>
+              <h2>{gazette.title}</h2>
 
-              <div className="gazette-empty" style={{ marginTop: 18 }}>
-                {article.analysis}
+              <div className="gazette-article">
+                {gazette.blocks.map((block, index) => (
+                  <article className="gazette-block" key={`${block.title}-${index}`}>
+                    <h3>{block.icon} {block.title}</h3>
+                    <p>{block.text}</p>
+                  </article>
+                ))}
+              </div>
+
+              <div className="gazette-summary">
+                <h3>🎯 En résumé</h3>
+                <ul>
+                  {gazette.summary.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
               </div>
             </main>
 
             <aside className="gazette-card">
               <h2>Podium actuel</h2>
 
-              <div className="gazette-rank-list">
-                {podium.map((player) => (
-                  <div className="gazette-rank-row" key={player.name}>
-                    <div className="gazette-place">{player.rank}</div>
+              {podium.length ? (
+                <div className="gazette-rank-list">
+                  {podium.map((player) => (
+                    <div className="gazette-rank-row" key={player.playerName}>
+                      <div className="gazette-place">{player.rank}</div>
 
-                    <div>
-                      <div className="gazette-player">{player.name}</div>
-                      <div className="gazette-sub">{player.exact} score(s) exact(s)</div>
+                      <div>
+                        <div className="gazette-player">
+                          <ProfileAvatar player={player.playerName} size={24} />
+                          <span>{getDisplayName(player.playerName)}</span>
+                        </div>
+                        <div className="gazette-sub">
+                          {player.specialExacts} exact(s) bonus/favori
+                        </div>
+                      </div>
+
+                      <div className="gazette-points">{player.total} pts</div>
                     </div>
-
-                    <div className="gazette-points">{player.points} pts</div>
-                  </div>
-                ))}
-              </div>
-            </aside>
-          </div>
-
-          <div className="gazette-bottom">
-            <div className="gazette-card">
-              <h2>Leader actuel</h2>
-
-              <div className="gazette-rank-row">
-                <div className="gazette-place">1</div>
-                <div>
-                  <div className="gazette-player">{leader.name}</div>
-                  <div className="gazette-sub">Patron du classement</div>
+                  ))}
                 </div>
-                <div className="gazette-points">{leader.points} pts</div>
-              </div>
-            </div>
-
-            <div className="gazette-card">
-              <h2>Ceux qui montent</h2>
-
-              <div className="gazette-rank-list">
-                {rises.length ? (
-                  rises.map((player) => (
-                    <div className="gazette-rank-row" key={player.name}>
-                      <div className="gazette-place">{player.rank}</div>
-                      <div className="gazette-player">{player.name}</div>
-                      <div className={`gazette-move ${moveClass(player.evolution)}`}>
-                        {moveText(player.evolution)}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="gazette-empty">Pas encore d'évolution positive enregistrée.</div>
-                )}
-              </div>
-            </div>
-
-            <div className="gazette-card">
-              <h2>Ceux qui reculent</h2>
-
-              <div className="gazette-rank-list">
-                {falls.length ? (
-                  falls.map((player) => (
-                    <div className="gazette-rank-row" key={player.name}>
-                      <div className="gazette-place">{player.rank}</div>
-                      <div className="gazette-player">{player.name}</div>
-                      <div className={`gazette-move ${moveClass(player.evolution)}`}>
-                        {moveText(player.evolution)}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="gazette-empty">Aucune chute marquante pour l'instant.</div>
-                )}
-              </div>
-            </div>
+              ) : (
+                <div className="gazette-empty">Aucun podium pour le moment.</div>
+              )}
+            </aside>
           </div>
 
           <div className="gazette-card gazette-top10">
             <h2>Top 10 du classement</h2>
 
-            <div className="gazette-rank-list">
-              {fullRanking.map((player) => (
-                <div className="gazette-rank-row" key={player.name}>
-                  <div className="gazette-place">{player.rank}</div>
+            {top10.length ? (
+              <div className="gazette-rank-list">
+                {top10.map((player) => (
+                  <div className="gazette-rank-row" key={player.playerName}>
+                    <div className="gazette-place">{player.rank}</div>
 
-                  <div>
-                    <div className="gazette-player">{player.name}</div>
-                    <div className="gazette-sub">
-                      {player.exact} exact(s)
-                      {player.previousRank ? ` · avant ${player.previousRank}e` : ""}
+                    <div>
+                      <div className="gazette-player">
+                        <ProfileAvatar player={player.playerName} size={24} />
+                        <span>{getDisplayName(player.playerName)}</span>
+                      </div>
+                      <div className="gazette-sub">
+                        J{lastJournee} : +{player.lastPoints} pts · évolution {moveText(player.evolution)}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="gazette-points">{player.points} pts</div>
-                </div>
-              ))}
-            </div>
+                    <div className="gazette-points">{player.total} pts</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="gazette-empty">Aucun joueur actif trouvé.</div>
+            )}
           </div>
         </>
       )}
     </div>
   );
 }
+
 
