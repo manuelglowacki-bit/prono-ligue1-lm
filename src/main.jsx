@@ -1,4 +1,5 @@
-﻿import "./styles/compact-modern.css";
+﻿import "./utils/protectAdminJournees";
+import "./styles/compact-modern.css";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
@@ -10,6 +11,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </AuthGate>
   </React.StrictMode>
 );
+
 
 
 

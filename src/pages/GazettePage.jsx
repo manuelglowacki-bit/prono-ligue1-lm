@@ -103,11 +103,11 @@ function getResult1N2(home, away) {
 }
 
 function computeNormalPoints(match, prono) {
-  if (!prono?.result || !hasScore(match)) return 0;
+  if (!get1N2Prono(prono) || !hasScore(match)) return 0;
 
   const realResult = getResult1N2(getScoreHome(match), getScoreAway(match));
 
-  return prono.result === realResult ? 1 : 0;
+  return get1N2Prono(prono) === realResult ? 1 : 0;
 }
 
 function computeExactModePoints(match, prono, type) {
@@ -117,8 +117,8 @@ function computeExactModePoints(match, prono, type) {
 
   const realHome = Number(getScoreHome(match));
   const realAway = Number(getScoreAway(match));
-  const pronoHome = Number(prono.homeScore ?? prono.home);
-  const pronoAway = Number(prono.awayScore ?? prono.away);
+  const pronoHome = Number(getScorePronoHome(prono));
+  const pronoAway = Number(getScorePronoAway(prono));
 
   if ([realHome, realAway, pronoHome, pronoAway].some(Number.isNaN)) {
     return { points: 0, exact: 0 };
@@ -144,7 +144,7 @@ function isFavoriteMatch(match, favoriteTeam) {
   return (
     favoriteTeam &&
     favoriteTeam !== "Non choisi" &&
-    (sameClub(match.home, favoriteTeam) || sameClub(match.away, favoriteTeam))
+    (sameClub(getTeamHome(match), favoriteTeam) || sameClub(getTeamAway(match), favoriteTeam))
   );
 }
 
@@ -354,6 +354,175 @@ function buildChatGptCopyText(gazette, ranking, lastJournee) {
     top10 || "Aucun top 10"
   ].join("\n");
 }
+
+/* points-engine-safe-final */
+function getTeamHome(match) {
+  return match?.home || match?.domicile || match?.equipeDomicile || match?.homeTeam || match?.club1 || match?.equipe1 || "";
+}
+
+function getTeamAway(match) {
+  return match?.away || match?.exterieur || match?.equipeExterieur || match?.awayTeam || match?.club2 || match?.equipe2 || "";
+}
+
+function getFavoriteTeamValue(value) {
+  if (!value) return "Non choisi";
+
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+
+    if (typeof parsed === "string") return parsed;
+
+    if (parsed && typeof parsed === "object") {
+      return parsed.favoriteTeam || parsed.club || parsed.team || parsed.equipe || Object.values(parsed).find(Boolean) || "Non choisi";
+    }
+  } catch {
+    return value;
+  }
+
+  return value || "Non choisi";
+}
+
+function getJourneePronos(pronos, journee) {
+  const keys = [
+    journee?.id,
+    String(journee?.id || ""),
+    journee?.number,
+    String(journee?.number || ""),
+    `j${journee?.number}`,
+    `J${journee?.number}`,
+    journee?.title
+  ].filter(Boolean);
+
+  for (const key of keys) {
+    if (pronos?.[key] && typeof pronos[key] === "object") {
+      return pronos[key];
+    }
+  }
+
+  return {};
+}
+
+function getMatchKeyCandidates(match) {
+  const home = getTeamHome(match);
+  const away = getTeamAway(match);
+
+  const values = [
+    match?.id,
+    match?.matchId,
+    match?.idMatch,
+    match?.match_id,
+    match?.key,
+    match?.slug,
+    `${home}-${away}`,
+    `${home} vs ${away}`,
+    `${home} - ${away}`,
+    `${clean(home)}-${clean(away)}`,
+    `${clean(home)}vs${clean(away)}`
+  ]
+    .filter(Boolean)
+    .map((value) => String(value));
+
+  return [...new Set(values)];
+}
+
+function getPronoForMatch(playerJourneePronos, match) {
+  if (!playerJourneePronos || typeof playerJourneePronos !== "object") return null;
+
+  for (const key of getMatchKeyCandidates(match)) {
+    if (playerJourneePronos[key]) {
+      return playerJourneePronos[key];
+    }
+  }
+
+  const home = clean(getTeamHome(match));
+  const away = clean(getTeamAway(match));
+
+  for (const [key, value] of Object.entries(playerJourneePronos)) {
+    const cleanedKey = clean(key);
+
+    if (home && away && cleanedKey.includes(home) && cleanedKey.includes(away)) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function getScorePronoHome(prono) {
+  const value =
+    prono?.homeScore ??
+    prono?.home ??
+    prono?.scoreHome ??
+    prono?.pronoHome ??
+    prono?.domicile ??
+    prono?.scoreDomicile ??
+    "";
+
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function getScorePronoAway(prono) {
+  const value =
+    prono?.awayScore ??
+    prono?.away ??
+    prono?.scoreAway ??
+    prono?.pronoAway ??
+    prono?.exterieur ??
+    prono?.scoreExterieur ??
+    "";
+
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function isScorePronoFilled(prono) {
+  return getScorePronoHome(prono) !== "" && getScorePronoAway(prono) !== "";
+}
+
+function get1N2Prono(prono) {
+  const value =
+    prono?.result ??
+    prono?.value ??
+    prono?.prediction ??
+    prono?.pronostic ??
+    prono?.choice ??
+    "";
+
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function normalizeBonusChoice(value) {
+  if (!value) return "";
+
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  if (typeof value === "object") {
+    return String(
+      value.id ||
+      value.matchId ||
+      value.match_id ||
+      value.bonusId ||
+      value.selectedBonusId ||
+      value.title ||
+      value.label ||
+      value.match ||
+      ""
+    );
+  }
+
+  return "";
+}
+
+function isSelectedBonusMatch(selectedBonusId, match) {
+  const selected = clean(normalizeBonusChoice(selectedBonusId));
+  if (!selected) return false;
+
+  return getMatchKeyCandidates(match).some((key) => {
+    const cleanedKey = clean(key);
+    return cleanedKey === selected || cleanedKey.includes(selected) || selected.includes(cleanedKey);
+  });
+}
 export default function GazettePage() {
   const [journees, setJournees] = useState([]);
   const [profiles, setProfiles] = useState([]);
@@ -448,7 +617,7 @@ export default function GazettePage() {
     const pronos = parseJson(store[PRONOS_KEY], {});
     const bonusByJournee = parseJson(store[BONUS_BY_JOURNEE_KEY], {});
     const oldBonus = store[OLD_BONUS_KEY] || "";
-    const favoriteTeam = store[FAVORITE_TEAM_KEY] || "Non choisi";
+    const favoriteTeam = getFavoriteTeamValue(store[FAVORITE_TEAM_KEY]);
 
     let total = 0;
     let favoriteExact = 0;
@@ -459,12 +628,12 @@ export default function GazettePage() {
       const isLast = Number(journee.number) === Number(lastJournee);
       if (onlyBeforeLast && isLast) return;
 
-      const playerJourneePronos = pronos[journee.id] || {};
+      const playerJourneePronos = getJourneePronos(pronos, journee);
 
       (journee.matches || []).forEach((match) => {
         if (!hasScore(match)) return;
 
-        const prono = playerJourneePronos[match.id];
+        const prono = getPronoForMatch(playerJourneePronos, match);
         const favorite = isFavoriteMatch(match, favoriteTeam);
 
         let result;
@@ -484,9 +653,9 @@ export default function GazettePage() {
         if (!hasScore(match)) return;
 
         const selectedBonusId = bonusByJournee[journee.id] || oldBonus;
-        if (selectedBonusId !== match.id) return;
+        if (!isSelectedBonusMatch(selectedBonusId, match)) return;
 
-        const prono = playerJourneePronos[match.id];
+        const prono = getPronoForMatch(playerJourneePronos, match);
         const result = computeExactModePoints(match, prono, "bonus");
 
         total += result.points;
@@ -876,5 +1045,7 @@ export default function GazettePage() {
     </div>
   );
 }
+
+
 
 

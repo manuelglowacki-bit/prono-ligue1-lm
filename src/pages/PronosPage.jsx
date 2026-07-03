@@ -65,38 +65,89 @@ function getRawScore(match, names) {
 function normalizeJournees(data) {
   if (!Array.isArray(data) || data.length === 0) return DEFAULT_JOURNEES;
 
-  return data.map((j, index) => ({
-    id: j.id || `j${index + 1}`,
-    number: j.number || index + 1,
-    title: j.title || `J${index + 1}`,
-    locked: Boolean(j.locked),
-    lockAt: j.lockAt || "",
-    matches: Array.isArray(j.matches)
-      ? j.matches.map((m, i) => ({
-          id: m.id || `${j.id || `j${index + 1}`}-m${i + 1}`,
-          home: m.home || "",
-          away: m.away || "",
-          date: m.date || "",
-          time: m.time || "",
-          status: m.status || "Ouvert",
-          scoreDomicile: getRawScore(m, ["scoreDomicile", "scoreHome", "homeScore", "score1", "resultHome", "resultatDomicile"]),
-          scoreExterieur: getRawScore(m, ["scoreExterieur", "scoreAway", "awayScore", "score2", "resultAway", "resultatExterieur"])
-        }))
-      : [],
-    bonus: Array.isArray(j.bonus)
-      ? j.bonus.slice(0, 3).map((b, i) => ({
-          id: b.id || `${j.id || `j${index + 1}`}-b${i + 1}`,
-          league: b.league || "Bonus",
-          home: b.home || "",
-          away: b.away || "",
-          date: b.date || "",
-          time: b.time || "",
-          status: b.status || "Ouvert",
-          scoreDomicile: getRawScore(b, ["scoreDomicile", "scoreHome", "homeScore", "score1", "resultHome", "resultatDomicile"]),
-          scoreExterieur: getRawScore(b, ["scoreExterieur", "scoreAway", "awayScore", "score2", "resultAway", "resultatExterieur"])
-        }))
-      : []
-  }));
+  function pick(value, fallback = "") {
+    return value !== undefined && value !== null ? value : fallback;
+  }
+
+  function normalizeMatch(match, id, type = "normal") {
+    const home =
+      match.home ||
+      match.homeTeam ||
+      match.domicile ||
+      match.equipeDomicile ||
+      match.equipe1 ||
+      match.club1 ||
+      "";
+
+    const away =
+      match.away ||
+      match.awayTeam ||
+      match.exterieur ||
+      match.equipeExterieur ||
+      match.equipe2 ||
+      match.club2 ||
+      "";
+
+    const homeScore = pick(
+      match.homeScore ??
+        match.scoreHome ??
+        match.scoreDomicile ??
+        match.score1 ??
+        match.resultHome ??
+        match.resultatDomicile,
+      ""
+    );
+
+    const awayScore = pick(
+      match.awayScore ??
+        match.scoreAway ??
+        match.scoreExterieur ??
+        match.score2 ??
+        match.resultAway ??
+        match.resultatExterieur,
+      ""
+    );
+
+    return {
+      ...match,
+      id,
+      type,
+      home,
+      away,
+      date: match.date || match.matchDate || match.dateMatch || "",
+      time: match.time || match.heure || match.hour || "",
+      league: match.league || match.championnat || match.competition || (type === "bonus" ? "Bonus" : "Ligue 1"),
+      status: match.status || match.statut || "Ouvert",
+      homeScore,
+      awayScore,
+      scoreDomicile: homeScore,
+      scoreExterieur: awayScore
+    };
+  }
+
+  return data.map((j, index) => {
+    const journeeId = j.id || `j${index + 1}`;
+    const number = j.number || j.numero || index + 1;
+
+    return {
+      ...j,
+      id: journeeId,
+      number,
+      title: j.title || `J${number}`,
+      locked: Boolean(j.locked),
+      lockAt: j.lockAt || "",
+      matches: Array.isArray(j.matches)
+        ? j.matches.map((m, i) =>
+            normalizeMatch(m, m.id || `${journeeId}-m${i + 1}`, "normal")
+          )
+        : [],
+      bonus: Array.isArray(j.bonus)
+        ? j.bonus.slice(0, 3).map((b, i) =>
+            normalizeMatch(b, b.id || `${journeeId}-b${i + 1}`, "bonus")
+          )
+        : []
+    };
+  });
 }
 
 function loadJournees() {
@@ -421,6 +472,479 @@ function getPronoPointsDisplay(match, prono, type) {
     detail: `Resultat reel : ${realHome}-${realAway}`
   };
 }
+
+/* prono-result-final */
+function getResultScoreValue(match, names) {
+  for (const name of names) {
+    const value = match?.[name];
+
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function getRealHomeScore(match) {
+  return getResultScoreValue(match, [
+    "homeScore",
+    "scoreHome",
+    "scoreDomicile",
+    "score1",
+    "resultHome",
+    "resultatDomicile"
+  ]);
+}
+
+function getRealAwayScore(match) {
+  return getResultScoreValue(match, [
+    "awayScore",
+    "scoreAway",
+    "scoreExterieur",
+    "score2",
+    "resultAway",
+    "resultatExterieur"
+  ]);
+}
+
+function hasRealResult(match) {
+  return getRealHomeScore(match) !== "" && getRealAwayScore(match) !== "";
+}
+
+function getResultFromScores(home, away) {
+  const h = Number(home);
+  const a = Number(away);
+
+  if (Number.isNaN(h) || Number.isNaN(a)) return null;
+  if (h > a) return "1";
+  if (h < a) return "2";
+  return "N";
+}
+
+function getPronoResultBadge(match, prono, type) {
+  if (!hasRealResult(match)) {
+    return {
+      className: "waiting",
+      text: "En attente du resultat"
+    };
+  }
+
+  const realHome = Number(getRealHomeScore(match));
+  const realAway = Number(getRealAwayScore(match));
+  const realResult = getResultFromScores(realHome, realAway);
+
+  if (type === "normal") {
+    if (!prono?.result) {
+      return {
+        className: "waiting",
+        text: "Prono non joue"
+      };
+    }
+
+    return prono.result === realResult
+      ? { className: "good", text: "Bon 1N2 +1 pt" }
+      : { className: "miss", text: "Rate 0 pt" };
+  }
+
+  const pronoHomeRaw = getPronoHomeValue(prono);
+  const pronoAwayRaw = getPronoAwayValue(prono);
+
+  if (pronoHomeRaw === "" || pronoAwayRaw === "") {
+    return {
+      className: "waiting",
+      text: "Score prono non saisi"
+    };
+  }
+
+  const pronoHome = Number(pronoHomeRaw);
+  const pronoAway = Number(pronoAwayRaw);
+
+  if (Number.isNaN(pronoHome) || Number.isNaN(pronoAway)) {
+    return {
+      className: "waiting",
+      text: "Score prono invalide"
+    };
+  }
+
+  const exact = realHome === pronoHome && realAway === pronoAway;
+  const goodResult = getResultFromScores(pronoHome, pronoAway) === realResult;
+
+  if (type === "bonus") {
+    if (exact) return { className: "exact", text: "Score exact bonus +3 pts" };
+    if (goodResult) return { className: "good", text: "Bon bonus +2 pts" };
+    return { className: "miss", text: "Bonus rate 0 pt" };
+  }
+
+  if (exact) return { className: "exact", text: "Score exact favori +2 pts" };
+  if (goodResult) return { className: "good", text: "Bon favori +1 pt" };
+
+  return { className: "miss", text: "Favori rate 0 pt" };
+}
+
+function PronoResultBadge({ match, prono, type }) {
+  const badge = getPronoResultBadge(match, prono, type);
+
+  return (
+    <div className={`prono-result-clean ${badge.className}`}>
+      {badge.text}
+    </div>
+  );
+}
+
+function getPronoHomeValue(prono) {
+  const value = prono?.homeScore ?? prono?.home ?? "";
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function getPronoAwayValue(prono) {
+  const value = prono?.awayScore ?? prono?.away ?? "";
+  return value === null || value === undefined ? "" : String(value);
+}
+
+/* bonus-score-display-final */
+function bonusGetScore(match, names) {
+  for (const name of names) {
+    const value = match?.[name];
+
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function bonusRealHome(match) {
+  return bonusGetScore(match, [
+    "homeScore",
+    "scoreHome",
+    "scoreDomicile",
+    "score1",
+    "resultHome",
+    "resultatDomicile"
+  ]);
+}
+
+function bonusRealAway(match) {
+  return bonusGetScore(match, [
+    "awayScore",
+    "scoreAway",
+    "scoreExterieur",
+    "score2",
+    "resultAway",
+    "resultatExterieur"
+  ]);
+}
+
+function bonusHasRealScore(match) {
+  return bonusRealHome(match) !== "" && bonusRealAway(match) !== "";
+}
+
+function bonusResult(home, away) {
+  const h = Number(home);
+  const a = Number(away);
+
+  if (Number.isNaN(h) || Number.isNaN(a)) return null;
+  if (h > a) return "1";
+  if (h < a) return "2";
+  return "N";
+}
+
+function bonusPronoHome(prono) {
+  const value = prono?.homeScore ?? prono?.home ?? "";
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function bonusPronoAway(prono) {
+  const value = prono?.awayScore ?? prono?.away ?? "";
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function BonusResultBadge({ match, prono }) {
+  if (!bonusHasRealScore(match)) {
+    return (
+      <div className="bonus-result-badge waiting">
+        Resultat en attente
+      </div>
+    );
+  }
+
+  const realHome = Number(bonusRealHome(match));
+  const realAway = Number(bonusRealAway(match));
+  const pronoHomeRaw = bonusPronoHome(prono);
+  const pronoAwayRaw = bonusPronoAway(prono);
+
+  if (pronoHomeRaw === "" || pronoAwayRaw === "") {
+    return (
+      <div className="bonus-result-badge waiting">
+        Score prono non saisi
+        <small>Resultat reel : {realHome}-{realAway}</small>
+      </div>
+    );
+  }
+
+  const pronoHome = Number(pronoHomeRaw);
+  const pronoAway = Number(pronoAwayRaw);
+
+  const exact = realHome === pronoHome && realAway === pronoAway;
+  const goodResult = bonusResult(realHome, realAway) === bonusResult(pronoHome, pronoAway);
+
+  if (exact) {
+    return (
+      <div className="bonus-result-badge exact">
+        🎯 Score exact bonus +3 pts
+        <small>Resultat reel : {realHome}-{realAway}</small>
+        <small>Resultat reel : {realHome}-{realAway}</small>
+      </div>
+    );
+  }
+
+  if (goodResult) {
+    return (
+      <div className="bonus-result-badge good">
+        ✅ Bon bonus +2 pts
+        <small>Resultat reel : {realHome}-{realAway}</small>
+        <small>Resultat reel : {realHome}-{realAway}</small>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bonus-result-badge miss">
+      ❌ Bonus rate 0 pt
+      <small>Resultat reel : {realHome}-{realAway}</small>
+      <small>Resultat reel : {realHome}-{realAway}</small>
+    </div>
+  );
+}
+
+/* bonus-display-score-line-final */
+function getDisplayMatchLabel(match) {
+  return (
+    match?.label ||
+    match?.affiche ||
+    match?.match ||
+    match?.rencontre ||
+    match?.name ||
+    match?.title ||
+    ""
+  );
+}
+
+function splitTeamsFromLabel(match) {
+  const label = String(getDisplayMatchLabel(match) || "").trim();
+
+  if (!label) return ["", ""];
+
+  const parts = label
+    .split(/\s+(?:vs|v|-)\s+/i)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return [parts[0], parts.slice(1).join(" - ")];
+  }
+
+  return ["", ""];
+}
+
+function getDisplayHome(match) {
+  const parsed = splitTeamsFromLabel(match);
+
+  return (
+    match?.home ||
+    match?.homeTeam ||
+    match?.domicile ||
+    match?.equipeDomicile ||
+    match?.club1 ||
+    match?.equipe1 ||
+    parsed[0] ||
+    "Match bonus"
+  );
+}
+
+function getDisplayAway(match) {
+  const parsed = splitTeamsFromLabel(match);
+
+  return (
+    match?.away ||
+    match?.awayTeam ||
+    match?.exterieur ||
+    match?.equipeExterieur ||
+    match?.club2 ||
+    match?.equipe2 ||
+    parsed[1] ||
+    ""
+  );
+}
+
+function displayScoreValue(match, names) {
+  for (const name of names) {
+    const value = match?.[name];
+
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function displayRealHome(match) {
+  return displayScoreValue(match, [
+    "homeScore",
+    "scoreHome",
+    "scoreDomicile",
+    "score1",
+    "resultHome",
+    "resultatDomicile"
+  ]);
+}
+
+function displayRealAway(match) {
+  return displayScoreValue(match, [
+    "awayScore",
+    "scoreAway",
+    "scoreExterieur",
+    "score2",
+    "resultAway",
+    "resultatExterieur"
+  ]);
+}
+
+function DisplayRealScoreLine({ match }) {
+  const home = displayRealHome(match);
+  const away = displayRealAway(match);
+
+  if (home === "" || away === "") {
+    return (
+      <div className="real-score-mini waiting">
+        Resultat reel : en attente
+      </div>
+    );
+  }
+
+  return (
+    <div className="real-score-mini">
+      Resultat reel : {home}-{away}
+    </div>
+  );
+}
+
+function bonusFinalPick(match, names) {
+  for (const name of names) {
+    const value = match?.[name];
+
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function bonusFinalRealHome(match) {
+  return bonusFinalPick(match, [
+    "homeScore",
+    "scoreHome",
+    "scoreDomicile",
+    "score1",
+    "resultHome",
+    "resultatDomicile"
+  ]);
+}
+
+function bonusFinalRealAway(match) {
+  return bonusFinalPick(match, [
+    "awayScore",
+    "scoreAway",
+    "scoreExterieur",
+    "score2",
+    "resultAway",
+    "resultatExterieur"
+  ]);
+}
+
+function bonusFinalPronoHome(prono) {
+  const value = prono?.homeScore ?? prono?.home ?? "";
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function bonusFinalPronoAway(prono) {
+  const value = prono?.awayScore ?? prono?.away ?? "";
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function bonusFinalResult(home, away) {
+  const h = Number(home);
+  const a = Number(away);
+
+  if (Number.isNaN(h) || Number.isNaN(a)) return null;
+  if (h > a) return "1";
+  if (h < a) return "2";
+  return "N";
+}
+
+function BonusResultBadgeFinal({ match, prono }) {
+  const realHomeRaw = bonusFinalRealHome(match);
+  const realAwayRaw = bonusFinalRealAway(match);
+
+  if (realHomeRaw === "" || realAwayRaw === "") {
+    return (
+      <div className="bonus-result-badge waiting">
+        <span>Resultat en attente</span>
+        <small>Score reel non saisi</small>
+      </div>
+    );
+  }
+
+  const pronoHomeRaw = bonusFinalPronoHome(prono);
+  const pronoAwayRaw = bonusFinalPronoAway(prono);
+
+  if (pronoHomeRaw === "" || pronoAwayRaw === "") {
+    return (
+      <div className="bonus-result-badge waiting">
+        <span>Score prono non saisi</span>
+        <small>Resultat reel : {realHomeRaw}-{realAwayRaw}</small>
+      </div>
+    );
+  }
+
+  const realHome = Number(realHomeRaw);
+  const realAway = Number(realAwayRaw);
+  const pronoHome = Number(pronoHomeRaw);
+  const pronoAway = Number(pronoAwayRaw);
+
+  const exact = realHome === pronoHome && realAway === pronoAway;
+  const goodResult =
+    bonusFinalResult(realHome, realAway) === bonusFinalResult(pronoHome, pronoAway);
+
+  if (exact) {
+    return (
+      <div className="bonus-result-badge exact">
+        <span>🎯 Score exact bonus +3 pts</span>
+        <small>Resultat reel : {realHomeRaw}-{realAwayRaw}</small>
+      </div>
+    );
+  }
+
+  if (goodResult) {
+    return (
+      <div className="bonus-result-badge good">
+        <span>✅ Bon bonus +2 pts</span>
+        <small>Resultat reel : {realHomeRaw}-{realAwayRaw}</small>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bonus-result-badge miss">
+      <span>❌ Bonus rate 0 pt</span>
+      <small>Resultat reel : {realHomeRaw}-{realAwayRaw}</small>
+    </div>
+  );
+}
 export default function PronosPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -517,16 +1041,32 @@ export default function PronosPage() {
 
     const key = selectedJournee.id;
 
+    const normalizedPatch = { ...patch };
+
+    if (Object.prototype.hasOwnProperty.call(normalizedPatch, "homeScore")) {
+      normalizedPatch.home = normalizedPatch.homeScore;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(normalizedPatch, "awayScore")) {
+      normalizedPatch.away = normalizedPatch.awayScore;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(normalizedPatch, "result")) {
+      normalizedPatch.value = normalizedPatch.result;
+    }
+
     setPronos((prev) => ({
       ...prev,
       [key]: {
         ...(prev[key] || {}),
         [match.id]: {
           ...((prev[key] || {})[match.id] || {}),
-          ...patch
+          ...normalizedPatch
         }
       }
     }));
+
+    window.dispatchEvent(new CustomEvent("pronos-updated"));
   }
 
   function getProno(id) {
@@ -855,6 +1395,249 @@ export default function PronosPage() {
         .match-card:has(.prono-result-clean.miss) .bonus-valid-btn {
           display: none !important;
         }
+
+        /* pronos-design-site-final */
+        .pronos-page-clean {
+          color: #f8fafc;
+        }
+
+        .pronos-header-clean,
+        .pronos-top-clean,
+        .pronos-hero-clean {
+          margin-bottom: 18px !important;
+          padding: 28px !important;
+          border-radius: 30px !important;
+          background:
+            radial-gradient(circle at top left, rgba(186,255,0,.16), transparent 34%),
+            linear-gradient(135deg, rgba(15,23,42,.98), rgba(29,78,216,.34)) !important;
+          border: 1px solid rgba(255,255,255,.10) !important;
+          box-shadow: 0 24px 70px rgba(0,0,0,.28) !important;
+        }
+
+        .pronos-header-clean h1,
+        .pronos-top-clean h1,
+        .pronos-hero-clean h1 {
+          margin: 0 !important;
+          font-size: 40px !important;
+          line-height: 1 !important;
+          font-weight: 950 !important;
+          letter-spacing: -.04em !important;
+        }
+
+        .match-card,
+        .bonus-card,
+        .bonus-match-card,
+        .prono-card-clean {
+          border-radius: 24px !important;
+          background: linear-gradient(180deg, rgba(20,32,51,.96), rgba(11,18,32,.98)) !important;
+          border: 1px solid rgba(255,255,255,.12) !important;
+          box-shadow: 0 16px 38px rgba(0,0,0,.22) !important;
+        }
+
+        .match-card.favorite,
+        .match-card.is-favorite,
+        .bonus-card.selected,
+        .bonus-match-card.selected,
+        .bonus-card.is-selected,
+        .bonus-match-card.is-selected {
+          border-color: rgba(186,255,0,.55) !important;
+          box-shadow:
+            0 0 0 1px rgba(186,255,0,.18),
+            0 18px 42px rgba(0,0,0,.28) !important;
+        }
+
+        .choice-btn,
+        .prono-choice-btn,
+        .bonus-choice-btn {
+          border-radius: 16px !important;
+          min-height: 52px !important;
+          font-weight: 950 !important;
+          border: 1px solid rgba(255,255,255,.12) !important;
+          background: rgba(255,255,255,.07) !important;
+          color: #ffffff !important;
+        }
+
+        .choice-btn.active,
+        .choice-btn.selected,
+        .prono-choice-btn.active,
+        .prono-choice-btn.selected,
+        .bonus-choice-btn.active,
+        .bonus-choice-btn.selected {
+          background: #baff00 !important;
+          color: #07111f !important;
+          border-color: #baff00 !important;
+          box-shadow: 0 12px 26px rgba(186,255,0,.18) !important;
+        }
+
+        .score-box,
+        .score-zone,
+        .favorite-score-box,
+        .bonus-score-box {
+          border-radius: 22px !important;
+          background: rgba(186,255,0,.06) !important;
+          border: 1px solid rgba(186,255,0,.28) !important;
+        }
+
+        .score-inputs input,
+        .score-input,
+        input[type="number"] {
+          border-radius: 16px !important;
+          background: rgba(15,23,42,.96) !important;
+          border: 1px solid rgba(255,255,255,.12) !important;
+          color: #ffffff !important;
+          font-weight: 950 !important;
+        }
+
+        .status-pill,
+        .match-status,
+        .bonus-pill {
+          border-radius: 999px !important;
+          background: rgba(34,197,94,.14) !important;
+          border: 1px solid rgba(34,197,94,.32) !important;
+          color: #bbf7d0 !important;
+          font-weight: 950 !important;
+        }
+
+        .prono-result-clean,
+        .bonus-result-badge,
+        .real-score-mini {
+          border-radius: 16px !important;
+          font-weight: 950 !important;
+        }
+
+        .prono-result-clean.good,
+        .bonus-result-badge.good {
+          background: rgba(34,197,94,.15) !important;
+          border: 1px solid rgba(34,197,94,.35) !important;
+          color: #bbf7d0 !important;
+        }
+
+        .prono-result-clean.exact,
+        .bonus-result-badge.exact {
+          background: rgba(186,255,0,.16) !important;
+          border: 1px solid rgba(186,255,0,.38) !important;
+          color: #d9ff66 !important;
+        }
+
+        .prono-result-clean.miss,
+        .bonus-result-badge.miss {
+          background: rgba(239,68,68,.15) !important;
+          border: 1px solid rgba(239,68,68,.35) !important;
+          color: #fecaca !important;
+        }
+
+        .real-score-mini {
+          background: rgba(255,255,255,.07) !important;
+          border: 1px solid rgba(255,255,255,.12) !important;
+          color: #dbeafe !important;
+        }
+
+        /* bonus-design-clean-final */
+        .bonus-card,
+        .bonus-match-card {
+          padding: 22px !important;
+          border-radius: 26px !important;
+          background: linear-gradient(180deg, rgba(20,32,51,.96), rgba(11,18,32,.98)) !important;
+          border: 1px solid rgba(255,255,255,.12) !important;
+          box-shadow: 0 16px 38px rgba(0,0,0,.22) !important;
+        }
+
+        .bonus-card.selected,
+        .bonus-match-card.selected,
+        .bonus-card.is-selected,
+        .bonus-match-card.is-selected {
+          border-color: rgba(34,197,94,.65) !important;
+          box-shadow:
+            0 0 0 1px rgba(34,197,94,.20),
+            0 18px 42px rgba(0,0,0,.28) !important;
+        }
+
+        .bonus-selected-btn,
+        .bonus-select-btn,
+        .bonus-choice-btn {
+          width: 100% !important;
+          min-height: 50px !important;
+          border-radius: 16px !important;
+          border: 1px solid rgba(34,197,94,.35) !important;
+          background: rgba(34,197,94,.13) !important;
+          color: #bbf7d0 !important;
+          font-weight: 950 !important;
+        }
+
+        .bonus-selected-btn,
+        .bonus-choice-btn.selected,
+        .bonus-choice-btn.active {
+          background: #22c55e !important;
+          color: #07111f !important;
+          border-color: #22c55e !important;
+        }
+
+        .bonus-result-badge {
+          margin-top: 12px !important;
+          padding: 13px 15px !important;
+          border-radius: 16px !important;
+          font-size: 14px !important;
+          font-weight: 950 !important;
+          display: grid !important;
+          gap: 5px !important;
+        }
+
+        .bonus-result-badge small {
+          display: block !important;
+          font-size: 12px !important;
+          font-weight: 900 !important;
+          opacity: .9 !important;
+        }
+
+        .bonus-result-badge.good {
+          background: rgba(34,197,94,.15) !important;
+          border: 1px solid rgba(34,197,94,.35) !important;
+          color: #bbf7d0 !important;
+        }
+
+        .bonus-result-badge.exact {
+          background: rgba(186,255,0,.16) !important;
+          border: 1px solid rgba(186,255,0,.38) !important;
+          color: #d9ff66 !important;
+        }
+
+        .bonus-result-badge.miss {
+          background: rgba(239,68,68,.15) !important;
+          border: 1px solid rgba(239,68,68,.35) !important;
+          color: #fecaca !important;
+        }
+
+        .bonus-result-badge.waiting {
+          background: rgba(148,163,184,.14) !important;
+          border: 1px solid rgba(148,163,184,.28) !important;
+          color: #cbd5e1 !important;
+        }
+
+        .real-score-mini {
+          display: none !important;
+        }
+
+        /* bonus-score-visible-final */
+        .bonus-result-badge {
+          margin-top: 12px !important;
+          padding: 13px 15px !important;
+          border-radius: 16px !important;
+          font-size: 14px !important;
+          font-weight: 950 !important;
+          display: grid !important;
+          gap: 6px !important;
+        }
+
+        .bonus-result-badge span {
+          display: block !important;
+        }
+
+        .bonus-result-badge small {
+          display: block !important;
+          font-size: 12px !important;
+          font-weight: 900 !important;
+          opacity: .9 !important;
+        }
         @media (max-width: 1100px) {
           .match-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -995,11 +1778,11 @@ export default function PronosPage() {
 
               <div className="teams">
                 <div className="team">
-                  <span>{match.home}</span>
+                  <span>{getDisplayHome(match)}</span>
                   <small>DOM</small>
                 </div>
                 <div className="team">
-                  <span>{match.away}</span>
+                  <span>{getDisplayAway(match)}</span>
                   <small>EXT</small>
                 </div>
               </div>
@@ -1012,7 +1795,7 @@ export default function PronosPage() {
                       type="number"
                       min="0"
                       disabled={blocked}
-                      value={prono.homeScore || ""}
+                      value={getPronoHomeValue(prono)}
                       onChange={(e) =>
                         updateProno(match, {
                           homeScore: e.target.value,
@@ -1026,7 +1809,7 @@ export default function PronosPage() {
                       type="number"
                       min="0"
                       disabled={blocked}
-                      value={prono.awayScore || ""}
+                      value={getPronoAwayValue(prono)}
                       onChange={(e) =>
                         updateProno(match, {
                           awayScore: e.target.value,
@@ -1036,6 +1819,7 @@ export default function PronosPage() {
                       placeholder="0"
                     />
                   </div>
+                  <PronoResultBadge match={match} prono={prono} type="favorite" />
                   <div className="muted">
                     {blocked
                       ? "Ce match est bloque."
@@ -1145,11 +1929,11 @@ export default function PronosPage() {
 
                 <div className="teams">
                   <div className="team">
-                    <span>{match.home}</span>
+                    <span>{getDisplayHome(match)}</span>
                     <small>DOM</small>
                   </div>
                   <div className="team">
-                    <span>{match.away}</span>
+                    <span>{getDisplayAway(match)}</span>
                     <small>EXT</small>
                   </div>
                 </div>
@@ -1162,7 +1946,7 @@ export default function PronosPage() {
                         type="number"
                         min="0"
                         disabled={blocked}
-                        value={prono.homeScore || ""}
+                        value={getPronoHomeValue(prono)}
                         onChange={(e) =>
                           updateProno(match, {
                             homeScore: e.target.value,
@@ -1176,7 +1960,7 @@ export default function PronosPage() {
                         type="number"
                         min="0"
                         disabled={blocked}
-                        value={prono.awayScore || ""}
+                        value={getPronoAwayValue(prono)}
                         onChange={(e) =>
                           updateProno(match, {
                             awayScore: e.target.value,
@@ -1186,6 +1970,8 @@ export default function PronosPage() {
                         placeholder="0"
                       />
                     </div>
+                    <BonusResultBadgeFinal match={match} prono={prono} />
+
                     <div className="muted">
                       {blocked
                         ? "Ce bonus est bloque."
@@ -1207,6 +1993,13 @@ export default function PronosPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
 
 
 

@@ -1,537 +1,1088 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
-import { getRegisteredPlayers } from '../utils/players';
-import '../styles/stats.css';
+﻿import React, { useEffect, useMemo, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
+import { getDisplayName } from "../utils/displayNames";
+import ProfileAvatar from "../components/ProfileAvatar";
 
+const CALENDAR_KEY = "admin_journees";
+const PRONOS_KEY = "prono_lm_clean_pronos";
+const BONUS_BY_JOURNEE_KEY = "prono_lm_bonus_selected_by_journee";
+const OLD_BONUS_KEY = "prono_lm_bonus_selected";
+const FAVORITE_TEAM_KEY = "favoriteTeam";
 
-const ADMIN_JOURNEES_KEY = "admin_journees";
-const ADMIN_MANAGER_KEY = "admin_pronos_manager_v3";
-
-function readStatsJson(key, fallback) {
+function parseJson(value, fallback) {
   try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
+    if (!value) return fallback;
+    return typeof value === "string" ? JSON.parse(value) : value;
   } catch {
     return fallback;
   }
 }
 
-function normalizeAdminStatsDate(value) {
-  return String(value || "").trim();
-}
-
-function normalizeAdminStatsTime(value) {
-  return String(value || "").trim();
-}
-
-function flattenAdminJourneesForStats() {
-  const journees =
-    readStatsJson(ADMIN_JOURNEES_KEY, null) ||
-    readStatsJson(ADMIN_MANAGER_KEY, null) ||
-    [];
-
-  if (!Array.isArray(journees) || !journees.length) {
-    return [];
-  }
-
-  return journees.flatMap((journee, journeeIndex) => {
-    const journeeId = journee.id || `j${journeeIndex + 1}`;
-    const journeeTitle = journee.title || `J${journee.number || journeeIndex + 1}`;
-
-    const ligue1Matches = Array.isArray(journee.matches)
-      ? journee.matches.map((match, matchIndex) => ({
-          ...match,
-          id: match.id || `${journeeId}-m${matchIndex + 1}`,
-          journeeId,
-          journeeTitle,
-          journeeNumber: journee.number || journeeIndex + 1,
-          type: "ligue1",
-          isBonus: false,
-          home: match.home || match.homeTeam || match.domicile || "",
-          away: match.away || match.awayTeam || match.exterieur || "",
-          date: normalizeAdminStatsDate(match.date),
-          time: normalizeAdminStatsTime(match.time),
-          status: match.status || match.statut || "Ouvert",
-          homeScore: match.homeScore ?? match.scoreDomicile ?? match.scoreHome ?? "",
-          awayScore: match.awayScore ?? match.scoreExterieur ?? match.scoreAway ?? "",
-          adminValidated: Boolean(match.adminValidated || match.validated || match.isValidated)
-        }))
-      : [];
-
-    const bonusMatches = Array.isArray(journee.bonus)
-      ? journee.bonus.map((match, matchIndex) => ({
-          ...match,
-          id: match.id || `${journeeId}-b${matchIndex + 1}`,
-          journeeId,
-          journeeTitle,
-          journeeNumber: journee.number || journeeIndex + 1,
-          type: "bonus",
-          isBonus: true,
-          league: match.league || match.competition || "",
-          home: match.home || match.homeTeam || match.domicile || "",
-          away: match.away || match.awayTeam || match.exterieur || "",
-          date: normalizeAdminStatsDate(match.date),
-          time: normalizeAdminStatsTime(match.time),
-          status: match.status || match.statut || "Ouvert",
-          homeScore: match.homeScore ?? match.scoreDomicile ?? match.scoreHome ?? "",
-          awayScore: match.awayScore ?? match.scoreExterieur ?? match.scoreAway ?? "",
-          adminValidated: Boolean(match.adminValidated || match.validated || match.isValidated)
-        }))
-      : [];
-
-    return [...ligue1Matches, ...bonusMatches];
-  });
-}
-
-function loadStatsMatchesFromAdminOrLegacy(legacyKey) {
-  const adminMatches = flattenAdminJourneesForStats();
-
-  if (adminMatches.length) {
-    try {
-      localStorage.setItem(legacyKey, JSON.stringify(adminMatches));
-    } catch {
-      // ignore storage errors
-    }
-
-    return adminMatches;
-  }
-
-  return readStatsJson(legacyKey, []);
-}
-
-const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';
-const PRONOS_KEY = 'prono_ligue1_lm_pronos_joueurs';
-const BONUS_CHOICES_KEY = 'prono_ligue1_lm_bonus_choices';
-const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
-const PLAYER_KEY = 'prono_ligue1_lm_current_player';
-
-const DEFAULT_PLAYERS = getRegisteredPlayers();
-
 function clean(value) {
-  return String(value || '')
+  return String(value || "")
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "")
     .trim();
 }
 
+function sameClub(a, b) {
+  const aliases = {
+    lens: "lens",
+    rclens: "lens",
+    racingclublens: "lens",
+    psg: "psg",
+    parissg: "psg",
+    parissaintgermain: "psg",
+    om: "marseille",
+    marseille: "marseille",
+    olympiquedemarseille: "marseille",
+    ol: "lyon",
+    lyon: "lyon",
+    olympiquelyonnais: "lyon",
+    losc: "lille",
+    lille: "lille",
+    lilleosc: "lille",
+    rcstrasbourg: "strasbourg",
+    strasbourg: "strasbourg"
+  };
+
+  const ca = clean(a);
+  const cb = clean(b);
+
+  return (aliases[ca] || ca) === (aliases[cb] || cb);
+}
+
+function getRawScore(match, names) {
+  for (const name of names) {
+    const value = match?.[name];
+
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function getScoreHome(match) {
+  return getRawScore(match, [
+    "scoreDomicile",
+    "scoreHome",
+    "homeScore",
+    "score1",
+    "resultHome",
+    "resultatDomicile"
+  ]);
+}
+
+function getScoreAway(match) {
+  return getRawScore(match, [
+    "scoreExterieur",
+    "scoreAway",
+    "awayScore",
+    "score2",
+    "resultAway",
+    "resultatExterieur"
+  ]);
+}
+
 function hasScore(match) {
-  return (
-    match.scoreDomicile !== null &&
-    match.scoreDomicile !== undefined &&
-    match.scoreExterieur !== null &&
-    match.scoreExterieur !== undefined
-  );
+  return getScoreHome(match) !== "" && getScoreAway(match) !== "";
 }
 
-function hasScoreProno(prono) {
-  return (
-    prono &&
-    prono.home !== '' &&
-    prono.home !== undefined &&
-    prono.away !== '' &&
-    prono.away !== undefined
-  );
-}
-
-function getResult(match) {
-  if (!hasScore(match)) return null;
-
-  const h = Number(match.scoreDomicile);
-  const a = Number(match.scoreExterieur);
+function getResult1N2(home, away) {
+  const h = Number(home);
+  const a = Number(away);
 
   if (Number.isNaN(h) || Number.isNaN(a)) return null;
-  if (h > a) return '1';
-  if (h < a) return '2';
-  return 'N';
+  if (h > a) return "1";
+  if (h < a) return "2";
+  return "N";
 }
 
-function getPoints(match, prono, scoreExactMode, isBonus) {
-  const result = getResult(match);
-  if (!result || !prono) return 0;
+function computeNormalPoints(match, prono) {
+  if (!get1N2Prono(prono) || !hasScore(match)) return { points: 0, correct: false };
 
-  if (scoreExactMode) {
-    if (!hasScoreProno(prono)) return 0;
+  const realResult = getResult1N2(getScoreHome(match), getScoreAway(match));
+  const correct = get1N2Prono(prono) === realResult;
 
-    const homeProno = Number(prono.home);
-    const awayProno = Number(prono.away);
-    const homeScore = Number(match.scoreDomicile);
-    const awayScore = Number(match.scoreExterieur);
+  return { points: correct ? 1 : 0, correct };
+}
 
-    if (homeProno === homeScore && awayProno === awayScore) {
-      return isBonus ? 3 : 2;
-    }
-
-    const predictedResult =
-      homeProno > awayProno ? '1' : homeProno < awayProno ? '2' : 'N';
-
-    if (predictedResult === result) {
-      return isBonus ? 2 : 1;
-    }
-
-    return 0;
+function computeExactModePoints(match, prono, type) {
+  if (!prono || !hasScore(match)) {
+    return { points: 0, exact: false, correct: false };
   }
 
-  return prono.value === result ? 1 : 0;
-}
+  const realHome = Number(getScoreHome(match));
+  const realAway = Number(getScoreAway(match));
+  const pronoHome = Number(getScorePronoHome(prono));
+  const pronoAway = Number(getScorePronoAway(prono));
 
-function isExact(match, prono, scoreExactMode) {
-  if (!scoreExactMode || !hasScore(match) || !hasScoreProno(prono)) return false;
-
-  return (
-    Number(prono.home) === Number(match.scoreDomicile) &&
-    Number(prono.away) === Number(match.scoreExterieur)
-  );
-}
-
-function isCorrectResult(match, prono, scoreExactMode) {
-  const result = getResult(match);
-  if (!result || !prono) return false;
-
-  if (scoreExactMode) {
-    if (!hasScoreProno(prono)) return false;
-
-    const homeProno = Number(prono.home);
-    const awayProno = Number(prono.away);
-
-    const predictedResult =
-      homeProno > awayProno ? '1' : homeProno < awayProno ? '2' : 'N';
-
-    return predictedResult === result;
+  if ([realHome, realAway, pronoHome, pronoAway].some(Number.isNaN)) {
+    return { points: 0, exact: false, correct: false };
   }
 
-  return prono.value === result;
-}
+  const exact = realHome === pronoHome && realAway === pronoAway;
+  const correct =
+    getResult1N2(realHome, realAway) === getResult1N2(pronoHome, pronoAway);
 
-function getPlayerFavorite(player, currentPlayer) {
-  const playerKey = `${FAVORITE_TEAM_KEY}_${player}`;
-  const savedPlayerTeam = localStorage.getItem(playerKey);
-
-  if (savedPlayerTeam) return savedPlayerTeam;
-
-  if (player === currentPlayer) {
-    return localStorage.getItem(FAVORITE_TEAM_KEY) || 'RC Lens';
+  if (type === "bonus") {
+    if (exact) return { points: 3, exact: true, correct: true };
+    if (correct) return { points: 2, exact: false, correct: true };
+    return { points: 0, exact: false, correct: false };
   }
 
-  return '';
+  if (exact) return { points: 2, exact: true, correct: true };
+  if (correct) return { points: 1, exact: false, correct: true };
+
+  return { points: 0, exact: false, correct: false };
 }
 
 function isFavoriteMatch(match, favoriteTeam) {
   return (
     favoriteTeam &&
-    (clean(match.domicile) === clean(favoriteTeam) ||
-      clean(match.exterieur) === clean(favoriteTeam))
+    favoriteTeam !== "Non choisi" &&
+    (sameClub(getTeamHome(match), favoriteTeam) || sameClub(getTeamAway(match), favoriteTeam))
   );
 }
 
-function cleanFavoriteClubDisplay(value) {
+function normalizeJournees(data) {
+  if (!Array.isArray(data)) return [];
+
+  return data.map((j, index) => ({
+    ...j,
+    id: j.id || `j${index + 1}`,
+    number: j.number || j.numero || index + 1,
+    title: j.title || `J${j.number || j.numero || index + 1}`,
+    matches: Array.isArray(j.matches) ? j.matches : Array.isArray(j.matchs) ? j.matchs : [],
+    bonus: Array.isArray(j.bonus) ? j.bonus : []
+  }));
+}
+
+function sortRanking(a, b) {
+  if (b.total !== a.total) return b.total - a.total;
+  if (b.specialExacts !== a.specialExacts) return b.specialExacts - a.specialExacts;
+  return String(a.playerName || "").localeCompare(String(b.playerName || ""), "fr");
+}
+
+function readFavoriteTeam(value) {
+  const parsed = parseJson(value, null);
+
+  if (typeof parsed === "string") return parsed;
+  if (parsed && typeof parsed === "object") {
+    return parsed.favoriteTeam || parsed.club || parsed.team || Object.values(parsed).find(Boolean) || "Non choisi";
+  }
+
+  return value || "Non choisi";
+}
+
+function rate(correct, attempts) {
+  if (!attempts) return 0;
+  return Math.round((correct / attempts) * 100);
+}
+
+function barPercent(value, total) {
+  if (!total) return 0;
+  return Math.round((value / total) * 100);
+}
+
+
+/* points-engine-safe-final */
+function getTeamHome(match) {
+  return match?.home || match?.domicile || match?.equipeDomicile || match?.homeTeam || match?.club1 || match?.equipe1 || "";
+}
+
+function getTeamAway(match) {
+  return match?.away || match?.exterieur || match?.equipeExterieur || match?.awayTeam || match?.club2 || match?.equipe2 || "";
+}
+
+function getFavoriteTeamValue(value) {
   if (!value) return "Non choisi";
 
-  if (typeof value === "string") {
-    const raw = value.trim();
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value) : value;
 
-    if (raw.startsWith("{") && raw.endsWith("}")) {
-      try {
-        const parsed = JSON.parse(raw);
-        return parsed.favoriteTeam || parsed.club || parsed.Manu || Object.values(parsed).find(Boolean) || "Non choisi";
-      } catch {
-        return raw;
-      }
+    if (typeof parsed === "string") return parsed;
+
+    if (parsed && typeof parsed === "object") {
+      return parsed.favoriteTeam || parsed.club || parsed.team || parsed.equipe || Object.values(parsed).find(Boolean) || "Non choisi";
     }
+  } catch {
+    return value;
+  }
 
-    return raw;
+  return value || "Non choisi";
+}
+
+function getJourneePronos(pronos, journee) {
+  const keys = [
+    journee?.id,
+    String(journee?.id || ""),
+    journee?.number,
+    String(journee?.number || ""),
+    `j${journee?.number}`,
+    `J${journee?.number}`,
+    journee?.title
+  ].filter(Boolean);
+
+  for (const key of keys) {
+    if (pronos?.[key] && typeof pronos[key] === "object") {
+      return pronos[key];
+    }
+  }
+
+  return {};
+}
+
+function getMatchKeyCandidates(match) {
+  const home = getTeamHome(match);
+  const away = getTeamAway(match);
+
+  const values = [
+    match?.id,
+    match?.matchId,
+    match?.idMatch,
+    match?.match_id,
+    match?.key,
+    match?.slug,
+    `${home}-${away}`,
+    `${home} vs ${away}`,
+    `${home} - ${away}`,
+    `${clean(home)}-${clean(away)}`,
+    `${clean(home)}vs${clean(away)}`
+  ]
+    .filter(Boolean)
+    .map((value) => String(value));
+
+  return [...new Set(values)];
+}
+
+function getPronoForMatch(playerJourneePronos, match) {
+  if (!playerJourneePronos || typeof playerJourneePronos !== "object") return null;
+
+  for (const key of getMatchKeyCandidates(match)) {
+    if (playerJourneePronos[key]) {
+      return playerJourneePronos[key];
+    }
+  }
+
+  const home = clean(getTeamHome(match));
+  const away = clean(getTeamAway(match));
+
+  for (const [key, value] of Object.entries(playerJourneePronos)) {
+    const cleanedKey = clean(key);
+
+    if (home && away && cleanedKey.includes(home) && cleanedKey.includes(away)) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function getScorePronoHome(prono) {
+  const value =
+    prono?.homeScore ??
+    prono?.home ??
+    prono?.scoreHome ??
+    prono?.pronoHome ??
+    prono?.domicile ??
+    prono?.scoreDomicile ??
+    "";
+
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function getScorePronoAway(prono) {
+  const value =
+    prono?.awayScore ??
+    prono?.away ??
+    prono?.scoreAway ??
+    prono?.pronoAway ??
+    prono?.exterieur ??
+    prono?.scoreExterieur ??
+    "";
+
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function isScorePronoFilled(prono) {
+  return getScorePronoHome(prono) !== "" && getScorePronoAway(prono) !== "";
+}
+
+function get1N2Prono(prono) {
+  const value =
+    prono?.result ??
+    prono?.value ??
+    prono?.prediction ??
+    prono?.pronostic ??
+    prono?.choice ??
+    "";
+
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function normalizeBonusChoice(value) {
+  if (!value) return "";
+
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
   }
 
   if (typeof value === "object") {
-    return value.favoriteTeam || value.club || value.Manu || Object.values(value).find(Boolean) || "Non choisi";
+    return String(
+      value.id ||
+      value.matchId ||
+      value.match_id ||
+      value.bonusId ||
+      value.selectedBonusId ||
+      value.title ||
+      value.label ||
+      value.match ||
+      ""
+    );
   }
 
-  return String(value);
+  return "";
 }
 
+function isSelectedBonusMatch(selectedBonusId, match) {
+  const selected = clean(normalizeBonusChoice(selectedBonusId));
+  if (!selected) return false;
+
+  return getMatchKeyCandidates(match).some((key) => {
+    const cleanedKey = clean(key);
+    return cleanedKey === selected || cleanedKey.includes(selected) || selected.includes(cleanedKey);
+  });
+}
 export default function StatsPage() {
-  const [matches, setMatches] = useState([]);
-  const [pronos, setPronos] = useState({});
-  const [bonusChoices, setBonusChoices] = useState({});
-  const [currentPlayer, setCurrentPlayer] = useState('Manu');
-  const [selectedPlayer, setSelectedPlayer] = useState('Manu');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [journees, setJournees] = useState([]);
+  const [profiles, setProfiles] = useState([]);
+  const [storageRows, setStorageRows] = useState([]);
+  const [selectedPlayerId, setSelectedPlayerId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  async function loadData(silent = false) {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user || null;
+      setCurrentUser(user);
+
+      let calendar = parseJson(localStorage.getItem(CALENDAR_KEY), []);
+
+      if ((!calendar || calendar.length === 0) && supabase) {
+        const { data } = await supabase
+          .from("app_settings")
+          .select("setting_value")
+          .eq("setting_key", CALENDAR_KEY)
+          .maybeSingle();
+
+        calendar = parseJson(data?.setting_value, []);
+      }
+
+      setJournees(normalizeJournees(calendar));
+
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("id,email,player_name,account_status")
+        .order("player_name", { ascending: true });
+
+      if (profileError) throw profileError;
+
+      const { data: pronoData, error: pronoError } = await supabase
+        .from("user_prono_storage")
+        .select("user_id,storage_key,storage_value");
+
+      if (pronoError) throw pronoError;
+
+      setProfiles(profileData || []);
+      setStorageRows(pronoData || []);
+
+      if (!selectedPlayerId && user?.id) {
+        setSelectedPlayerId(user.id);
+      }
+    } catch (err) {
+      setMessage(err.message || "Erreur chargement statistiques.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    const savedCurrentPlayer = localStorage.getItem(PLAYER_KEY) || 'Manu';
+    loadData();
 
-    setMatches(loadStatsMatchesFromAdminOrLegacy(MATCHS_KEY));
-    setPronos(JSON.parse(localStorage.getItem(PRONOS_KEY) || '{}'));
-    setBonusChoices(JSON.parse(localStorage.getItem(BONUS_CHOICES_KEY) || '{}'));
-    setCurrentPlayer(savedCurrentPlayer);
-    setSelectedPlayer(savedCurrentPlayer);
+    function refresh() {
+      loadData(true);
+    }
+
+    const interval = setInterval(refresh, 3000);
+
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("pronos-updated", refresh);
+    window.addEventListener("favorite-team-updated", refresh);
+    window.addEventListener("results-updated", refresh);
+    window.addEventListener("calendar-updated", refresh);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("pronos-updated", refresh);
+      window.removeEventListener("favorite-team-updated", refresh);
+      window.removeEventListener("results-updated", refresh);
+      window.removeEventListener("calendar-updated", refresh);
+    };
   }, []);
 
-  const scoredMatches = useMemo(() => matches.filter(hasScore), [matches]);
+
+  // auto-live-stats-final
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadData(true);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+  const activeProfiles = useMemo(() => {
+    return profiles.filter((p) => (p.account_status || "active") === "active");
+  }, [profiles]);
+
+  const storageByUser = useMemo(() => {
+    const map = {};
+
+    storageRows.forEach((row) => {
+      if (!map[row.user_id]) map[row.user_id] = {};
+      map[row.user_id][row.storage_key] = row.storage_value;
+    });
+
+    return map;
+  }, [storageRows]);
+
+  const scoredMatches = useMemo(() => {
+    const rows = [];
+
+    journees.forEach((journee) => {
+      [...(journee.matches || []), ...(journee.bonus || [])].forEach((match) => {
+        if (hasScore(match)) {
+          rows.push({
+            ...match,
+            journeeId: journee.id,
+            journeeTitle: journee.title,
+            journeeNumber: journee.number
+          });
+        }
+      });
+    });
+
+    return rows;
+  }, [journees]);
 
   const scoredJournees = useMemo(() => {
-    return [...new Set(scoredMatches.map((m) => String(m.journee || '').trim()).filter(Boolean))]
-      .sort((a, b) => Number(a) - Number(b));
+    return [...new Set(scoredMatches.map((m) => Number(m.journeeNumber || 0)).filter(Boolean))]
+      .sort((a, b) => a - b);
   }, [scoredMatches]);
 
-  function calculatePlayer(player) {
-    const favoriteTeam = getPlayerFavorite(player, currentPlayer);
-    const playerPronos = pronos[player] || {};
+  const lastJournee = scoredJournees[scoredJournees.length - 1] || 1;
+
+  function calculatePlayer(profile, onlyBeforeLast = false) {
+    const store = storageByUser[profile.id] || {};
+    const pronos = parseJson(store[PRONOS_KEY], {});
+    const bonusByJournee = parseJson(store[BONUS_BY_JOURNEE_KEY], {});
+    const oldBonus = store[OLD_BONUS_KEY] || "";
+    const favoriteTeam = getFavoriteTeamValue(store[FAVORITE_TEAM_KEY]);
 
     let total = 0;
-    let exacts = 0;
+    let favoritePoints = 0;
+    let bonusPoints = 0;
+    let normalPoints = 0;
+
+    let favoriteExacts = 0;
+    let bonusExacts = 0;
+
     let attempts = 0;
     let corrects = 0;
 
-    let normalPoints = 0;
-    let favoritePoints = 0;
-    let bonusPoints = 0;
-
-    let normalCorrect = 0;
     let normalAttempts = 0;
+    let normalCorrect = 0;
 
-    let favoriteCorrect = 0;
     let favoriteAttempts = 0;
-    let favoriteExacts = 0;
+    let favoriteCorrect = 0;
 
-    let bonusCorrect = 0;
     let bonusAttempts = 0;
-    let bonusExacts = 0;
+    let bonusCorrect = 0;
 
-    const byJournee = scoredJournees.map((journee) => {
+    let lastPoints = 0;
+
+    const byJournee = scoredJournees.map((num) => ({
+      journee: num,
+      points: 0
+    }));
+
+    journees.forEach((journee) => {
+      const isLast = Number(journee.number) === Number(lastJournee);
+      if (onlyBeforeLast && isLast) return;
+
+      const playerJourneePronos = getJourneePronos(pronos, journee);
       let dayPoints = 0;
 
-      scoredMatches
-        .filter((match) => String(match.journee || '') === String(journee))
-        .forEach((match) => {
-          const isBonus = match.type === 'BONUS';
-          const bonusKey = `${player}-J${journee}`;
-          const selectedBonusId = bonusChoices[bonusKey];
+      (journee.matches || []).forEach((match) => {
+        if (!hasScore(match)) return;
 
-          if (isBonus && selectedBonusId !== match.id) return;
+        const prono = getPronoForMatch(playerJourneePronos, match);
+        const favorite = isFavoriteMatch(match, favoriteTeam);
 
-          const favorite = isFavoriteMatch(match, favoriteTeam);
-          const scoreExactMode = favorite || isBonus;
-          const prono = playerPronos[match.id];
+        if (favorite) {
+          const hasAttempt = isScorePronoFilled(prono);
 
-          const attempted = scoreExactMode ? hasScoreProno(prono) : Boolean(prono?.value);
-          if (!attempted) return;
+          if (!hasAttempt) return;
 
-          const pts = getPoints(match, prono, scoreExactMode, isBonus);
-          const correct = isCorrectResult(match, prono, scoreExactMode);
-          const exact = isExact(match, prono, scoreExactMode);
+          const result = computeExactModePoints(match, prono, "favorite");
 
           attempts += 1;
-          if (correct) corrects += 1;
-          if (exact) exacts += 1;
+          favoriteAttempts += 1;
 
-          total += pts;
-          dayPoints += pts;
-
-          if (isBonus) {
-            bonusPoints += pts;
-            bonusAttempts += 1;
-            if (correct) bonusCorrect += 1;
-            if (exact) bonusExacts += 1;
-          } else if (favorite) {
-            favoritePoints += pts;
-            favoriteAttempts += 1;
-            if (correct) favoriteCorrect += 1;
-            if (exact) favoriteExacts += 1;
-          } else {
-            normalPoints += pts;
-            normalAttempts += 1;
-            if (correct) normalCorrect += 1;
+          if (result.correct) {
+            corrects += 1;
+            favoriteCorrect += 1;
           }
-        });
 
-      return {
-        journee,
-        points: dayPoints,
-      };
+          if (result.exact) favoriteExacts += 1;
+
+          total += result.points;
+          favoritePoints += result.points;
+          dayPoints += result.points;
+        } else {
+          if (!prono?.result) return;
+
+          const result = computeNormalPoints(match, prono);
+
+          attempts += 1;
+          normalAttempts += 1;
+
+          if (result.correct) {
+            corrects += 1;
+            normalCorrect += 1;
+          }
+
+          total += result.points;
+          normalPoints += result.points;
+          dayPoints += result.points;
+        }
+      });
+
+      (journee.bonus || []).forEach((match) => {
+        if (!hasScore(match)) return;
+
+        const selectedBonusId = bonusByJournee[journee.id] || oldBonus;
+        if (!isSelectedBonusMatch(selectedBonusId, match)) return;
+
+        const prono = getPronoForMatch(playerJourneePronos, match);
+
+        const hasAttempt = isScorePronoFilled(prono);
+
+        if (!hasAttempt) return;
+
+        const result = computeExactModePoints(match, prono, "bonus");
+
+        attempts += 1;
+        bonusAttempts += 1;
+
+        if (result.correct) {
+          corrects += 1;
+          bonusCorrect += 1;
+        }
+
+        if (result.exact) bonusExacts += 1;
+
+        total += result.points;
+        bonusPoints += result.points;
+        dayPoints += result.points;
+      });
+
+      const day = byJournee.find((d) => Number(d.journee) === Number(journee.number));
+      if (day) day.points += dayPoints;
+
+      if (isLast) lastPoints += dayPoints;
     });
 
-    const recentForm = byJournee.slice(-3);
-    const recentPoints = recentForm.reduce((sum, day) => sum + day.points, 0);
+    const playerName = profile.player_name || profile.email?.split("@")[0] || "Joueur";
+    const specialExacts = favoriteExacts + bonusExacts;
 
     return {
-      player,
+      id: profile.id,
+      playerName,
       favoriteTeam,
       total,
-      exacts,
-      attempts,
-      corrects,
-      successRate: attempts > 0 ? Math.round((corrects / attempts) * 100) : 0,
       normalPoints,
       favoritePoints,
       bonusPoints,
-      normalCorrect,
-      normalAttempts,
-      favoriteCorrect,
-      favoriteAttempts,
       favoriteExacts,
-      bonusCorrect,
-      bonusAttempts,
       bonusExacts,
-      byJournee,
-      recentForm,
-      recentPoints,
+      specialExacts,
+      attempts,
+      corrects,
+      successRate: rate(corrects, attempts),
+      normalAttempts,
+      normalCorrect,
+      favoriteAttempts,
+      favoriteCorrect,
+      bonusAttempts,
+      bonusCorrect,
+      lastPoints,
+      byJournee
     };
   }
 
   const allStats = useMemo(() => {
-    return DEFAULT_PLAYERS.map(calculatePlayer).sort((a, b) => {
-      if (b.total !== a.total) return b.total - a.total;
-      return b.exacts - a.exacts;
+    const current = activeProfiles
+      .map((profile) => calculatePlayer(profile, false))
+      .sort(sortRanking)
+      .map((item, index) => ({ ...item, rank: index + 1 }));
+
+    const beforeLast = activeProfiles
+      .map((profile) => calculatePlayer(profile, true))
+      .sort(sortRanking)
+      .map((item, index) => ({ playerName: item.playerName, oldRank: index + 1 }));
+
+    return current.map((item) => {
+      const old = beforeLast.find((entry) => entry.playerName === item.playerName);
+      const oldRank = old?.oldRank || item.rank;
+      const evolution = oldRank - item.rank;
+
+      return { ...item, oldRank, evolution };
     });
-  }, [matches, pronos, bonusChoices, currentPlayer, scoredJournees]);
+  }, [activeProfiles, storageByUser, journees, lastJournee, scoredJournees]);
 
-  const selectedStats = allStats.find((item) => item.player === selectedPlayer) || allStats[0];
+  const selectedStats =
+    allStats.find((item) => item.id === selectedPlayerId) ||
+    allStats.find((item) => item.id === currentUser?.id) ||
+    allStats[0];
 
-  const selectedDays = selectedStats?.byJournee || [];
+  const leader = allStats[0];
 
-  const bestDay = selectedDays.reduce((best, day) => {
+  const bestDayPlayer = allStats.reduce((best, player) => {
+    if (!best || player.lastPoints > best.lastPoints) return player;
+    return best;
+  }, null);
+
+  const bestBonus = [...allStats].sort((a, b) => b.bonusPoints - a.bonusPoints || b.bonusExacts - a.bonusExacts)[0];
+  const bestExact = [...allStats].sort((a, b) => b.specialExacts - a.specialExacts || b.total - a.total)[0];
+  const best1N2 = [...allStats].sort((a, b) => b.normalPoints - a.normalPoints || b.normalCorrect - a.normalCorrect)[0];
+
+  const bestDay = selectedStats?.byJournee?.reduce((best, day) => {
     if (!best || day.points > best.points) return day;
     return best;
   }, null);
 
-  const averageDayPoints =
-    selectedDays.length > 0
+  const average =
+    selectedStats?.byJournee?.length
       ? Math.round(
-          (selectedDays.reduce((sum, day) => sum + day.points, 0) / selectedDays.length) * 10
+          (selectedStats.byJournee.reduce((sum, day) => sum + day.points, 0) /
+            selectedStats.byJournee.length) *
+            10
         ) / 10
       : 0;
 
-  const topPointsList = [...allStats]
-    .sort((a, b) => b.total - a.total || b.exacts - a.exacts)
-    .slice(0, 3);
+  const topPoints = allStats.slice(0, 5);
+  const topBonus = [...allStats].sort((a, b) => b.bonusPoints - a.bonusPoints || b.bonusExacts - a.bonusExacts).slice(0, 5);
+  const topExact = [...allStats].sort((a, b) => b.specialExacts - a.specialExacts || b.total - a.total).slice(0, 5);
+  const top1N2 = [...allStats].sort((a, b) => b.normalPoints - a.normalPoints || b.normalCorrect - a.normalCorrect).slice(0, 5);
 
-  const topBonusList = [...allStats]
-    .sort((a, b) => b.bonusPoints - a.bonusPoints || b.bonusExacts - a.bonusExacts)
-    .slice(0, 3);
-
-  const topExactList = [...allStats]
-    .sort((a, b) => b.exacts - a.exacts || b.total - a.total)
-    .slice(0, 3);
-
-  const top1N2List = [...allStats]
-    .sort((a, b) => b.normalPoints - a.normalPoints || b.normalCorrect - a.normalCorrect)
-    .slice(0, 3);
-
-  const repartitionTotal =
-    (selectedStats?.normalPoints || 0) +
-    (selectedStats?.favoritePoints || 0) +
-    (selectedStats?.bonusPoints || 0);
-
-  function barWidth(value) {
-    if (repartitionTotal <= 0) return 0;
-    return Math.round((value / repartitionTotal) * 100);
-  }
-
-  if (matches.length === 0) {
+  if (loading) {
     return (
-      <div className="stats-page">
-        <section className="stats-header">
-          <div>
-            <p>STATS</p>
-            <h1>Statistiques</h1>
-            <span>Aucun match chargÃ© pour le moment.</span>
-          </div>
+      <div className="stats-page-final">
+        <section className="stats-header-final">
+          <h1>Statistiques</h1>
+          <p>Chargement des performances...</p>
         </section>
-
-        <div className="stats-empty">
-          Va dans Admin puis synchronise les matchs Ligue 1.
-        </div>
       </div>
     );
   }
 
   return (
-    <div className="stats-page">
-      <section className="stats-header">
+    <div className="stats-page-final">
+      <style>{`
+        .stats-page-final {
+          color: #f8fafc;
+        }
+
+        .stats-header-final {
+          margin-bottom: 18px;
+          padding: 28px;
+          border-radius: 30px;
+          background:
+            radial-gradient(circle at top left, rgba(186,255,0,.16), transparent 34%),
+            linear-gradient(135deg, rgba(15,23,42,.98), rgba(29,78,216,.34));
+          border: 1px solid rgba(255,255,255,.10);
+          box-shadow: 0 24px 70px rgba(0,0,0,.28);
+          display: flex;
+          justify-content: space-between;
+          gap: 18px;
+          align-items: flex-end;
+        }
+
+        .stats-header-final h1 {
+          margin: 0;
+          font-size: 40px;
+          line-height: 1;
+          font-weight: 950;
+          letter-spacing: -.04em;
+        }
+
+        .stats-header-final p {
+          margin: 10px 0 0;
+          color: #cbd5e1;
+          font-weight: 800;
+        }
+
+        .stats-select-box {
+          min-width: 240px;
+        }
+
+        .stats-select-box span {
+          display: block;
+          margin-bottom: 8px;
+          color: #baff00;
+          font-weight: 950;
+          text-transform: uppercase;
+          font-size: 12px;
+          letter-spacing: .08em;
+        }
+
+        .stats-select-box select {
+          width: 100%;
+          min-height: 46px;
+          border-radius: 16px;
+          border: 1px solid rgba(186,255,0,.38);
+          background: rgba(15,23,42,.96);
+          color: #ffffff;
+          padding: 0 14px;
+          font-weight: 950;
+          outline: none;
+        }
+
+        .stats-kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 14px;
+          margin-bottom: 18px;
+        }
+
+        .stats-kpi {
+          padding: 18px;
+          border-radius: 22px;
+          background: linear-gradient(180deg, rgba(20,32,51,.96), rgba(11,18,32,.98));
+          border: 1px solid rgba(255,255,255,.12);
+          box-shadow: 0 16px 38px rgba(0,0,0,.22);
+        }
+
+        .stats-kpi span {
+          display: block;
+          color: #9fb0ca;
+          font-size: 12px;
+          font-weight: 950;
+          text-transform: uppercase;
+          letter-spacing: .08em;
+          margin-bottom: 8px;
+        }
+
+        .stats-kpi strong {
+          display: block;
+          color: #ffffff;
+          font-size: 26px;
+          font-weight: 950;
+          line-height: 1.05;
+        }
+
+        .stats-kpi small {
+          display: block;
+          margin-top: 9px;
+          color: #baff00;
+          font-weight: 900;
+        }
+
+        .stats-main-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+          align-items: start;
+          margin-bottom: 18px;
+        }
+
+        .stats-card {
+          padding: 22px;
+          border-radius: 24px;
+          background: linear-gradient(180deg, rgba(15,23,42,.94), rgba(2,6,23,.96));
+          border: 1px solid rgba(255,255,255,.12);
+          box-shadow: 0 16px 38px rgba(0,0,0,.24);
+        }
+
+        .stats-card h2 {
+          margin: 0 0 14px;
+          font-size: 25px;
+          font-weight: 950;
+        }
+
+        .stats-profile-head {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+
+        .stats-profile-head h3 {
+          margin: 0;
+          font-size: 24px;
+          font-weight: 950;
+        }
+
+        .stats-profile-head p {
+          margin: 4px 0 0;
+          color: #94a3b8;
+          font-weight: 850;
+        }
+
+        .stats-line {
+          display: flex;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 13px 0;
+          border-bottom: 1px solid rgba(255,255,255,.08);
+          color: #cbd5e1;
+          font-weight: 850;
+        }
+
+        .stats-line:last-child {
+          border-bottom: 0;
+        }
+
+        .stats-line strong {
+          color: #ffffff;
+          text-align: right;
+        }
+
+        .stats-breakdown {
+          display: grid;
+          gap: 14px;
+        }
+
+        .stats-breakdown-top {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          color: #cbd5e1;
+          font-weight: 900;
+          margin-bottom: 8px;
+        }
+
+        .stats-breakdown-top strong {
+          color: #ffffff;
+        }
+
+        .stats-track {
+          height: 12px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.08);
+          overflow: hidden;
+        }
+
+        .stats-track div {
+          height: 100%;
+          border-radius: 999px;
+          background: #baff00;
+        }
+
+        .stats-evolution {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+          gap: 10px;
+        }
+
+        .stats-day {
+          padding: 12px;
+          border-radius: 16px;
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.10);
+          text-align: center;
+        }
+
+        .stats-day span {
+          display: block;
+          color: #94a3b8;
+          font-size: 12px;
+          font-weight: 950;
+        }
+
+        .stats-day strong {
+          display: block;
+          margin-top: 5px;
+          color: #d9ff66;
+          font-size: 20px;
+          font-weight: 950;
+        }
+
+        .stats-top-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 16px;
+        }
+
+        .stats-rank-list {
+          display: grid;
+          gap: 10px;
+        }
+
+        .stats-rank-row {
+          display: grid;
+          grid-template-columns: 40px 1fr auto;
+          align-items: center;
+          gap: 10px;
+          padding: 11px;
+          border-radius: 16px;
+          background: rgba(255,255,255,.06);
+          border: 1px solid rgba(255,255,255,.10);
+        }
+
+        .stats-rank {
+          width: 36px;
+          height: 36px;
+          border-radius: 13px;
+          display: grid;
+          place-items: center;
+          background: rgba(186,255,0,.14);
+          color: #baff00;
+          font-weight: 950;
+        }
+
+        .stats-player {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #ffffff;
+          font-weight: 950;
+        }
+
+        .stats-rank-row small {
+          display: block;
+          margin-top: 3px;
+          color: #94a3b8;
+          font-weight: 850;
+        }
+
+        .stats-value {
+          color: #d9ff66;
+          font-weight: 950;
+          white-space: nowrap;
+        }
+
+        .stats-empty {
+          padding: 15px 16px;
+          border-radius: 18px;
+          background: rgba(255,255,255,.05);
+          border: 1px dashed rgba(255,255,255,.16);
+          color: #94a3b8;
+          font-weight: 850;
+        }
+
+        @media (max-width: 1100px) {
+          .stats-kpi-grid,
+          .stats-main-grid,
+          .stats-top-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .stats-header-final {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .stats-select-box {
+            width: 100%;
+          }
+        }
+      `}</style>
+
+      <section className="stats-header-final">
         <div>
-          <p>STATS</p>
-          <h1>Analyse des performances</h1>
-          <span>
-            {scoredJournees.length} journÃ©e(s) avec rÃ©sultats Â· {DEFAULT_PLAYERS.length} joueurs
-          </span>
+          <h1>Statistiques</h1>
+          <p>
+            Analyse des performances - {scoredJournees.length} journee(s) avec resultats - {activeProfiles.length} joueurs
+          </p>
         </div>
 
-        <div className="stats-player-select">
-          <span>Joueur analysÃ©</span>
-          <select value={selectedPlayer} onChange={(e) => setSelectedPlayer(e.target.value)}>
-            {DEFAULT_PLAYERS.map((player) => (
-              <option key={player} value={player}>
-                {player}
-              </option>
-            ))}
-          </select>
-        </div>
       </section>
 
-      <section className="stats-kpis">
-        <article>
+      {message && <div className="stats-empty" style={{ marginBottom: 16 }}>{message}</div>}
+
+      <section className="stats-kpi-grid">
+        <article className="stats-kpi">
           <span>Total points</span>
           <strong>{selectedStats?.total || 0}</strong>
-          <small>{selectedStats?.player}</small>
+          <small>rang {selectedStats?.rank || "-"}</small>
         </article>
 
-        <article>
-          <span>Scores exacts</span>
-          <strong>{selectedStats?.exacts || 0}</strong>
-          <small>favori + bonus</small>
+        <article className="stats-kpi">
+          <span>Exact bonus/favori</span>
+          <strong>{selectedStats?.specialExacts || 0}</strong>
+          <small>{selectedStats?.favoriteExacts || 0} favori - {selectedStats?.bonusExacts || 0} bonus</small>
         </article>
 
-        <article>
-          <span>Points bonus</span>
-          <strong>{selectedStats?.bonusPoints || 0}</strong>
-          <small>{selectedStats?.bonusCorrect || 0} bonus rÃ©ussi(s)</small>
-        </article>
-
-        <article>
-          <span>RÃ©ussite</span>
+        <article className="stats-kpi">
+          <span>Reussite</span>
           <strong>{selectedStats?.successRate || 0}%</strong>
-          <small>{selectedStats?.corrects || 0}/{selectedStats?.attempts || 0} pronos</small>
+          <small>{selectedStats?.corrects || 0}/{selectedStats?.attempts || 0} bons pronos</small>
+        </article>
+
+        <article className="stats-kpi">
+          <span>Derniere journee</span>
+          <strong>+{selectedStats?.lastPoints || 0}</strong>
+          <small>J{lastJournee}</small>
         </article>
       </section>
 
       <section className="stats-main-grid">
-        <article className="stats-panel stats-evolution-minimal">
-          <div className="stats-panel-title">
-            <h2>Ã‰volution des points</h2>
-            <span>minimal</span>
-          </div>
-
-          <div className="stats-mini-evolution">
-            {selectedDays.map((day) => (
-              <div
-                key={day.journee}
-                className={`stats-mini-day ${
-                  day.points >= 8 ? 'hot' : day.points >= 5 ? 'ok' : 'low'
-                }`}
-              >
-                <span>J{day.journee}</span>
-                <strong>+{day.points}</strong>
-              </div>
-            ))}
-          </div>
-
-          <div className="stats-mini-summary">
-            <div>
-              <span>Meilleure journÃ©e</span>
-              <strong>{bestDay ? `J${bestDay.journee} Â· +${bestDay.points} pts` : '-'}</strong>
-            </div>
+        <article className="stats-card">
+          <div className="stats-profile-head">
+            <ProfileAvatar player={selectedStats?.playerName || "Joueur"} size={54} />
 
             <div>
-              <span>Moyenne</span>
-              <strong>{averageDayPoints} pts/J</strong>
+              <h3>{getDisplayName(selectedStats?.playerName || "Joueur")}</h3>
+              <p>{selectedStats?.favoriteTeam || "Club favori non choisi"}</p>
             </div>
+          </div>
+
+          <div className="stats-line">
+            <span>Leader actuel</span>
+            <strong>{leader ? `${getDisplayName(leader.playerName)} - ${leader.total} pts` : "-"}</strong>
+          </div>
+
+          <div className="stats-line">
+            <span>Joueur de la J{lastJournee}</span>
+            <strong>{bestDayPlayer ? `${getDisplayName(bestDayPlayer.playerName)} +${bestDayPlayer.lastPoints}` : "-"}</strong>
+          </div>
+
+          <div className="stats-line">
+            <span>Meilleure journee perso</span>
+            <strong>{bestDay ? `J${bestDay.journee} +${bestDay.points}` : "-"}</strong>
+          </div>
+
+          <div className="stats-line">
+            <span>Moyenne par journee</span>
+            <strong>{average} pts/J</strong>
           </div>
         </article>
 
-        <article className="stats-panel">
-          <div className="stats-panel-title">
-            <h2>RÃ©partition des points</h2>
-            <span>{selectedStats?.total || 0} pts</span>
-          </div>
+        <article className="stats-card">
+          <h2>Repartition des points</h2>
 
           <div className="stats-breakdown">
             <div>
@@ -539,18 +1090,18 @@ export default function StatsPage() {
                 <span>1N2 classique</span>
                 <strong>{selectedStats?.normalPoints || 0} pts</strong>
               </div>
-              <div className="stats-breakdown-track">
-                <div style={{ width: `${barWidth(selectedStats?.normalPoints || 0)}%` }} />
+              <div className="stats-track">
+                <div style={{ width: `${barPercent(selectedStats?.normalPoints || 0, selectedStats?.total || 0)}%` }} />
               </div>
             </div>
 
             <div>
               <div className="stats-breakdown-top">
-                <span>Ã‰quipe favorite</span>
+                <span>Equipe favorite</span>
                 <strong>{selectedStats?.favoritePoints || 0} pts</strong>
               </div>
-              <div className="stats-breakdown-track">
-                <div style={{ width: `${barWidth(selectedStats?.favoritePoints || 0)}%` }} />
+              <div className="stats-track">
+                <div style={{ width: `${barPercent(selectedStats?.favoritePoints || 0, selectedStats?.total || 0)}%` }} />
               </div>
             </div>
 
@@ -559,201 +1110,132 @@ export default function StatsPage() {
                 <span>Match bonus</span>
                 <strong>{selectedStats?.bonusPoints || 0} pts</strong>
               </div>
-              <div className="stats-breakdown-track">
-                <div style={{ width: `${barWidth(selectedStats?.bonusPoints || 0)}%` }} />
+              <div className="stats-track">
+                <div style={{ width: `${barPercent(selectedStats?.bonusPoints || 0, selectedStats?.total || 0)}%` }} />
               </div>
             </div>
           </div>
         </article>
       </section>
 
-      <section className="stats-tops stats-badge-board">
-        <article className="stats-badge-ranking">
-          <div className="stats-badge-head">
-            <span>Machine Ã  points</span>
-            <strong>ðŸ†</strong>
+      <section className="stats-main-grid">
+        <article className="stats-card">
+          <h2>Evolution par journee</h2>
+
+          {selectedStats?.byJournee?.length ? (
+            <div className="stats-evolution">
+              {selectedStats.byJournee.map((day) => (
+                <div className="stats-day" key={day.journee}>
+                  <span>J{day.journee}</span>
+                  <strong>+{day.points}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="stats-empty">Aucune journee notee pour le moment.</div>
+          )}
+        </article>
+
+        <article className="stats-card">
+          <h2>Efficacite par type</h2>
+
+          <div className="stats-line">
+            <span>1N2 classique</span>
+            <strong>{selectedStats?.normalCorrect || 0}/{selectedStats?.normalAttempts || 0} - {rate(selectedStats?.normalCorrect || 0, selectedStats?.normalAttempts || 0)}%</strong>
           </div>
 
-          <div className="mini-badge-list">
-            {topPointsList.map((player, index) => (
-              <div key={player.player} className="mini-badge-row">
-                <em>{index + 1}</em>
-                <strong>{player.player}</strong>
-                <span>{player.total} pts</span>
+          <div className="stats-line">
+            <span>Equipe favorite</span>
+            <strong>{selectedStats?.favoriteCorrect || 0}/{selectedStats?.favoriteAttempts || 0} - {rate(selectedStats?.favoriteCorrect || 0, selectedStats?.favoriteAttempts || 0)}%</strong>
+          </div>
+
+          <div className="stats-line">
+            <span>Match bonus</span>
+            <strong>{selectedStats?.bonusCorrect || 0}/{selectedStats?.bonusAttempts || 0} - {rate(selectedStats?.bonusCorrect || 0, selectedStats?.bonusAttempts || 0)}%</strong>
+          </div>
+        </article>
+      </section>
+
+      <section className="stats-top-grid">
+        <article className="stats-card">
+          <h2>Machine a points</h2>
+          <div className="stats-rank-list">
+            {topPoints.map((player) => (
+              <div className="stats-rank-row" key={player.id}>
+                <div className="stats-rank">{player.rank}</div>
+                <div>
+                  <div className="stats-player">
+                    <ProfileAvatar player={player.playerName} size={22} />
+                    <span>{getDisplayName(player.playerName)}</span>
+                  </div>
+                  <small>{player.specialExacts} exact(s)</small>
+                </div>
+                <div className="stats-value">{player.total}</div>
               </div>
             ))}
           </div>
         </article>
 
-        <article className="stats-badge-ranking">
-          <div className="stats-badge-head">
-            <span>Roi du bonus</span>
-            <strong>ðŸŽ¯</strong>
-          </div>
-
-          <div className="mini-badge-list">
-            {topBonusList.map((player, index) => (
-              <div key={player.player} className="mini-badge-row">
-                <em>{index + 1}</em>
-                <strong>{player.player}</strong>
-                <span>{player.bonusPoints} pts</span>
+        <article className="stats-card">
+          <h2>Roi du bonus</h2>
+          <div className="stats-rank-list">
+            {topBonus.map((player, index) => (
+              <div className="stats-rank-row" key={player.id}>
+                <div className="stats-rank">{index + 1}</div>
+                <div>
+                  <div className="stats-player">
+                    <ProfileAvatar player={player.playerName} size={22} />
+                    <span>{getDisplayName(player.playerName)}</span>
+                  </div>
+                  <small>{player.bonusExacts} exact(s)</small>
+                </div>
+                <div className="stats-value">{player.bonusPoints}</div>
               </div>
             ))}
           </div>
         </article>
 
-        <article className="stats-badge-ranking">
-          <div className="stats-badge-head">
-            <span>Expert exact</span>
-            <strong>ðŸ’Ž</strong>
-          </div>
-
-          <div className="mini-badge-list">
-            {topExactList.map((player, index) => (
-              <div key={player.player} className="mini-badge-row">
-                <em>{index + 1}</em>
-                <strong>{player.player}</strong>
-                <span>{player.exacts} exact</span>
+        <article className="stats-card">
+          <h2>Expert exact</h2>
+          <div className="stats-rank-list">
+            {topExact.map((player, index) => (
+              <div className="stats-rank-row" key={player.id}>
+                <div className="stats-rank">{index + 1}</div>
+                <div>
+                  <div className="stats-player">
+                    <ProfileAvatar player={player.playerName} size={22} />
+                    <span>{getDisplayName(player.playerName)}</span>
+                  </div>
+                  <small>bonus + favori</small>
+                </div>
+                <div className="stats-value">{player.specialExacts}</div>
               </div>
             ))}
           </div>
         </article>
 
-        <article className="stats-badge-ranking">
-          <div className="stats-badge-head">
-            <span>Meilleur 1N2</span>
-            <strong>âš½</strong>
-          </div>
-
-          <div className="mini-badge-list">
-            {top1N2List.map((player, index) => (
-              <div key={player.player} className="mini-badge-row">
-                <em>{index + 1}</em>
-                <strong>{player.player}</strong>
-                <span>{player.normalPoints} pts</span>
+        <article className="stats-card">
+          <h2>Meilleur 1N2</h2>
+          <div className="stats-rank-list">
+            {top1N2.map((player, index) => (
+              <div className="stats-rank-row" key={player.id}>
+                <div className="stats-rank">{index + 1}</div>
+                <div>
+                  <div className="stats-player">
+                    <ProfileAvatar player={player.playerName} size={22} />
+                    <span>{getDisplayName(player.playerName)}</span>
+                  </div>
+                  <small>{player.normalCorrect}/{player.normalAttempts} bons</small>
+                </div>
+                <div className="stats-value">{player.normalPoints}</div>
               </div>
             ))}
           </div>
         </article>
       </section>
-      <section className="stats-profile-section">
-        <article className="stats-profile-card">
-          <div className="stats-panel-title">
-            <h2>Profil stats</h2>
-            <span>{selectedStats?.player}</span>
-          </div>
-
-          <div className="stats-profile-main">
-            <div className="stats-profile-avatar">
-              {selectedStats?.player?.slice(0, 1)}
-            </div>
-
-            <div>
-              <h3>{selectedStats?.player}</h3>
-              <p>{selectedStats?.favoriteTeam || 'Club favori non renseignÃ©'}</p>
-            </div>
-          </div>
-
-          <div className="stats-profile-lines">
-            <div>
-              <span>Total points</span>
-              <strong>{selectedStats?.total || 0} pts</strong>
-            </div>
-
-            <div>
-              <span>RÃ©ussite globale</span>
-              <strong>{selectedStats?.successRate || 0}%</strong>
-            </div>
-
-            <div>
-              <span>Scores exacts</span>
-              <strong>{selectedStats?.exacts || 0}</strong>
-            </div>
-
-            <div>
-              <span>Bonus rÃ©ussis</span>
-              <strong>{selectedStats?.bonusCorrect || 0}</strong>
-            </div>
-          </div>
-        </article>
-
-        <article className="stats-profile-card">
-          <div className="stats-panel-title">
-            <h2>EfficacitÃ© par type</h2>
-            <span>rÃ©ussite</span>
-          </div>
-
-          <div className="stats-profile-lines">
-            <div>
-              <span>1N2 classique</span>
-              <strong>
-                {selectedStats?.normalCorrect || 0}/{selectedStats?.normalAttempts || 0} Â·{' '}
-                {selectedStats?.normalAttempts
-                  ? Math.round(((selectedStats?.normalCorrect || 0) / selectedStats.normalAttempts) * 100)
-                  : 0}%
-              </strong>
-            </div>
-
-            <div>
-              <span>Ã‰quipe favorite</span>
-              <strong>
-                {selectedStats?.favoriteCorrect || 0}/{selectedStats?.favoriteAttempts || 0} Â·{' '}
-                {selectedStats?.favoriteAttempts
-                  ? Math.round(((selectedStats?.favoriteCorrect || 0) / selectedStats.favoriteAttempts) * 100)
-                  : 0}%
-              </strong>
-            </div>
-
-            <div>
-              <span>Match bonus</span>
-              <strong>
-                {selectedStats?.bonusCorrect || 0}/{selectedStats?.bonusAttempts || 0} Â·{' '}
-                {selectedStats?.bonusAttempts
-                  ? Math.round(((selectedStats?.bonusCorrect || 0) / selectedStats.bonusAttempts) * 100)
-                  : 0}%
-              </strong>
-            </div>
-
-            <div className="highlight">
-              <span>RÃ©ussite globale</span>
-              <strong>{selectedStats?.successRate || 0}%</strong>
-            </div>
-          </div>
-        </article>
-
-        <article className="stats-profile-card">
-          <div className="stats-panel-title">
-            <h2>RepÃ¨res</h2>
-            <span>forme</span>
-          </div>
-
-          <div className="stats-profile-lines">
-            <div>
-              <span>Pronos jouÃ©s</span>
-              <strong>{selectedStats?.attempts || 0}</strong>
-            </div>
-
-            <div>
-              <span>Bons rÃ©sultats</span>
-              <strong>{selectedStats?.corrects || 0}</strong>
-            </div>
-
-            <div>
-              <span>Bonus exacts</span>
-              <strong>{selectedStats?.bonusExacts || 0}</strong>
-            </div>
-
-            <div>
-              <span>Favori exacts</span>
-              <strong>{selectedStats?.favoriteExacts || 0}</strong>
-            </div>
-          </div>
-        </article>
-      </section>
-</div>
+    </div>
   );
 }
-
 
 
 

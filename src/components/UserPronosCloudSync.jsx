@@ -1,216 +1,215 @@
-﻿import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-const PRONO_WORDS = [
-  "prono",
-  "pronos",
-  "pronostic",
-  "pronostics",
-  "prediction",
-  "predictions"
+const LAST_USER_KEY = "prono_lm_last_connected_user_id";
+const RELOAD_FLAG = "prono_lm_account_switch_reloaded";
+
+const SYNC_KEYS = [
+  "prono_lm_clean_pronos",
+  "prono_lm_bonus_selected_by_journee",
+  "prono_lm_bonus_selected",
+  "favoriteTeam",
+  "favoriteTeamValidated",
+  "clubFavori",
+  "selectedClub",
+  "favoriteClub"
 ];
 
-function isPronoKey(key) {
-  const lower = String(key || "").toLowerCase();
-
-  if (!PRONO_WORDS.some((word) => lower.includes(word))) {
-    return false;
-  }
-
-  if (
-    lower.includes("admin_journees") ||
-    lower.includes("journees") ||
-    lower.includes("calendar") ||
-    lower.includes("supabase") ||
-    lower.includes("auth")
-  ) {
-    return false;
-  }
-
-  return true;
+function hasLocalPlayerData() {
+  return SYNC_KEYS.some((key) => localStorage.getItem(key) !== null);
 }
 
-function getLocalPronoSnapshot() {
-  const snapshot = {};
-
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-
-      if (isPronoKey(key)) {
-        snapshot[key] = localStorage.getItem(key) || "";
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  return snapshot;
+function clearLocalPlayerData() {
+  SYNC_KEYS.forEach((key) => {
+    localStorage.removeItem(key);
+  });
 }
 
-function sameSnapshot(a, b) {
-  const aKeys = Object.keys(a || {}).sort();
-  const bKeys = Object.keys(b || {}).sort();
+function mirrorFavoriteTeam() {
+  const favorite =
+    localStorage.getItem("favoriteTeam") ||
+    localStorage.getItem("clubFavori") ||
+    localStorage.getItem("selectedClub") ||
+    localStorage.getItem("favoriteClub");
 
-  if (aKeys.length !== bKeys.length) return false;
+  if (!favorite) return;
 
-  for (let i = 0; i < aKeys.length; i++) {
-    const key = aKeys[i];
-
-    if (key !== bKeys[i]) return false;
-    if (a[key] !== b[key]) return false;
-  }
-
-  return true;
+  localStorage.setItem("favoriteTeam", favorite);
+  localStorage.setItem("clubFavori", favorite);
+  localStorage.setItem("selectedClub", favorite);
+  localStorage.setItem("favoriteClub", favorite);
 }
 
-function clearLocalPronos() {
-  try {
-    const keysToRemove = [];
+function mirrorValidated() {
+  const validated = localStorage.getItem("favoriteTeamValidated");
 
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
+  if (validated) {
+    localStorage.setItem("favoriteTeamValidated", validated);
+  }
+}
 
-      if (isPronoKey(key)) {
-        keysToRemove.push(key);
-      }
+export default function UserPronosCloudSync() {
+  const userIdRef = useRef(null);
+  const hydratedRef = useRef(false);
+  const savingRef = useRef(false);
+
+  async function hydrateUser(user) {
+    if (!user?.id) return;
+
+    hydratedRef.current = false;
+
+    const lastUserId = localStorage.getItem(LAST_USER_KEY);
+    const localHadData = hasLocalPlayerData();
+
+    const isDifferentUser = lastUserId && lastUserId !== user.id;
+    const isFirstUserAfterOldData = !lastUserId && localHadData;
+
+    if (isDifferentUser || isFirstUserAfterOldData) {
+      clearLocalPlayerData();
     }
 
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
-  } catch {
-    // ignore
-  }
-}
+    const { data, error } = await supabase
+      .from("user_prono_storage")
+      .select("storage_key,storage_value")
+      .eq("user_id", user.id);
 
-export default function UserPronosCloudSync({ session }) {
-  const [status, setStatus] = useState("idle");
-  const lastSnapshotRef = useRef({});
-  const loadingRef = useRef(false);
-  const userId = session?.user?.id || "";
-
-  useEffect(() => {
-    if (!userId || !supabase) return;
-
-    let cancelled = false;
-
-    async function loadUserPronos() {
-      loadingRef.current = true;
-      setStatus("loading");
-
-      try {
-        const { data, error } = await supabase
-          .from("user_prono_storage")
-          .select("storage_key,storage_value")
-          .eq("user_id", userId);
-
-        if (error) throw error;
-
-        if (cancelled) return;
-
-        clearLocalPronos();
-
-        (data || []).forEach((row) => {
-          if (row.storage_key && row.storage_value !== null) {
-            localStorage.setItem(row.storage_key, row.storage_value);
-          }
-        });
-
-        const snapshot = getLocalPronoSnapshot();
-        lastSnapshotRef.current = snapshot;
-
-        window.dispatchEvent(new Event("lm_pronos_loaded"));
-
-        setStatus("ready");
-      } catch {
-        setStatus("error");
-      } finally {
-        loadingRef.current = false;
-      }
+    if (error) {
+      console.error("Erreur chargement pronos cloud", error);
+      hydratedRef.current = true;
+      return;
     }
 
-    loadUserPronos();
+    clearLocalPlayerData();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
+    (data || []).forEach((row) => {
+      if (SYNC_KEYS.includes(row.storage_key)) {
+        localStorage.setItem(row.storage_key, row.storage_value);
+      }
+    });
 
-  useEffect(() => {
-    if (!userId || !supabase) return;
+    mirrorFavoriteTeam();
+    mirrorValidated();
 
-    async function saveSnapshotIfChanged() {
-      if (loadingRef.current) return;
+    localStorage.setItem(LAST_USER_KEY, user.id);
 
-      const current = getLocalPronoSnapshot();
-      const previous = lastSnapshotRef.current || {};
+    userIdRef.current = user.id;
+    hydratedRef.current = true;
 
-      if (sameSnapshot(current, previous)) return;
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new CustomEvent("pronos-updated"));
+    window.dispatchEvent(new CustomEvent("favorite-team-updated"));
+    window.dispatchEvent(new CustomEvent("bonus-choice-updated"));
 
-      const currentKeys = Object.keys(current);
-      const previousKeys = Object.keys(previous);
+    if ((isDifferentUser || isFirstUserAfterOldData) && sessionStorage.getItem(RELOAD_FLAG) !== user.id) {
+      sessionStorage.setItem(RELOAD_FLAG, user.id);
 
-      const deletedKeys = previousKeys.filter((key) => !(key in current));
+      setTimeout(() => {
+        window.location.reload();
+      }, 80);
+    }
+  }
 
-      try {
-        if (currentKeys.length > 0) {
-          const rows = currentKeys.map((key) => ({
+  async function saveUserData() {
+    const userId = userIdRef.current;
+
+    if (!userId || !hydratedRef.current || savingRef.current) return;
+
+    savingRef.current = true;
+
+    try {
+      mirrorFavoriteTeam();
+      mirrorValidated();
+
+      const rows = SYNC_KEYS
+        .map((key) => {
+          const value = localStorage.getItem(key);
+
+          if (value === null || value === undefined) return null;
+
+          return {
             user_id: userId,
             storage_key: key,
-            storage_value: current[key],
-            updated_at: new Date().toISOString(),
-          }));
+            storage_value: value,
+            updated_at: new Date().toISOString()
+          };
+        })
+        .filter(Boolean);
 
-          const { error } = await supabase
-            .from("user_prono_storage")
-            .upsert(rows, { onConflict: "user_id,storage_key" });
+      if (!rows.length) return;
 
-          if (error) throw error;
-        }
+      const { error } = await supabase
+        .from("user_prono_storage")
+        .upsert(rows, { onConflict: "user_id,storage_key" });
 
-        for (const key of deletedKeys) {
-          await supabase
-            .from("user_prono_storage")
-            .delete()
-            .eq("user_id", userId)
-            .eq("storage_key", key);
-        }
-
-        lastSnapshotRef.current = current;
-        setStatus("saved");
-      } catch {
-        setStatus("error");
+      if (error) {
+        console.error("Erreur sauvegarde pronos cloud", error);
       }
+    } finally {
+      savingRef.current = false;
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function start() {
+      const { data } = await supabase.auth.getUser();
+      const user = data?.user || null;
+
+      if (!mounted) return;
+
+      if (!user?.id) {
+        hydratedRef.current = false;
+        userIdRef.current = null;
+        clearLocalPlayerData();
+        localStorage.removeItem(LAST_USER_KEY);
+        return;
+      }
+
+      await hydrateUser(user);
     }
 
-    const interval = setInterval(saveSnapshotIfChanged, 1500);
+    start();
 
-    return () => clearInterval(interval);
-  }, [userId]);
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const user = session?.user || null;
 
-  if (!userId) return null;
+      if (!user?.id) {
+        hydratedRef.current = false;
+        userIdRef.current = null;
+        clearLocalPlayerData();
+        localStorage.removeItem(LAST_USER_KEY);
+        window.dispatchEvent(new Event("storage"));
+        return;
+      }
 
-  return (
-    <div
-      style={{
-        position: "fixed",
-        right: "16px",
-        bottom: "16px",
-        zIndex: 9999,
-        padding: "8px 12px",
-        borderRadius: "999px",
-        background: "rgba(15,23,42,0.88)",
-        border: "1px solid rgba(255,255,255,0.14)",
-        color: status === "error" ? "#fecaca" : "#cbd5e1",
-        fontSize: "12px",
-        fontWeight: 800,
-        pointerEvents: "none"
-      }}
-    >
-      {status === "loading" && "Pronos : chargement..."}
-      {status === "ready" && "Pronos : connectes"}
-      {status === "saved" && "Pronos : sauvegardes"}
-      {status === "error" && "Pronos : erreur sync"}
-      {status === "idle" && "Pronos : attente"}
-    </div>
-  );
+      await hydrateUser(user);
+    });
+
+    const interval = setInterval(() => {
+      saveUserData();
+    }, 1500);
+
+    function handleUpdate() {
+      saveUserData();
+    }
+
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("pronos-updated", handleUpdate);
+    window.addEventListener("favorite-team-updated", handleUpdate);
+    window.addEventListener("bonus-choice-updated", handleUpdate);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+      listener?.subscription?.unsubscribe?.();
+
+      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("pronos-updated", handleUpdate);
+      window.removeEventListener("favorite-team-updated", handleUpdate);
+      window.removeEventListener("bonus-choice-updated", handleUpdate);
+    };
+  }, []);
+
+  return null;
 }
