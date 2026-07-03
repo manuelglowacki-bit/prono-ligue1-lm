@@ -1,261 +1,372 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
-import { getRegisteredPlayers } from '../utils/players';
-import '../styles/ranking.css';
-import { getDisplayName } from '../utils/displayNames';
-import PlayerBadges from '../components/PlayerBadges';
-import ProfileAvatar from '../components/ProfileAvatar';
+﻿import React, { useEffect, useMemo, useState } from "react";
+import "../styles/ranking.css";
+import { supabase } from "../lib/supabaseClient";
+import { getDisplayName } from "../utils/displayNames";
+import PlayerBadges from "../components/PlayerBadges";
+import ProfileAvatar from "../components/ProfileAvatar";
 
-const MATCHS_KEY = 'prono_ligue1_lm_matchs_admin';
-const PRONOS_KEY = 'prono_ligue1_lm_pronos_joueurs';
-const BONUS_CHOICES_KEY = 'prono_ligue1_lm_bonus_choices';
-const FAVORITE_TEAM_KEY = 'prono_ligue1_lm_favorite_team';
-const PLAYER_KEY = 'prono_ligue1_lm_current_player';
+const CALENDAR_KEY = "admin_journees";
+const PRONOS_KEY = "prono_lm_clean_pronos";
+const BONUS_BY_JOURNEE_KEY = "prono_lm_bonus_selected_by_journee";
+const OLD_BONUS_KEY = "prono_lm_bonus_selected";
+const FAVORITE_TEAM_KEY = "favoriteTeam";
 
-const DEFAULT_PLAYERS = getRegisteredPlayers();
+function parseJson(value, fallback) {
+  try {
+    if (!value) return fallback;
+    return typeof value === "string" ? JSON.parse(value) : value;
+  } catch {
+    return fallback;
+  }
+}
 
 function clean(value) {
-  return String(value || '')
+  return String(value || "")
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "")
     .trim();
 }
 
+function sameClub(a, b) {
+  const aliases = {
+    lens: "lens",
+    rclens: "lens",
+    racingclublens: "lens",
+    psg: "psg",
+    parissg: "psg",
+    parissaintgermain: "psg",
+    om: "marseille",
+    marseille: "marseille",
+    olympiquedemarseille: "marseille",
+    ol: "lyon",
+    lyon: "lyon",
+    olympiquelyonnais: "lyon",
+    losc: "lille",
+    lille: "lille",
+    lilleosc: "lille",
+    rcstrasbourg: "strasbourg",
+    strasbourg: "strasbourg"
+  };
+
+  const ca = clean(a);
+  const cb = clean(b);
+
+  return (aliases[ca] || ca) === (aliases[cb] || cb);
+}
+
+function getRawScore(match, names) {
+  for (const name of names) {
+    const value = match?.[name];
+
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function getScoreHome(match) {
+  return getRawScore(match, [
+    "scoreDomicile",
+    "scoreHome",
+    "homeScore",
+    "score1",
+    "resultHome",
+    "resultatDomicile"
+  ]);
+}
+
+function getScoreAway(match) {
+  return getRawScore(match, [
+    "scoreExterieur",
+    "scoreAway",
+    "awayScore",
+    "score2",
+    "resultAway",
+    "resultatExterieur"
+  ]);
+}
+
 function hasScore(match) {
-  return (
-    match.scoreDomicile !== null &&
-    match.scoreDomicile !== undefined &&
-    match.scoreExterieur !== null &&
-    match.scoreExterieur !== undefined
-  );
+  return getScoreHome(match) !== "" && getScoreAway(match) !== "";
 }
 
-function hasScoreProno(prono) {
-  return (
-    prono &&
-    prono.home !== '' &&
-    prono.home !== undefined &&
-    prono.away !== '' &&
-    prono.away !== undefined
-  );
-}
-
-function getResult(match) {
-  if (!hasScore(match)) return null;
-
-  const h = Number(match.scoreDomicile);
-  const a = Number(match.scoreExterieur);
+function getResult1N2(home, away) {
+  const h = Number(home);
+  const a = Number(away);
 
   if (Number.isNaN(h) || Number.isNaN(a)) return null;
-  if (h > a) return '1';
-  if (h < a) return '2';
-  return 'N';
+  if (h > a) return "1";
+  if (h < a) return "2";
+  return "N";
 }
 
-function getPoints(match, prono, scoreExactMode, isBonus) {
-  const result = getResult(match);
-  if (!result || !prono) return 0;
+function computeNormalPoints(match, prono) {
+  if (!prono?.result || !hasScore(match)) return 0;
 
-  if (scoreExactMode) {
-    if (!hasScoreProno(prono)) return 0;
+  const realResult = getResult1N2(getScoreHome(match), getScoreAway(match));
 
-    const homeProno = Number(prono.home);
-    const awayProno = Number(prono.away);
-    const homeScore = Number(match.scoreDomicile);
-    const awayScore = Number(match.scoreExterieur);
+  return prono.result === realResult ? 1 : 0;
+}
 
-    if (homeProno === homeScore && awayProno === awayScore) {
-      return isBonus ? 3 : 2;
-    }
-
-    const predictedResult =
-      homeProno > awayProno ? '1' : homeProno < awayProno ? '2' : 'N';
-
-    if (predictedResult === result) {
-      return isBonus ? 2 : 1;
-    }
-
-    return 0;
+function computeExactModePoints(match, prono, type) {
+  if (!prono || !hasScore(match)) {
+    return { points: 0, exact: 0 };
   }
 
-  return prono.value === result ? 1 : 0;
-}
+  const realHome = Number(getScoreHome(match));
+  const realAway = Number(getScoreAway(match));
+  const pronoHome = Number(prono.homeScore ?? prono.home);
+  const pronoAway = Number(prono.awayScore ?? prono.away);
 
-function getExact(match, prono, scoreExactMode) {
-  if (!scoreExactMode || !hasScore(match) || !hasScoreProno(prono)) return 0;
-
-  return Number(prono.home) === Number(match.scoreDomicile) &&
-    Number(prono.away) === Number(match.scoreExterieur)
-    ? 1
-    : 0;
-}
-
-function getPlayerFavorite(player, currentPlayer) {
-  const playerKey = `${FAVORITE_TEAM_KEY}_${player}`;
-  const savedPlayerTeam = localStorage.getItem(playerKey);
-
-  if (savedPlayerTeam) return savedPlayerTeam;
-
-  if (player === currentPlayer) {
-    return localStorage.getItem(FAVORITE_TEAM_KEY) || 'RC Lens';
+  if ([realHome, realAway, pronoHome, pronoAway].some(Number.isNaN)) {
+    return { points: 0, exact: 0 };
   }
 
-  return '';
+  const exact = realHome === pronoHome && realAway === pronoAway;
+  const good1N2 =
+    getResult1N2(realHome, realAway) === getResult1N2(pronoHome, pronoAway);
+
+  if (type === "bonus") {
+    if (exact) return { points: 3, exact: 1 };
+    if (good1N2) return { points: 2, exact: 0 };
+    return { points: 0, exact: 0 };
+  }
+
+  if (exact) return { points: 2, exact: 1 };
+  if (good1N2) return { points: 1, exact: 0 };
+
+  return { points: 0, exact: 0 };
 }
 
 function isFavoriteMatch(match, favoriteTeam) {
   return (
     favoriteTeam &&
-    (clean(match.domicile) === clean(favoriteTeam) ||
-      clean(match.exterieur) === clean(favoriteTeam))
+    favoriteTeam !== "Non choisi" &&
+    (sameClub(match.home, favoriteTeam) || sameClub(match.away, favoriteTeam))
   );
 }
 
+function normalizeJournees(data) {
+  if (!Array.isArray(data)) return [];
+
+  return data.map((j, index) => ({
+    ...j,
+    id: j.id || `j${index + 1}`,
+    number: j.number || j.numero || index + 1,
+    title: j.title || `J${j.number || j.numero || index + 1}`,
+    matches: Array.isArray(j.matches) ? j.matches : Array.isArray(j.matchs) ? j.matchs : [],
+    bonus: Array.isArray(j.bonus) ? j.bonus : []
+  }));
+}
+
 function getRankIcon(index) {
-  if (index === 0) return 'ðŸ¥‡';
-  if (index === 1) return 'ðŸ¥ˆ';
-  if (index === 2) return 'ðŸ¥‰';
+  if (index === 0) return "1";
+  if (index === 1) return "2";
+  if (index === 2) return "3";
   return index + 1;
 }
 
 function getEvolutionLabel(evo) {
-  if (evo > 0) return `â†‘ +${evo}`;
-  if (evo < 0) return `â†“ ${evo}`;
-  return 'â†’ 0';
+  if (evo > 0) return `+${evo}`;
+  if (evo < 0) return `${evo}`;
+  return "0";
 }
 
 function getEvolutionClass(evo) {
-  if (evo > 0) return 'up';
-  if (evo < 0) return 'down';
-  return 'same';
+  if (evo > 0) return "up";
+  if (evo < 0) return "down";
+  return "same";
 }
 
-function cleanFavoriteClubDisplay(value) {
-  if (!value) return "Non choisi";
-
-  if (typeof value === "string") {
-    const raw = value.trim();
-
-    if (raw.startsWith("{") && raw.endsWith("}")) {
-      try {
-        const parsed = JSON.parse(raw);
-        return parsed.favoriteTeam || parsed.club || parsed.Manu || Object.values(parsed).find(Boolean) || "Non choisi";
-      } catch {
-        return raw;
-      }
-    }
-
-    return raw;
-  }
-
-  if (typeof value === "object") {
-    return value.favoriteTeam || value.club || value.Manu || Object.values(value).find(Boolean) || "Non choisi";
-  }
-
-  return String(value);
+function sortRanking(a, b) {
+  if (b.total !== a.total) return b.total - a.total;
+  if (b.specialExacts !== a.specialExacts) return b.specialExacts - a.specialExacts;
+  return String(a.playerName || "").localeCompare(String(b.playerName || ""), "fr");
 }
 
 export default function RankingPage() {
-  const [matches, setMatches] = useState([]);
-  const [pronos, setPronos] = useState({});
-  const [bonusChoices, setBonusChoices] = useState({});
-  const [currentPlayer, setCurrentPlayer] = useState('Manu');
+  const [journees, setJournees] = useState([]);
+  const [profiles, setProfiles] = useState([]);
+  const [storageRows, setStorageRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  async function loadRankingData() {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      let calendar = parseJson(localStorage.getItem(CALENDAR_KEY), []);
+
+      if ((!calendar || calendar.length === 0) && supabase) {
+        const { data } = await supabase
+          .from("app_settings")
+          .select("setting_value")
+          .eq("setting_key", CALENDAR_KEY)
+          .maybeSingle();
+
+        calendar = parseJson(data?.setting_value, []);
+      }
+
+      setJournees(normalizeJournees(calendar));
+
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("id,email,player_name,account_status")
+        .order("player_name", { ascending: true });
+
+      if (profileError) throw profileError;
+
+      const { data: pronoData, error: pronoError } = await supabase
+        .from("user_prono_storage")
+        .select("user_id,storage_key,storage_value");
+
+      if (pronoError) throw pronoError;
+
+      setProfiles(profileData || []);
+      setStorageRows(pronoData || []);
+    } catch (err) {
+      setMessage(err.message || "Erreur chargement classement.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    setMatches(JSON.parse(localStorage.getItem(MATCHS_KEY) || '[]'));
-    setPronos(JSON.parse(localStorage.getItem(PRONOS_KEY) || '{}'));
-    setBonusChoices(JSON.parse(localStorage.getItem(BONUS_CHOICES_KEY) || '{}'));
-    setCurrentPlayer(localStorage.getItem(PLAYER_KEY) || 'Manu');
+    loadRankingData();
   }, []);
 
   const scoredMatches = useMemo(() => {
-    return matches.filter(hasScore);
-  }, [matches]);
+    const rows = [];
 
-  const scoredJournees = useMemo(() => {
-    return [...new Set(scoredMatches.map((m) => String(m.journee || '').trim()).filter(Boolean))]
-      .sort((a, b) => Number(a) - Number(b));
-  }, [scoredMatches]);
-
-  const lastJournee = scoredJournees[scoredJournees.length - 1] || '1';
-
-  function calculatePlayer(player, onlyBeforeLast = false) {
-    const favoriteTeam = getPlayerFavorite(player, currentPlayer);
-    const playerPronos = pronos[player] || {};
-
-    let total = 0;
-    let exacts = 0;
-    let lastPoints = 0;
-
-    scoredMatches.forEach((match) => {
-      const journee = String(match.journee || '');
-      const isLast = journee === String(lastJournee);
-
-      if (onlyBeforeLast && isLast) return;
-
-      const isBonus = match.type === 'BONUS';
-      const bonusKey = `${player}-J${journee}`;
-      const selectedBonusId = bonusChoices[bonusKey];
-
-      if (isBonus && selectedBonusId !== match.id) return;
-
-      const favorite = isFavoriteMatch(match, favoriteTeam);
-      const scoreExactMode = favorite || isBonus;
-      const prono = playerPronos[match.id];
-
-      const pts = getPoints(match, prono, scoreExactMode, isBonus);
-      const exact = getExact(match, prono, scoreExactMode);
-
-      total += pts;
-      exacts += exact;
-
-      if (isLast) {
-        lastPoints += pts;
-      }
+    journees.forEach((journee) => {
+      [...(journee.matches || []), ...(journee.bonus || [])].forEach((match) => {
+        if (hasScore(match)) {
+          rows.push({
+            ...match,
+            journeeId: journee.id,
+            journeeTitle: journee.title,
+            journeeNumber: journee.number
+          });
+        }
+      });
     });
 
+    return rows;
+  }, [journees]);
+
+  const scoredJournees = useMemo(() => {
+    return [...new Set(scoredMatches.map((m) => Number(m.journeeNumber || 0)).filter(Boolean))]
+      .sort((a, b) => a - b);
+  }, [scoredMatches]);
+
+  const lastJournee = scoredJournees[scoredJournees.length - 1] || 1;
+
+  const storageByUser = useMemo(() => {
+    const map = {};
+
+    storageRows.forEach((row) => {
+      if (!map[row.user_id]) map[row.user_id] = {};
+      map[row.user_id][row.storage_key] = row.storage_value;
+    });
+
+    return map;
+  }, [storageRows]);
+
+  function calculatePlayer(profile, onlyBeforeLast = false) {
+    const store = storageByUser[profile.id] || {};
+    const pronos = parseJson(store[PRONOS_KEY], {});
+    const bonusByJournee = parseJson(store[BONUS_BY_JOURNEE_KEY], {});
+    const oldBonus = store[OLD_BONUS_KEY] || "";
+    const favoriteTeam = store[FAVORITE_TEAM_KEY] || "Non choisi";
+
+    let total = 0;
+    let favoriteExact = 0;
+    let bonusExact = 0;
+    let lastPoints = 0;
+
+    journees.forEach((journee) => {
+      const isLast = Number(journee.number) === Number(lastJournee);
+      if (onlyBeforeLast && isLast) return;
+
+      const playerJourneePronos = pronos[journee.id] || {};
+
+      (journee.matches || []).forEach((match) => {
+        if (!hasScore(match)) return;
+
+        const prono = playerJourneePronos[match.id];
+        const favorite = isFavoriteMatch(match, favoriteTeam);
+
+        let result;
+
+        if (favorite) {
+          result = computeExactModePoints(match, prono, "favorite");
+          favoriteExact += result.exact;
+        } else {
+          result = { points: computeNormalPoints(match, prono), exact: 0 };
+        }
+
+        total += result.points;
+        if (isLast) lastPoints += result.points;
+      });
+
+      (journee.bonus || []).forEach((match) => {
+        if (!hasScore(match)) return;
+
+        const selectedBonusId = bonusByJournee[journee.id] || oldBonus;
+        if (selectedBonusId !== match.id) return;
+
+        const prono = playerJourneePronos[match.id];
+        const result = computeExactModePoints(match, prono, "bonus");
+
+        total += result.points;
+        bonusExact += result.exact;
+        if (isLast) lastPoints += result.points;
+      });
+    });
+
+    const playerName = profile.player_name || profile.email?.split("@")[0] || "Joueur";
+
     return {
-      player,
+      player: playerName,
+      playerName,
       total,
-      exacts,
+      favoriteExact,
+      bonusExact,
+      specialExacts: favoriteExact + bonusExact,
       lastPoints,
-      favoriteTeam,
+      favoriteTeam
     };
   }
 
   const ranking = useMemo(() => {
-    const current = DEFAULT_PLAYERS.map((player) => calculatePlayer(player, false))
-      .sort((a, b) => {
-        if (b.total !== a.total) return b.total - a.total;
-        return b.exacts - a.exacts;
-      })
-      .map((item, index) => ({
-        ...item,
-        rank: index + 1,
-      }));
+    const activeProfiles = profiles.filter((p) => {
+      const status = p.account_status || "active";
+      return status === "active";
+    });
 
-    const beforeLast = DEFAULT_PLAYERS.map((player) => calculatePlayer(player, true))
-      .sort((a, b) => {
-        if (b.total !== a.total) return b.total - a.total;
-        return b.exacts - a.exacts;
-      })
-      .map((item, index) => ({
-        player: item.player,
-        oldRank: index + 1,
-      }));
+    const current = activeProfiles
+      .map((profile) => calculatePlayer(profile, false))
+      .sort(sortRanking)
+      .map((item, index) => ({ ...item, rank: index + 1 }));
+
+    const beforeLast = activeProfiles
+      .map((profile) => calculatePlayer(profile, true))
+      .sort(sortRanking)
+      .map((item, index) => ({ playerName: item.playerName, oldRank: index + 1 }));
 
     return current.map((item) => {
-      const old = beforeLast.find((entry) => entry.player === item.player);
+      const old = beforeLast.find((entry) => entry.playerName === item.playerName);
       const oldRank = old?.oldRank || item.rank;
       const evolution = oldRank - item.rank;
 
-      return {
-        ...item,
-        oldRank,
-        evolution,
-      };
+      return { ...item, oldRank, evolution };
     });
-  }, [matches, pronos, bonusChoices, currentPlayer, lastJournee]);
+  }, [profiles, storageByUser, journees, lastJournee]);
 
   const leader = ranking[0];
   const podium = ranking.slice(0, 3);
@@ -271,19 +382,47 @@ export default function RankingPage() {
     return best;
   }, null);
 
-  if (matches.length === 0) {
+  if (loading) {
     return (
       <div className="ranking-page">
         <section className="ranking-header">
           <div>
             <p>CLASSEMENT</p>
-            <h1>Classement gÃ©nÃ©ral</h1>
-            <span>Aucun match chargÃ© pour le moment.</span>
+            <h1>Classement general</h1>
+            <span>Chargement du classement automatique...</span>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (message) {
+    return (
+      <div className="ranking-page">
+        <section className="ranking-header">
+          <div>
+            <p>CLASSEMENT</p>
+            <h1>Classement general</h1>
+            <span>{message}</span>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (journees.length === 0) {
+    return (
+      <div className="ranking-page">
+        <section className="ranking-header">
+          <div>
+            <p>CLASSEMENT</p>
+            <h1>Classement general</h1>
+            <span>Aucun calendrier charge.</span>
           </div>
         </section>
 
         <div className="ranking-empty">
-          Va dans Admin puis synchronise les matchs Ligue 1.
+          Va dans Admin, importe les matchs puis sauvegarde le calendrier en ligne.
         </div>
       </div>
     );
@@ -294,49 +433,49 @@ export default function RankingPage() {
       <section className="ranking-header">
         <div>
           <p>CLASSEMENT</p>
-          <h1>Classement gÃ©nÃ©ral</h1>
+          <h1>Classement general</h1>
           <span>
-            JournÃ©e analysÃ©e : J{lastJournee} Â· {ranking.length} joueurs
+            Journee analysee : J{lastJournee} - {ranking.length} joueurs
           </span>
         </div>
 
         <div className="ranking-header-badge">
-          {leader ? `ðŸ‘‘ Leader : ${leader.player}` : 'Aucun leader'}
+          {leader ? `Leader : ${leader.playerName}` : "Aucun leader"}
         </div>
       </section>
 
       <section className="ranking-kpis">
         <article>
           <span>Leader</span>
-          <strong>{leader?.player || '-'}</strong>
+          <strong>{leader?.playerName || "-"}</strong>
           <small>{leader?.total || 0} pts</small>
         </article>
 
         <article>
           <span>Meilleure J{lastJournee}</span>
-          <strong>{bestLastDay?.player || '-'}</strong>
+          <strong>{bestLastDay?.playerName || "-"}</strong>
           <small>+{bestLastDay?.lastPoints || 0} pts</small>
         </article>
 
         <article>
           <span>Progression</span>
-          <strong>{bestProgress?.player || '-'}</strong>
+          <strong>{bestProgress?.playerName || "-"}</strong>
           <small>{getEvolutionLabel(bestProgress?.evolution || 0)} place(s)</small>
         </article>
       </section>
 
       <section className="ranking-podium">
         {podium.map((player, index) => (
-          <article key={player.player} className={`podium-card rank-${index + 1}`}>
+          <article key={player.playerName} className={`podium-card rank-${index + 1}`}>
             <div className="podium-medal">{getRankIcon(index)}</div>
 
             <div className="podium-player-photo">
-              <ProfileAvatar player={player.player} size={58} />
+              <ProfileAvatar player={player.playerName} size={58} />
             </div>
 
-            <h2>{getDisplayName(player.player)}</h2>
+            <h2>{getDisplayName(player.playerName)}</h2>
             <strong>{player.total} pts</strong>
-            <span>{player.exacts} score(s) exact(s)</span>
+            <span>{player.specialExacts} exact(s) bonus/favori</span>
           </article>
         ))}
       </section>
@@ -350,19 +489,19 @@ export default function RankingPage() {
         <div className="ranking-table">
           <div className="ranking-row ranking-row-head">
             <span>Place</span>
-            <span>Ã‰vo</span>
+            <span>Evo</span>
             <span>Joueur</span>
             <span>Points</span>
             <span>Exacts bonus/favori</span>
             <span>J{lastJournee}</span>
-            <span>Ã‰cart</span>
+            <span>Ecart leader</span>
           </div>
 
           {ranking.map((player, index) => {
             const gap = leaderPoints - player.total;
 
             return (
-              <div key={player.player} className="ranking-row">
+              <div key={player.playerName} className="ranking-row">
                 <span className="rank-place">{getRankIcon(index)}</span>
 
                 <span className={`rank-evo ${getEvolutionClass(player.evolution)}`}>
@@ -371,22 +510,21 @@ export default function RankingPage() {
 
                 <span className="rank-player">
                   <span className="rank-player-name">
-                    <ProfileAvatar player={player.player} size={28} />
-                    <span>{getDisplayName(player.player)}</span>
-                    {player.player === currentPlayer && <em>toi</em>}
+                    <ProfileAvatar player={player.playerName} size={28} />
+                    <span>{getDisplayName(player.playerName)}</span>
                   </span>
 
-                  <PlayerBadges player={player.player} compact />
+                  <PlayerBadges player={player.playerName} compact />
                 </span>
 
                 <span className="rank-points">{player.total} pts</span>
 
-                <span className="rank-exacts">{player.exacts}</span>
+                <span className="rank-exacts">{player.specialExacts}</span>
 
                 <span className="rank-last">+{player.lastPoints}</span>
 
                 <span className="rank-gap">
-                  {gap === 0 ? 'Leader' : `-${gap} pts`}
+                  {gap === 0 ? "Leader" : `-${gap} pts`}
                 </span>
               </div>
             );
@@ -396,13 +534,4 @@ export default function RankingPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
 
