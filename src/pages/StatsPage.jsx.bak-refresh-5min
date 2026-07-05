@@ -368,7 +368,7 @@ export default function StatsPage() {
   const [message, setMessage] = useState("");
 
   async function loadData(silent = false) {
-    if (!silent) setLoading(true);
+    setLoading(true);
     setMessage("");
 
     try {
@@ -419,15 +419,6 @@ export default function StatsPage() {
     loadData();
   }, []);
 
-
-  // refresh-5min-stats
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadData(true);
-    }, 300000);
-
-    return () => clearInterval(interval);
-  }, []);
   const activeProfiles = useMemo(() => {
     return profiles.filter((p) => (p.account_status || "active") === "active");
   }, [profiles]);
@@ -995,23 +986,6 @@ export default function StatsPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          className="stats-refresh-button"
-          onClick={() => loadData()}
-          style={{
-            minHeight: 44,
-            border: 0,
-            borderRadius: 14,
-            padding: "0 16px",
-            background: "#22c55e",
-            color: "#07111f",
-            fontWeight: 950,
-            cursor: "pointer"
-          }}
-        >
-          Actualiser
-        </button>
       </section>
 
       {message && <div className="stats-empty" style={{ marginBottom: 16 }}>{message}</div>}
@@ -1229,7 +1203,6 @@ export default function StatsPage() {
     </div>
   );
 }
-
 
 
 

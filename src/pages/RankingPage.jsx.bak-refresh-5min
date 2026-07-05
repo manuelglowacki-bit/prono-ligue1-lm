@@ -365,7 +365,7 @@ export default function RankingPage() {
   const [message, setMessage] = useState("");
 
   async function loadRankingData(silent = false) {
-    if (!silent) setLoading(true);
+    setLoading(true);
     setMessage("");
 
     try {
@@ -408,15 +408,6 @@ export default function RankingPage() {
     loadRankingData();
   }, []);
 
-
-  // refresh-5min-ranking
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadRankingData(true);
-    }, 300000);
-
-    return () => clearInterval(interval);
-  }, []);
   const scoredMatches = useMemo(() => {
     const rows = [];
 
@@ -711,7 +702,6 @@ export default function RankingPage() {
     </div>
   );
 }
-
 
 
 

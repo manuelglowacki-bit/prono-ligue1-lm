@@ -365,7 +365,7 @@ export default function RankingPage() {
   const [message, setMessage] = useState("");
 
   async function loadRankingData(silent = false) {
-    if (!silent) setLoading(true);
+    setLoading(true);
     setMessage("");
 
     try {
@@ -404,16 +404,40 @@ export default function RankingPage() {
       setLoading(false);
     }
   }
+
   useEffect(() => {
     loadRankingData();
+
+    function refreshRanking() {
+      loadRankingData(true);
+    }
+
+    const interval = setInterval(refreshRanking, 3000);
+
+    window.addEventListener("focus", refreshRanking);
+    window.addEventListener("storage", refreshRanking);
+    window.addEventListener("pronos-updated", refreshRanking);
+    window.addEventListener("favorite-team-updated", refreshRanking);
+    window.addEventListener("results-updated", refreshRanking);
+    window.addEventListener("calendar-updated", refreshRanking);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refreshRanking);
+      window.removeEventListener("storage", refreshRanking);
+      window.removeEventListener("pronos-updated", refreshRanking);
+      window.removeEventListener("favorite-team-updated", refreshRanking);
+      window.removeEventListener("results-updated", refreshRanking);
+      window.removeEventListener("calendar-updated", refreshRanking);
+    };
   }, []);
 
 
-  // refresh-5min-ranking
+  // auto-live-ranking-final
   useEffect(() => {
     const interval = setInterval(() => {
       loadRankingData(true);
-    }, 300000);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, []);
@@ -711,9 +735,6 @@ export default function RankingPage() {
     </div>
   );
 }
-
-
-
 
 
 

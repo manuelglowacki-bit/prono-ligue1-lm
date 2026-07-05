@@ -368,7 +368,7 @@ export default function StatsPage() {
   const [message, setMessage] = useState("");
 
   async function loadData(silent = false) {
-    if (!silent) setLoading(true);
+    setLoading(true);
     setMessage("");
 
     try {
@@ -415,16 +415,40 @@ export default function StatsPage() {
       setLoading(false);
     }
   }
+
   useEffect(() => {
     loadData();
+
+    function refresh() {
+      loadData(true);
+    }
+
+    const interval = setInterval(refresh, 3000);
+
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("pronos-updated", refresh);
+    window.addEventListener("favorite-team-updated", refresh);
+    window.addEventListener("results-updated", refresh);
+    window.addEventListener("calendar-updated", refresh);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("pronos-updated", refresh);
+      window.removeEventListener("favorite-team-updated", refresh);
+      window.removeEventListener("results-updated", refresh);
+      window.removeEventListener("calendar-updated", refresh);
+    };
   }, []);
 
 
-  // refresh-5min-stats
+  // auto-live-stats-final
   useEffect(() => {
     const interval = setInterval(() => {
       loadData(true);
-    }, 300000);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, []);
@@ -995,23 +1019,6 @@ export default function StatsPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          className="stats-refresh-button"
-          onClick={() => loadData()}
-          style={{
-            minHeight: 44,
-            border: 0,
-            borderRadius: 14,
-            padding: "0 16px",
-            background: "#22c55e",
-            color: "#07111f",
-            fontWeight: 950,
-            cursor: "pointer"
-          }}
-        >
-          Actualiser
-        </button>
       </section>
 
       {message && <div className="stats-empty" style={{ marginBottom: 16 }}>{message}</div>}
@@ -1229,10 +1236,6 @@ export default function StatsPage() {
     </div>
   );
 }
-
-
-
-
 
 
 

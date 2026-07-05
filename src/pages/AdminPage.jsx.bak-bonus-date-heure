@@ -1141,7 +1141,7 @@ export default function AdminPage() {
                     <label className="admin-bonus-date-filter">
             <span>Date début bonus</span>
             <input
-              type="datetime-local"
+              type="date"
               value={bonusRandomStartDate}
               onChange={(event) => setBonusRandomStartDate(event.target.value)}
             />
@@ -1150,7 +1150,7 @@ export default function AdminPage() {
           <label className="admin-bonus-date-filter">
             <span>Date fin bonus</span>
             <input
-              type="datetime-local"
+              type="date"
               value={bonusRandomEndDate}
               onChange={(event) => setBonusRandomEndDate(event.target.value)}
             />
@@ -1432,5 +1432,4 @@ export default function AdminPage() {
     </div>
   );
 }
-
 

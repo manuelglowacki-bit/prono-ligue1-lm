@@ -1,4 +1,5 @@
-﻿import "./utils/protectAdminJournees";
+﻿import './styles/no-motion.css';
+import "./utils/protectAdminJournees";
 import "./styles/compact-modern.css";
 import React from "react";
 import ReactDOM from "react-dom/client";
@@ -11,6 +12,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </AuthGate>
   </React.StrictMode>
 );
+
 
 
 
