@@ -922,7 +922,7 @@ function handleBonusExcelImport(event) {
             match.away
           );
 
-        const bonusRows = pickRandomBonusMatches(availableBonusRows, 4);
+        const bonusRows = pickRandomBonusMatches(availableBonusRows, 3);
 
         if (!bonusRows.length) {
           setMessage("Import bonus impossible : aucun match trouve dans la periode choisie.");
@@ -939,18 +939,9 @@ function handleBonusExcelImport(event) {
             return previous;
           }
 
-          const importedLeague = normalizeBonusLeague(
-            imported.league ||
-            imported.championnat ||
-            imported.competition ||
-            ""
-          );
-
           return {
             ...previous,
-            league: importedLeague,
-championnat: importedLeague,
-competition: importedLeague,
+            league: imported.league,
             home: imported.home,
             away: imported.away,
             date: imported.date,
@@ -1599,8 +1590,6 @@ isValidated: false,
     </div>
   );
 }
-
-
 
 
 

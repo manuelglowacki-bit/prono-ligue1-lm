@@ -1,6 +1,6 @@
-﻿import AdminOnly from "./components/AdminOnly.jsx";
+﻿import { supabase, isSupabaseConfigured } from './lib/supabaseClient';
+import AdminOnly from "./components/AdminOnly.jsx";
 import React, { useEffect, useState } from "react";
-import { supabase } from "./lib/supabaseClient";
 
 import HomePage from "./pages/HomePage.jsx";
 import PronosPage from "./pages/PronosPage.jsx";
@@ -232,6 +232,10 @@ export default function App() {
     </div>
   );
 }
+
+
+
+
 
 
 

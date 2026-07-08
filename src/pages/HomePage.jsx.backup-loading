@@ -418,7 +418,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   async function loadData() {
-    setLoading(true); setTimeout(() => setLoading(false), 2500);
+    setLoading(true);
     setMessage("");
 
     try {
@@ -1193,7 +1193,6 @@ window.removeEventListener("favorite-team-updated", refresh);
     </div>
   );
 }
-
 
 
 

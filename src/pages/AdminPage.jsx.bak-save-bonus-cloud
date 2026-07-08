@@ -1,7 +1,6 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { parseExcelWorkbookToJournees } from "../utils/excelJournees.js";
-import { supabase } from "../lib/supabaseClient";
 
 const STORAGE_KEY = "admin_pronos_manager_v3";
 const PUBLIC_JOURNEES_KEY = "admin_journees";
@@ -97,35 +96,9 @@ function loadJson(key, fallback) {
   }
 }
 
-function savePublicJourneesLocal(journees) {
+function savePublicJournees(journees) {
   localStorage.setItem(PUBLIC_JOURNEES_KEY, JSON.stringify(journees));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(journees));
-  window.dispatchEvent(new Event("storage"));
-  window.dispatchEvent(new CustomEvent("calendar-updated"));
-  window.dispatchEvent(new CustomEvent("results-updated"));
-}
-
-async function savePublicJourneesOnline(journees) {
-  savePublicJourneesLocal(journees);
-
-  const { error } = await supabase
-    .from("app_settings")
-    .upsert(
-      {
-        setting_key: PUBLIC_JOURNEES_KEY,
-        setting_value: journees,
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "setting_key" }
-    );
-
-  if (error) {
-    throw error;
-  }
-}
-
-function savePublicJournees(journees) {
-  savePublicJourneesLocal(journees);
 }
 
 function toDateInputValue(value) {
@@ -195,7 +168,7 @@ function normalizeJournees(data) {
           }))
         : [],
       bonus: Array.isArray(j.bonus)
-        ? j.bonus.slice(0, 4).map((b, i) => ({
+        ? j.bonus.slice(0, 3).map((b, i) => ({
             id: b.id || `${journeyId}-b${i + 1}`,
             league: b.league || "",
             home: b.home || "",
@@ -232,14 +205,14 @@ function makeEmptyBonus(journeyId, index) {
 function ensureThreeBonus(journee) {
   const bonus = Array.isArray(journee.bonus) ? [...journee.bonus] : [];
 
-  while (bonus.length < 4) {
+  while (bonus.length < 3) {
     bonus.push(makeEmptyBonus(journee.id, bonus.length));
   }
 
   return {
     ...journee,
     lockAt: journee.lockAt || "",
-    bonus: bonus.slice(0, 4)
+    bonus: bonus.slice(0, 3)
   };
 }
 
@@ -277,42 +250,8 @@ export default function AdminPage() {
     );
   }, [journees, selectedJourneeId]);
 
-  // load-online-admin-journees
   useEffect(() => {
-    let mounted = true;
-
-    async function loadOnlineJournees() {
-      try {
-        const { data, error } = await supabase
-          .from("app_settings")
-          .select("setting_value")
-          .eq("setting_key", PUBLIC_JOURNEES_KEY)
-          .maybeSingle();
-
-        if (error) throw error;
-
-        const online = data?.setting_value;
-
-        if (mounted && Array.isArray(online) && online.length) {
-          const normalized = normalizeJournees(online).map(ensureThreeBonus);
-          setJournees(normalized);
-          setSelectedJourneeId(normalized[0]?.id || "j1");
-          savePublicJourneesLocal(normalized);
-        }
-      } catch (error) {
-        console.error("Erreur chargement calendrier cloud", error);
-      }
-    }
-
-    loadOnlineJournees();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    savePublicJourneesLocal(journees);
+    savePublicJournees(journees);
   }, [journees]);
 
   useEffect(() => {
@@ -320,27 +259,14 @@ export default function AdminPage() {
     localStorage.setItem(BONUS_RANDOM_END_KEY, bonusRandomEndDate || "");
   }, [bonusRandomStartDate, bonusRandomEndDate]);
 
-  useEffect(() => {
-    localStorage.setItem(BONUS_RANDOM_START_KEY, bonusRandomStartDate || "");
-    localStorage.setItem(BONUS_RANDOM_END_KEY, bonusRandomEndDate || "");
-  }, [bonusRandomStartDate, bonusRandomEndDate]);
-
   function updateSelectedJournee(patch) {
-    setJournees((prev) => {
-      const next = prev.map((j) =>
+    setJournees((prev) =>
+      prev.map((j) =>
         j.id === selectedJournee.id
           ? ensureThreeBonus({ ...j, ...patch })
           : j
-      );
-
-      savePublicJourneesLocal(next);
-
-      savePublicJourneesOnline(next).catch((error) => {
-        console.error("Erreur sauvegarde cloud admin", error);
-      });
-
-      return next;
-    });
+      )
+    );
   }
 
   function updateMatch(matchId, patch) {
@@ -569,9 +495,7 @@ export default function AdminPage() {
 
         setJournees(imported);
         setSelectedJourneeId(imported[0].id);
-        savePublicJourneesOnline(imported).catch((error) => {
-          console.error("Erreur sauvegarde cloud import Excel", error);
-        });
+        savePublicJournees(imported);
 
         setMessage(`${imported.length} journee(s) importee(s) depuis Excel.`);
       } catch (error) {
@@ -607,95 +531,60 @@ export default function AdminPage() {
   }
 
   function normalizeBonusLeague(value) {
-  const text = String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
+    const raw = String(value || "").trim();
+    const key = raw
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
 
-  if (
-    text.includes("bundes") ||
-    text.includes("allemagne") ||
-    text.includes("germany")
-  ) {
-    return "Bundesliga";
-  }
-
-  if (
-    text.includes("premier") ||
-    text.includes("angleterre") ||
-    text.includes("england")
-  ) {
-    return "Premier League";
-  }
-
-  if (
-    text.includes("serie") ||
-    text.includes("italie") ||
-    text.includes("italy")
-  ) {
-    return "Serie A";
-  }
-
-  if (
-    text.includes("liga") ||
-    text.includes("laliga") ||
-    text.includes("espagne") ||
-    text.includes("spain")
-  ) {
-    return "Liga";
-  }
-
-  return String(value || "").trim();
-}
-
-function isAllowedBonusLeague(value) {
-  return ["Premier League", "Liga", "Serie A", "Bundesliga"].includes(
-    normalizeBonusLeague(value)
-  );
-}
-
-function bonusDateInputValue(value) {
-  if (!value) return "";
-
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
-  }
-
-  if (typeof value === "number") {
-    const excelDate = new Date(Math.round((value - 25569) * 86400 * 1000));
-    if (!Number.isNaN(excelDate.getTime())) {
-      return excelDate.toISOString().slice(0, 10);
+    if (key.includes("premier") || key.includes("angleterre") || key.includes("england")) {
+      return "Premier League";
     }
+
+    if (key.includes("liga") || key.includes("espagne") || key.includes("spain")) {
+      return "Liga";
+    }
+
+    if (key.includes("serie") || key.includes("italie") || key.includes("italy")) {
+      return "Serie A";
+    }
+
+    if (key.includes("bundesliga") || key.includes("allemagne") || key.includes("germany")) {
+      return "Bundesliga";
+    }
+
+    return raw;
   }
 
-  const text = String(value).trim();
-
-  const french = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (french) {
-    const day = french[1].padStart(2, "0");
-    const month = french[2].padStart(2, "0");
-    const year = french[3];
-    return `${year}-${month}-${day}`;
+  function isAllowedBonusLeague(value) {
+    const league = normalizeBonusLeague(value);
+    return ["Premier League", "Liga", "Serie A", "Bundesliga"].includes(league);
   }
 
-  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (iso) {
-    const year = iso[1];
-    const month = iso[2].padStart(2, "0");
-    const day = iso[3].padStart(2, "0");
-    return `${year}-${month}-${day}`;
+  function bonusDateInputValue(value) {
+    if (!value) return "";
+
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      const year = value.getFullYear();
+      const month = String(value.getMonth() + 1).padStart(2, "0");
+      const day = String(value.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    if (typeof value === "number") {
+      const parsed = XLSX.SSF.parse_date_code(value);
+      if (parsed) {
+        const year = parsed.y;
+        const month = String(parsed.m).padStart(2, "0");
+        const day = String(parsed.d).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+    }
+
+    return toDateInputValue(value);
   }
 
-  const parsed = new Date(text);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 10);
-  }
-
-  return "";
-}
-
-function bonusTimeInputValue(value) {
+  function bonusTimeInputValue(value) {
     if (!value) return "";
 
     if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -742,33 +631,27 @@ function bonusTimeInputValue(value) {
     return Boolean(bonusRandomStartDate || bonusRandomEndDate);
   }
 
-  function isBonusDateInRange(dateValue, timeValue) {
-  const date = bonusDateInputValue(dateValue);
-  if (!date) return false;
+  function isBonusDateInRange(dateValue, timeValue = "") {
+    const date = String(dateValue || "").slice(0, 10);
+    const time = String(timeValue || "00:00").slice(0, 5);
+    const dateTime = date ? `${date}T${time}` : "";
 
-  const time = bonusTimeInputValue(timeValue) || "12:00";
-  const safeTime = /^\d{1,2}:\d{2}$/.test(time) ? time : "12:00";
+    if (!dateTime) return false;
 
-  const dateTime = new Date(`${date}T${safeTime}:00`);
+    if (bonusRandomStartDate && dateTime < bonusRandomStartDate) {
+      return false;
+    }
 
-  if (Number.isNaN(dateTime.getTime())) {
-    return false;
+    if (bonusRandomEndDate && dateTime > bonusRandomEndDate) {
+      return false;
+    }
+
+    return true;
   }
 
-  if (bonusRandomStartDate) {
-    const start = new Date(`${bonusRandomStartDate}T00:00:00`);
-    if (dateTime < start) return false;
-  }
 
-  if (bonusRandomEndDate) {
-    const end = new Date(`${bonusRandomEndDate}T23:59:59`);
-    if (dateTime > end) return false;
-  }
 
-  return true;
-}
-
-function shuffleBonusMatches(list) {
+  function shuffleBonusMatches(list) {
     const arr = [...list];
 
     for (let i = arr.length - 1; i > 0; i--) {
@@ -781,75 +664,59 @@ function shuffleBonusMatches(list) {
     return arr;
   }
 
-  function pickRandomBonusMatches(matches, count = 4) {
-  const wantedLeagues = ["Premier League", "Liga", "Serie A", "Bundesliga"];
-
-  const clean = Array.isArray(matches)
-    ? matches.filter((match) => {
-        const league = normalizeBonusLeague(match.league || match.championnat || match.Championnat || "");
-        const home = match.home || match.domicile || match.equipeDomicile || "";
-        const away = match.away || match.exterieur || match.equipeExterieur || "";
-        return wantedLeagues.includes(league) && home && away;
-      })
-    : [];
-
-  const selected = [];
-
-  wantedLeagues.forEach((wantedLeague) => {
-    const candidates = clean.filter((match) => {
-      const league = normalizeBonusLeague(match.league || match.championnat || match.Championnat || "");
-      return league === wantedLeague;
-    });
-
-    if (candidates.length > 0) {
-      const picked = shuffleBonusMatches(candidates)[0];
-
-      selected.push({
-        ...picked,
-        league: wantedLeague,
-        championnat: wantedLeague,
-        result: "",
-        resultat: "",
-        resultatFinal: "",
-        scoreHome: "",
-        scoreAway: "",
-        scoreDomicile: "",
-        scoreExterieur: "",
-        resultatDomicile: "",
-        resultatExterieur: "",
-        validated: false,
-        isValidated: false
-      });
-    }
-  });
-
-  const counts = wantedLeagues.map((league) => {
-    const total = clean.filter((match) => {
-      return normalizeBonusLeague(match.league || match.championnat || match.Championnat || "") === league;
-    }).length;
-
-    return `${league}: ${total}`;
-  });
-
-  console.log("DEBUG BONUS PAR CHAMPIONNAT:", counts.join(" / "));
-
-  const missing = wantedLeagues.filter((league) => {
-    return !selected.some((match) => normalizeBonusLeague(match.league) === league);
-  });
-
-  if (missing.length > 0) {
-    alert(
-      "Championnat manquant dans le tirage : " +
-        missing.join(", ") +
-        "\n\nTrouvés dans la période :\n" +
-        counts.join("\n")
+  function pickRandomBonusMatches(matches, limit = 3) {
+    const clean = shuffleBonusMatches(
+      matches.filter((match) =>
+        isAllowedBonusLeague(match.league) &&
+        match.home &&
+        match.away
+      )
     );
+
+    const selected = [];
+    const usedLeagues = new Set();
+
+    // 1. On essaie d'abord de prendre des championnats différents
+    for (const match of clean) {
+      const league = normalizeBonusLeague(match.league);
+
+      if (!usedLeagues.has(league)) {
+        selected.push({
+          ...match,
+          league
+        });
+
+        usedLeagues.add(league);
+      }
+
+      if (selected.length >= limit) {
+        return shuffleBonusMatches(selected).slice(0, limit);
+      }
+    }
+
+    // 2. S'il manque des matchs, on complète avec le reste au hasard
+    for (const match of clean) {
+      const key = [match.league, match.home, match.away, match.date, match.time].join("|");
+
+      const alreadyTaken = selected.some((taken) => {
+        const takenKey = [taken.league, taken.home, taken.away, taken.date, taken.time].join("|");
+        return takenKey === key;
+      });
+
+      if (!alreadyTaken) {
+        selected.push(match);
+      }
+
+      if (selected.length >= limit) {
+        break;
+      }
+    }
+
+    return shuffleBonusMatches(selected).slice(0, limit);
   }
 
-  return selected.slice(0, count);
-}
 
-function handleBonusExcelImport(event) {
+  function handleBonusExcelImport(event) {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -922,7 +789,7 @@ function handleBonusExcelImport(event) {
             match.away
           );
 
-        const bonusRows = pickRandomBonusMatches(availableBonusRows, 4);
+        const bonusRows = pickRandomBonusMatches(availableBonusRows, 3);
 
         if (!bonusRows.length) {
           setMessage("Import bonus impossible : aucun match trouve dans la periode choisie.");
@@ -931,7 +798,7 @@ function handleBonusExcelImport(event) {
 
         const currentBonus = ensureThreeBonus(selectedJournee).bonus;
 
-        const nextBonus = [0, 1, 2, 3].map((index) => {
+        const nextBonus = [0, 1, 2].map((index) => {
           const imported = bonusRows[index];
           const previous = currentBonus[index] || makeEmptyBonus(selectedJournee.id, index);
 
@@ -939,35 +806,13 @@ function handleBonusExcelImport(event) {
             return previous;
           }
 
-          const importedLeague = normalizeBonusLeague(
-            imported.league ||
-            imported.championnat ||
-            imported.competition ||
-            ""
-          );
-
           return {
             ...previous,
-            league: importedLeague,
-championnat: importedLeague,
-competition: importedLeague,
+            league: imported.league,
             home: imported.home,
             away: imported.away,
             date: imported.date,
             time: imported.time,
-scoreHome: "",
-scoreAway: "",
-scoreDomicile: "",
-scoreExterieur: "",
-homeScore: "",
-awayScore: "",
-resultatDomicile: "",
-resultatExterieur: "",
-resultat: "",
-result: "",
-resultatFinal: "",
-validated: false,
-isValidated: false,
             homeScore: "",
             awayScore: "",
             adminValidated: false,
@@ -1476,8 +1321,8 @@ isValidated: false,
       </div>
 
       <div className="section-head">
-        <h2>Les 4 matchs bonus - {selectedJournee.title}</h2>
-        <span>4 bonus modifiables</span>
+        <h2>Les 3 matchs bonus - {selectedJournee.title}</h2>
+        <span>3 bonus modifiables</span>
       </div>
 
       <div className="admin-match-grid">
@@ -1599,22 +1444,6 @@ isValidated: false,
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

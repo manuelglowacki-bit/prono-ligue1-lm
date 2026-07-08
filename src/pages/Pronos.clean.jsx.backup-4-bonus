@@ -128,7 +128,7 @@ export default function Pronos() {
 
   const data = useMemo(() => getImportedData(), []);
   const matchs = data.matchs && data.matchs.length > 0 ? data.matchs : DEFAULT_MATCHS;
-  const bonus = data.bonus && data.bonus.length > 0 ? data.bonus.slice(0, 4) : DEFAULT_BONUS;
+  const bonus = data.bonus && data.bonus.length > 0 ? data.bonus.slice(0, 3) : DEFAULT_BONUS;
 
   useEffect(() => {
     localStorage.setItem(PRONOS_KEY, JSON.stringify(pronos));
@@ -164,7 +164,7 @@ export default function Pronos() {
       <div className="prono-top">
         <div className="prono-title">
           <h1>ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â Mes pronos</h1>
-          <p>3 matchs par ligne. Ligue 1 d'abord, puis les 4 bonus ÃƒÆ’Ã‚Â  la fin.</p>
+          <p>3 matchs par ligne. Ligue 1 d'abord, puis les 3 bonus ÃƒÆ’Ã‚Â  la fin.</p>
         </div>
 
         <div className="prono-actions">
@@ -262,7 +262,7 @@ export default function Pronos() {
       </div>
 
       <div className="section-head">
-        <h2>Les 4 matchs bonus</h2>
+        <h2>Les 3 matchs bonus</h2>
         <span>{bonusSelected ? "1/3 choisi" : "0/3"}</span>
       </div>
 
@@ -398,5 +398,4 @@ export default function Pronos() {
     </div>
   );
 }
-
 

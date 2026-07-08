@@ -613,37 +613,20 @@ export default function AdminPage() {
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
 
-  if (
-    text.includes("bundes") ||
-    text.includes("allemagne") ||
-    text.includes("germany")
-  ) {
-    return "Bundesliga";
-  }
-
-  if (
-    text.includes("premier") ||
-    text.includes("angleterre") ||
-    text.includes("england")
-  ) {
+  if (text.includes("premier") || text.includes("angleterre") || text.includes("england")) {
     return "Premier League";
   }
 
-  if (
-    text.includes("serie") ||
-    text.includes("italie") ||
-    text.includes("italy")
-  ) {
+  if (text.includes("liga") || text.includes("laliga") || text.includes("espagne") || text.includes("spain")) {
+    return "Liga";
+  }
+
+  if (text.includes("serie") || text.includes("italie") || text.includes("italy")) {
     return "Serie A";
   }
 
-  if (
-    text.includes("liga") ||
-    text.includes("laliga") ||
-    text.includes("espagne") ||
-    text.includes("spain")
-  ) {
-    return "Liga";
+  if (text.includes("bundes") || text.includes("allemagne") || text.includes("germany")) {
+    return "Bundesliga";
   }
 
   return String(value || "").trim();
@@ -922,7 +905,7 @@ function handleBonusExcelImport(event) {
             match.away
           );
 
-        const bonusRows = pickRandomBonusMatches(availableBonusRows, 4);
+        const bonusRows = pickRandomBonusMatches(availableBonusRows, 3);
 
         if (!bonusRows.length) {
           setMessage("Import bonus impossible : aucun match trouve dans la periode choisie.");
@@ -939,18 +922,9 @@ function handleBonusExcelImport(event) {
             return previous;
           }
 
-          const importedLeague = normalizeBonusLeague(
-            imported.league ||
-            imported.championnat ||
-            imported.competition ||
-            ""
-          );
-
           return {
             ...previous,
-            league: importedLeague,
-championnat: importedLeague,
-competition: importedLeague,
+            league: imported.league,
             home: imported.home,
             away: imported.away,
             date: imported.date,
@@ -1599,9 +1573,6 @@ isValidated: false,
     </div>
   );
 }
-
-
-
 
 
 

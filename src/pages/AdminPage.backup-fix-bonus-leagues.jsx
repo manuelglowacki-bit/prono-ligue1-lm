@@ -607,95 +607,60 @@ export default function AdminPage() {
   }
 
   function normalizeBonusLeague(value) {
-  const text = String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
+    const raw = String(value || "").trim();
+    const key = raw
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
 
-  if (
-    text.includes("bundes") ||
-    text.includes("allemagne") ||
-    text.includes("germany")
-  ) {
-    return "Bundesliga";
-  }
-
-  if (
-    text.includes("premier") ||
-    text.includes("angleterre") ||
-    text.includes("england")
-  ) {
-    return "Premier League";
-  }
-
-  if (
-    text.includes("serie") ||
-    text.includes("italie") ||
-    text.includes("italy")
-  ) {
-    return "Serie A";
-  }
-
-  if (
-    text.includes("liga") ||
-    text.includes("laliga") ||
-    text.includes("espagne") ||
-    text.includes("spain")
-  ) {
-    return "Liga";
-  }
-
-  return String(value || "").trim();
-}
-
-function isAllowedBonusLeague(value) {
-  return ["Premier League", "Liga", "Serie A", "Bundesliga"].includes(
-    normalizeBonusLeague(value)
-  );
-}
-
-function bonusDateInputValue(value) {
-  if (!value) return "";
-
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
-  }
-
-  if (typeof value === "number") {
-    const excelDate = new Date(Math.round((value - 25569) * 86400 * 1000));
-    if (!Number.isNaN(excelDate.getTime())) {
-      return excelDate.toISOString().slice(0, 10);
+    if (key.includes("premier") || key.includes("angleterre") || key.includes("england")) {
+      return "Premier League";
     }
+
+    if (key.includes("liga") || key.includes("espagne") || key.includes("spain")) {
+      return "Liga";
+    }
+
+    if (key.includes("serie") || key.includes("italie") || key.includes("italy")) {
+      return "Serie A";
+    }
+
+    if (key.includes("bundesliga") || key.includes("allemagne") || key.includes("germany")) {
+      return "Bundesliga";
+    }
+
+    return raw;
   }
 
-  const text = String(value).trim();
-
-  const french = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (french) {
-    const day = french[1].padStart(2, "0");
-    const month = french[2].padStart(2, "0");
-    const year = french[3];
-    return `${year}-${month}-${day}`;
+  function isAllowedBonusLeague(value) {
+    const league = normalizeBonusLeague(value);
+    return ["Premier League", "Liga", "Serie A", "Bundesliga"].includes(league);
   }
 
-  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (iso) {
-    const year = iso[1];
-    const month = iso[2].padStart(2, "0");
-    const day = iso[3].padStart(2, "0");
-    return `${year}-${month}-${day}`;
+  function bonusDateInputValue(value) {
+    if (!value) return "";
+
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      const year = value.getFullYear();
+      const month = String(value.getMonth() + 1).padStart(2, "0");
+      const day = String(value.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    if (typeof value === "number") {
+      const parsed = XLSX.SSF.parse_date_code(value);
+      if (parsed) {
+        const year = parsed.y;
+        const month = String(parsed.m).padStart(2, "0");
+        const day = String(parsed.d).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+    }
+
+    return toDateInputValue(value);
   }
 
-  const parsed = new Date(text);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 10);
-  }
-
-  return "";
-}
-
-function bonusTimeInputValue(value) {
+  function bonusTimeInputValue(value) {
     if (!value) return "";
 
     if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -742,33 +707,27 @@ function bonusTimeInputValue(value) {
     return Boolean(bonusRandomStartDate || bonusRandomEndDate);
   }
 
-  function isBonusDateInRange(dateValue, timeValue) {
-  const date = bonusDateInputValue(dateValue);
-  if (!date) return false;
+  function isBonusDateInRange(dateValue, timeValue = "") {
+    const date = String(dateValue || "").slice(0, 10);
+    const time = String(timeValue || "00:00").slice(0, 5);
+    const dateTime = date ? `${date}T${time}` : "";
 
-  const time = bonusTimeInputValue(timeValue) || "12:00";
-  const safeTime = /^\d{1,2}:\d{2}$/.test(time) ? time : "12:00";
+    if (!dateTime) return false;
 
-  const dateTime = new Date(`${date}T${safeTime}:00`);
+    if (bonusRandomStartDate && dateTime < bonusRandomStartDate) {
+      return false;
+    }
 
-  if (Number.isNaN(dateTime.getTime())) {
-    return false;
+    if (bonusRandomEndDate && dateTime > bonusRandomEndDate) {
+      return false;
+    }
+
+    return true;
   }
 
-  if (bonusRandomStartDate) {
-    const start = new Date(`${bonusRandomStartDate}T00:00:00`);
-    if (dateTime < start) return false;
-  }
 
-  if (bonusRandomEndDate) {
-    const end = new Date(`${bonusRandomEndDate}T23:59:59`);
-    if (dateTime > end) return false;
-  }
 
-  return true;
-}
-
-function shuffleBonusMatches(list) {
+  function shuffleBonusMatches(list) {
     const arr = [...list];
 
     for (let i = arr.length - 1; i > 0; i--) {
@@ -784,66 +743,46 @@ function shuffleBonusMatches(list) {
   function pickRandomBonusMatches(matches, count = 4) {
   const wantedLeagues = ["Premier League", "Liga", "Serie A", "Bundesliga"];
 
-  const clean = Array.isArray(matches)
-    ? matches.filter((match) => {
-        const league = normalizeBonusLeague(match.league || match.championnat || match.Championnat || "");
-        const home = match.home || match.domicile || match.equipeDomicile || "";
-        const away = match.away || match.exterieur || match.equipeExterieur || "";
-        return wantedLeagues.includes(league) && home && away;
-      })
-    : [];
+  const clean = shuffleBonusMatches(
+    matches.filter((match) => isAllowedBonusLeague(match.league))
+  );
 
   const selected = [];
+  const usedKeys = new Set();
+
+  function matchKey(match) {
+    return [
+      match.league || "",
+      match.home || match.domicile || "",
+      match.away || match.exterieur || "",
+      match.date || "",
+      match.time || ""
+    ].join("|");
+  }
 
   wantedLeagues.forEach((wantedLeague) => {
     const candidates = clean.filter((match) => {
-      const league = normalizeBonusLeague(match.league || match.championnat || match.Championnat || "");
-      return league === wantedLeague;
+      const league = normalizeBonusLeague(match.league);
+      const key = matchKey(match);
+      return league === wantedLeague && !usedKeys.has(key);
     });
 
-    if (candidates.length > 0) {
+    if (candidates.length) {
       const picked = shuffleBonusMatches(candidates)[0];
-
-      selected.push({
-        ...picked,
-        league: wantedLeague,
-        championnat: wantedLeague,
-        result: "",
-        resultat: "",
-        resultatFinal: "",
-        scoreHome: "",
-        scoreAway: "",
-        scoreDomicile: "",
-        scoreExterieur: "",
-        resultatDomicile: "",
-        resultatExterieur: "",
-        validated: false,
-        isValidated: false
-      });
+      selected.push(picked);
+      usedKeys.add(matchKey(picked));
     }
   });
 
-  const counts = wantedLeagues.map((league) => {
-    const total = clean.filter((match) => {
-      return normalizeBonusLeague(match.league || match.championnat || match.Championnat || "") === league;
-    }).length;
-
-    return `${league}: ${total}`;
-  });
-
-  console.log("DEBUG BONUS PAR CHAMPIONNAT:", counts.join(" / "));
-
-  const missing = wantedLeagues.filter((league) => {
-    return !selected.some((match) => normalizeBonusLeague(match.league) === league);
-  });
-
-  if (missing.length > 0) {
-    alert(
-      "Championnat manquant dans le tirage : " +
-        missing.join(", ") +
-        "\n\nTrouvés dans la période :\n" +
-        counts.join("\n")
-    );
+  // Sécurité : si un championnat n'a aucun match dans la période, on complète avec les autres
+  if (selected.length < count) {
+    clean.forEach((match) => {
+      const key = matchKey(match);
+      if (selected.length < count && !usedKeys.has(key)) {
+        selected.push(match);
+        usedKeys.add(key);
+      }
+    });
   }
 
   return selected.slice(0, count);
@@ -922,7 +861,7 @@ function handleBonusExcelImport(event) {
             match.away
           );
 
-        const bonusRows = pickRandomBonusMatches(availableBonusRows, 4);
+        const bonusRows = pickRandomBonusMatches(availableBonusRows, 3);
 
         if (!bonusRows.length) {
           setMessage("Import bonus impossible : aucun match trouve dans la periode choisie.");
@@ -939,35 +878,13 @@ function handleBonusExcelImport(event) {
             return previous;
           }
 
-          const importedLeague = normalizeBonusLeague(
-            imported.league ||
-            imported.championnat ||
-            imported.competition ||
-            ""
-          );
-
           return {
             ...previous,
-            league: importedLeague,
-championnat: importedLeague,
-competition: importedLeague,
+            league: imported.league,
             home: imported.home,
             away: imported.away,
             date: imported.date,
             time: imported.time,
-scoreHome: "",
-scoreAway: "",
-scoreDomicile: "",
-scoreExterieur: "",
-homeScore: "",
-awayScore: "",
-resultatDomicile: "",
-resultatExterieur: "",
-resultat: "",
-result: "",
-resultatFinal: "",
-validated: false,
-isValidated: false,
             homeScore: "",
             awayScore: "",
             adminValidated: false,
@@ -1599,14 +1516,6 @@ isValidated: false,
     </div>
   );
 }
-
-
-
-
-
-
-
-
 
 
 

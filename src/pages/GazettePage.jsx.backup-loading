@@ -531,7 +531,7 @@ export default function GazettePage() {
   const [message, setMessage] = useState("");
 
   async function loadData() {
-    setLoading(true); setTimeout(() => setLoading(false), 2500);
+    setLoading(true);
     setMessage("");
 
     try {
@@ -1045,7 +1045,6 @@ export default function GazettePage() {
     </div>
   );
 }
-
 
 
 

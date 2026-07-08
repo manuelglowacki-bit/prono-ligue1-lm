@@ -1882,7 +1882,7 @@ export default function PronosPage() {
 
       <div className="section-head">
         <h2>Les 4 matchs bonus - {selectedJournee.title}</h2>
-        <span>{bonusSelected ? "1/4 choisi" : "0/4"}</span>
+        <span>{bonusSelected ? "1/3 choisi" : "0/3"}</span>
       </div>
 
       {bonus.length === 0 ? (
@@ -1993,7 +1993,6 @@ export default function PronosPage() {
     </div>
   );
 }
-
 
 
 

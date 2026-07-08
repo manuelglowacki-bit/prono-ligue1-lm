@@ -368,7 +368,7 @@ export default function StatsPage() {
   const [message, setMessage] = useState("");
 
   async function loadData(silent = false) {
-    if (!silent) { setLoading(true); setTimeout(() => setLoading(false), 2500); } setTimeout(() => setLoading(false), 2500);
+    if (!silent) setLoading(true);
     setMessage("");
 
     try {
@@ -1229,7 +1229,6 @@ export default function StatsPage() {
     </div>
   );
 }
-
 
 
 

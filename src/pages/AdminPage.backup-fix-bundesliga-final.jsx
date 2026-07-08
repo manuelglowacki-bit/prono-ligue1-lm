@@ -614,27 +614,11 @@ export default function AdminPage() {
     .trim();
 
   if (
-    text.includes("bundes") ||
-    text.includes("allemagne") ||
-    text.includes("germany")
-  ) {
-    return "Bundesliga";
-  }
-
-  if (
     text.includes("premier") ||
     text.includes("angleterre") ||
     text.includes("england")
   ) {
     return "Premier League";
-  }
-
-  if (
-    text.includes("serie") ||
-    text.includes("italie") ||
-    text.includes("italy")
-  ) {
-    return "Serie A";
   }
 
   if (
@@ -646,13 +630,50 @@ export default function AdminPage() {
     return "Liga";
   }
 
+  if (
+    text.includes("serie") ||
+    text.includes("italie") ||
+    text.includes("italy")
+  ) {
+    return "Serie A";
+  }
+
+  if (
+    text.includes("bundes") ||
+    text.includes("allemagne") ||
+    text.includes("germany")
+  ) {
+    return "Bundesliga";
+  }
+
   return String(value || "").trim();
 }
 
+function getBonusLeagueBucket(matchOrLeague) {
+  const raw =
+    typeof matchOrLeague === "object" && matchOrLeague !== null
+      ? (
+          matchOrLeague.league ||
+          matchOrLeague.championnat ||
+          matchOrLeague.Championnat ||
+          matchOrLeague.competition ||
+          matchOrLeague.Competition ||
+          ""
+        )
+      : matchOrLeague;
+
+  return normalizeBonusLeague(raw);
+}
+
 function isAllowedBonusLeague(value) {
-  return ["Premier League", "Liga", "Serie A", "Bundesliga"].includes(
-    normalizeBonusLeague(value)
-  );
+  const league = getBonusLeagueBucket(value);
+
+  return [
+    "Premier League",
+    "Liga",
+    "Serie A",
+    "Bundesliga"
+  ].includes(league);
 }
 
 function bonusDateInputValue(value) {
@@ -786,19 +807,31 @@ function shuffleBonusMatches(list) {
 
   const clean = Array.isArray(matches)
     ? matches.filter((match) => {
-        const league = normalizeBonusLeague(match.league || match.championnat || match.Championnat || "");
+        const league = getBonusLeagueBucket(match);
         const home = match.home || match.domicile || match.equipeDomicile || "";
         const away = match.away || match.exterieur || match.equipeExterieur || "";
-        return wantedLeagues.includes(league) && home && away;
+        return league && home && away;
       })
     : [];
 
   const selected = [];
+  const usedKeys = new Set();
+
+  function matchKey(match) {
+    return [
+      getBonusLeagueBucket(match),
+      match.home || match.domicile || match.equipeDomicile || "",
+      match.away || match.exterieur || match.equipeExterieur || "",
+      match.date || "",
+      match.time || ""
+    ].join("|");
+  }
 
   wantedLeagues.forEach((wantedLeague) => {
     const candidates = clean.filter((match) => {
-      const league = normalizeBonusLeague(match.league || match.championnat || match.Championnat || "");
-      return league === wantedLeague;
+      const league = getBonusLeagueBucket(match);
+      const key = matchKey(match);
+      return league === wantedLeague && !usedKeys.has(key);
     });
 
     if (candidates.length > 0) {
@@ -807,42 +840,22 @@ function shuffleBonusMatches(list) {
       selected.push({
         ...picked,
         league: wantedLeague,
-        championnat: wantedLeague,
-        result: "",
-        resultat: "",
-        resultatFinal: "",
-        scoreHome: "",
-        scoreAway: "",
-        scoreDomicile: "",
-        scoreExterieur: "",
-        resultatDomicile: "",
-        resultatExterieur: "",
-        validated: false,
-        isValidated: false
+        championnat: wantedLeague
       });
+
+      usedKeys.add(matchKey(picked));
     }
   });
 
-  const counts = wantedLeagues.map((league) => {
-    const total = clean.filter((match) => {
-      return normalizeBonusLeague(match.league || match.championnat || match.Championnat || "") === league;
-    }).length;
+  const missingLeagues = wantedLeagues.filter(
+    (league) => !selected.some((match) => getBonusLeagueBucket(match) === league)
+  );
 
-    return `${league}: ${total}`;
-  });
-
-  console.log("DEBUG BONUS PAR CHAMPIONNAT:", counts.join(" / "));
-
-  const missing = wantedLeagues.filter((league) => {
-    return !selected.some((match) => normalizeBonusLeague(match.league) === league);
-  });
-
-  if (missing.length > 0) {
+  if (missingLeagues.length > 0) {
     alert(
-      "Championnat manquant dans le tirage : " +
-        missing.join(", ") +
-        "\n\nTrouvés dans la période :\n" +
-        counts.join("\n")
+      "Attention : aucun match trouvé pour " +
+        missingLeagues.join(", ") +
+        " dans la période choisie."
     );
   }
 
@@ -922,7 +935,7 @@ function handleBonusExcelImport(event) {
             match.away
           );
 
-        const bonusRows = pickRandomBonusMatches(availableBonusRows, 4);
+        const bonusRows = pickRandomBonusMatches(availableBonusRows, 3);
 
         if (!bonusRows.length) {
           setMessage("Import bonus impossible : aucun match trouve dans la periode choisie.");
@@ -939,18 +952,9 @@ function handleBonusExcelImport(event) {
             return previous;
           }
 
-          const importedLeague = normalizeBonusLeague(
-            imported.league ||
-            imported.championnat ||
-            imported.competition ||
-            ""
-          );
-
           return {
             ...previous,
-            league: importedLeague,
-championnat: importedLeague,
-competition: importedLeague,
+            league: imported.league,
             home: imported.home,
             away: imported.away,
             date: imported.date,
@@ -1599,10 +1603,6 @@ isValidated: false,
     </div>
   );
 }
-
-
-
-
 
 
 

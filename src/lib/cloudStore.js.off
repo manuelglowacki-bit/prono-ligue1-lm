@@ -1,0 +1,45 @@
+﻿import { supabase } from './supabaseClient.js';
+
+const APP_ID = 'prono_ligue1_lm';
+
+export async function loadCloudData() {
+  if (!supabase) {
+    console.warn('Supabase non configuré');
+    return {};
+  }
+
+  const { data, error } = await supabase
+    .from('app_state')
+    .select('data')
+    .eq('id', APP_ID)
+    .single();
+
+  if (error) {
+    console.error('Erreur chargement Supabase:', error);
+    return {};
+  }
+
+  return data?.data || {};
+}
+
+export async function saveCloudData(newData) {
+  if (!supabase) {
+    console.warn('Supabase non configuré');
+    return false;
+  }
+
+  const { error } = await supabase
+    .from('app_state')
+    .upsert({
+      id: APP_ID,
+      data: newData,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    console.error('Erreur sauvegarde Supabase:', error);
+    return false;
+  }
+
+  return true;
+}

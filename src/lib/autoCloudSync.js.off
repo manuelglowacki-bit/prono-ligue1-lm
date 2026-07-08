@@ -1,0 +1,182 @@
+﻿import { loadCloudData, saveCloudData } from './cloudStore.js';
+
+const CLOUD_SYNC_KEY = '__prono_cloud_sync';
+const EXCLUDED_PREFIXES = ['__cloud_', 'sb-', 'supabase.', 'vite-'];
+
+let cloudReady = false;
+let applyingRemote = false;
+let saveTimer = null;
+let currentSyncAt = 0;
+
+function isAllowedKey(key) {
+  if (!key) return false;
+  if (key === CLOUD_SYNC_KEY) return false;
+  return !EXCLUDED_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+function getLocalSnapshot() {
+  const snapshot = {};
+
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (isAllowedKey(key)) {
+        snapshot[key] = localStorage.getItem(key);
+      }
+    }
+  } catch (error) {
+    console.error('Erreur lecture localStorage:', error);
+  }
+
+  return snapshot;
+}
+
+function sameSnapshot(a, b) {
+  return JSON.stringify(a || {}) === JSON.stringify(b || {});
+}
+
+function applySnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return false;
+
+  const before = getLocalSnapshot();
+  applyingRemote = true;
+
+  try {
+    Object.keys(before).forEach((key) => {
+      if (isAllowedKey(key) && !(key in snapshot)) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    Object.entries(snapshot).forEach(([key, value]) => {
+      if (isAllowedKey(key)) {
+        localStorage.setItem(key, value);
+      }
+    });
+  } catch (error) {
+    console.error('Erreur application cloud:', error);
+  }
+
+  applyingRemote = false;
+
+  const after = getLocalSnapshot();
+  return !sameSnapshot(before, after);
+}
+
+async function pushToCloud() {
+  if (!cloudReady || applyingRemote) return;
+
+  const syncedAt = Date.now();
+  currentSyncAt = syncedAt;
+
+  await saveCloudData({
+    localStorage: getLocalSnapshot(),
+    syncedAt,
+  });
+}
+
+function scheduleSave() {
+  if (!cloudReady || applyingRemote) return;
+
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    pushToCloud();
+  }, 800);
+}
+
+function patchLocalStorage() {
+  if (window.__PRONO_CLOUD_PATCHED__) return;
+  window.__PRONO_CLOUD_PATCHED__ = true;
+
+  const originalSetItem = Storage.prototype.setItem;
+  const originalRemoveItem = Storage.prototype.removeItem;
+  const originalClear = Storage.prototype.clear;
+
+  Storage.prototype.setItem = function patchedSetItem(key, value) {
+    const result = originalSetItem.apply(this, arguments);
+    if (this === window.localStorage && isAllowedKey(key)) {
+      scheduleSave();
+    }
+    return result;
+  };
+
+  Storage.prototype.removeItem = function patchedRemoveItem(key) {
+    const result = originalRemoveItem.apply(this, arguments);
+    if (this === window.localStorage && isAllowedKey(key)) {
+      scheduleSave();
+    }
+    return result;
+  };
+
+  Storage.prototype.clear = function patchedClear() {
+    const result = originalClear.apply(this, arguments);
+    if (this === window.localStorage) {
+      scheduleSave();
+    }
+    return result;
+  };
+}
+
+async function pullFromCloud({ reloadIfChanged = false } = {}) {
+  try {
+    const cloudData = await loadCloudData();
+    const remoteSnapshot = cloudData?.localStorage || {};
+    const remoteSyncAt = Number(cloudData?.syncedAt || 0);
+
+    if (!remoteSnapshot || typeof remoteSnapshot !== 'object') return;
+    if (remoteSyncAt && remoteSyncAt === currentSyncAt) return;
+
+    const changed = applySnapshot(remoteSnapshot);
+
+    if (remoteSyncAt) {
+      currentSyncAt = remoteSyncAt;
+    }
+
+    if (changed && reloadIfChanged) {
+      window.location.reload();
+    }
+  } catch (error) {
+    console.error('Erreur pull cloud:', error);
+  }
+}
+
+async function startCloudSync() {
+  try {
+    patchLocalStorage();
+
+    const firstCloudData = await loadCloudData();
+    const firstSnapshot = firstCloudData?.localStorage || {};
+    currentSyncAt = Number(firstCloudData?.syncedAt || 0);
+
+    const hasCloudData = firstSnapshot && Object.keys(firstSnapshot).length > 0;
+
+    if (hasCloudData) {
+      const changed = applySnapshot(firstSnapshot);
+
+      if (changed && !sessionStorage.getItem('__cloud_first_reload_done')) {
+        sessionStorage.setItem('__cloud_first_reload_done', '1');
+        setTimeout(() => window.location.reload(), 300);
+        return;
+      }
+    } else {
+      await saveCloudData({
+        localStorage: getLocalSnapshot(),
+        syncedAt: Date.now(),
+      });
+    }
+
+    cloudReady = true;
+    console.log('✅ Cloud sync activée PC ↔ téléphone');
+
+    setInterval(() => {
+      pullFromCloud({ reloadIfChanged: true });
+    }, 5000);
+  } catch (error) {
+    cloudReady = true;
+    console.error('❌ Cloud sync erreur:', error);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  startCloudSync();
+}
