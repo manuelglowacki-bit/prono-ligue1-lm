@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/prono/AppShell";
 import { supabase } from "@/lib/supabase";
+import { resizeImageToJpegFile } from "@/lib/resizeImage";
 import { useKeyboardOpen } from "@/hooks/useKeyboardOpen";
 import {
   VESTIAIRE_UNREAD_KEY,
@@ -268,14 +269,77 @@ function parseChatContent(content: string): ParsedChatContent {
 // pour rien (échec côté serveur après avoir attendu inutilement).
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+// Formats photo que le bucket n'accepte pas et que la plupart des navigateurs
+// n'affichent pas, mais que les iPhone produisent par défaut : on les accepte
+// à l'import et on les convertit en JPEG avant l'upload (voir prepareMedia).
+const CONVERTIBLE_IMAGE_TYPES = ["image/heic", "image/heif", "image/avif", "image/bmp", "image/tiff"];
+// Longueur max d'un message. La colonne `content` stocke déjà des charges
+// bien plus longues (le JSON d'un message photo : texte + jusqu'à 6 URLs de
+// médias), l'ancienne limite de 1000 était donc purement cosmétique — et trop
+// basse pour une annonce de classement.
+const MAX_MESSAGE_LENGTH = 2000;
+// Hauteur max de la zone de saisie avant de faire défiler (~6 lignes).
+const COMPOSER_MAX_HEIGHT = 132;
+
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 Mo
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024; // 25 Mo
 
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  heic: "image/heic",
+  heif: "image/heif",
+  avif: "image/avif",
+  bmp: "image/bmp",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+};
+
+const VIDEO_EXTENSIONS_BY_NAME: Record<string, string> = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+};
+
+function fileExtension(name: string) {
+  const match = /\.([a-z0-9]+)$/i.exec(name.trim());
+  return match ? match[1].toLowerCase() : "";
+}
+
+/** Type MIME réel d'un fichier choisi par l'utilisateur.
+ *
+ * `file.type` n'est PAS fiable : selon le sélecteur de fichiers (Android, un
+ * gestionnaire de fichiers tiers, un partage depuis une autre app), il arrive
+ * vide ou en `application/octet-stream`. On retombe alors sur l'extension du
+ * nom, sinon une photo parfaitement valide était refusée avec « Format non
+ * supporté ». */
+function resolveMediaType(file: File) {
+  const declared = file.type.toLowerCase();
+  if (declared.startsWith("image/") || declared.startsWith("video/")) return declared;
+
+  const extension = fileExtension(file.name);
+  return IMAGE_EXTENSIONS[extension] || VIDEO_EXTENSIONS_BY_NAME[extension] || declared;
+}
+
 function mediaKind(type: string): "image" | "video" | null {
-  if (ALLOWED_IMAGE_TYPES.includes(type)) return "image";
+  if (ALLOWED_IMAGE_TYPES.includes(type) || CONVERTIBLE_IMAGE_TYPES.includes(type)) return "image";
   if (ALLOWED_VIDEO_TYPES.includes(type)) return "video";
   return null;
 }
+
+const MEDIA_EXTENSION_BY_TYPE: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+  "video/quicktime": "mov",
+};
 
 const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".m4v"];
 
@@ -401,6 +465,7 @@ function VestiairePage() {
   const voiceUserIdRef = useRef<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const draftInputRef = useRef<HTMLTextAreaElement | null>(null);
   const messageRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -430,6 +495,17 @@ function VestiairePage() {
       ? Notification.permission
       : "unsupported"
   );
+
+  useEffect(() => {
+    // La zone de saisie grandit avec le texte (jusqu'à ~6 lignes) puis
+    // défile, pour ne pas manger tout l'écran sur un long message.
+    const textarea = draftInputRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, COMPOSER_MAX_HEIGHT)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > COMPOSER_MAX_HEIGHT ? "auto" : "hidden";
+  }, [draft]);
 
   useEffect(() => {
     // L'ouverture du Vestiaire signifie que les messages visibles sont lus.
@@ -947,8 +1023,19 @@ function VestiairePage() {
       setMessages((current) =>
         current.filter((message) => !message.id.startsWith("temp-"))
       );
+      // On affiche la vraie cause : « Bucket not found », « new row violates
+      // row-level security policy », « Payload too large »… sinon impossible
+      // de savoir si le problème vient du fichier, du bucket ou des droits.
+      const reason =
+        error instanceof Error && error.message
+          ? error.message
+          : typeof error === "object" && error && "message" in error
+            ? String((error as { message: unknown }).message)
+            : "";
       setErrorMessage(
-        "Le message ou la photo n'a pas pu être envoyé. Vérifie le bucket Supabase chat-images."
+        reason
+          ? `Envoi impossible : ${reason}`
+          : "Le message ou la photo n'a pas pu être envoyé. Vérifie le bucket Supabase chat-images."
       );
     } finally {
       setSending(false);
@@ -1400,13 +1487,15 @@ function VestiairePage() {
     let rejectedSize = false;
 
     for (const file of files) {
-      const kind = mediaKind(file.type);
+      const kind = mediaKind(resolveMediaType(file));
       if (!kind) {
         rejectedType = true;
         continue;
       }
-      const maxBytes = kind === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES;
-      if (file.size > maxBytes) {
+      // Une photo trop lourde n'est plus refusée : elle sera recompressée
+      // juste avant l'upload (voir prepareMedia). Seules les vidéos, qu'on ne
+      // sait pas ré-encoder dans le navigateur, restent bloquées ici.
+      if (kind === "video" && file.size > MAX_VIDEO_BYTES) {
         rejectedSize = true;
         continue;
       }
@@ -1414,9 +1503,9 @@ function VestiairePage() {
     }
 
     if (rejectedType) {
-      setErrorMessage("Format non supporté (photos JPEG/PNG/WebP/GIF ou vidéos MP4/WebM/MOV uniquement).");
+      setErrorMessage("Format non supporté (photos JPEG/PNG/WebP/GIF/HEIC ou vidéos MP4/WebM/MOV uniquement).");
     } else if (rejectedSize) {
-      setErrorMessage("Fichier trop volumineux (max 8 Mo par photo, 25 Mo par vidéo).");
+      setErrorMessage("Vidéo trop volumineuse (25 Mo maximum).");
     } else if (accepted.length) {
       setErrorMessage("");
     }
@@ -1433,8 +1522,10 @@ function VestiairePage() {
     setPendingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
 
-  function handlePaste(event: ClipboardEvent<HTMLInputElement>) {
-    const pastedMedia = Array.from(event.clipboardData.files).filter((file) => mediaKind(file.type));
+  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const pastedMedia = Array.from(event.clipboardData.files).filter((file) =>
+      mediaKind(resolveMediaType(file))
+    );
     if (pastedMedia.length) {
       event.preventDefault();
       addFiles(pastedMedia);
@@ -1447,19 +1538,74 @@ function VestiairePage() {
     addFiles(Array.from(event.dataTransfer.files));
   }
 
+  /** Prépare une photo pour l'upload : conversion en JPEG quand le bucket ne
+   * sait pas stocker le format d'origine (HEIC d'iPhone…) et recompression
+   * quand elle dépasse la limite, plutôt que de refuser l'envoi. Les vidéos
+   * passent telles quelles (pas de ré-encodage possible côté navigateur). */
+  async function prepareMedia(file: File) {
+    const type = resolveMediaType(file);
+
+    if (mediaKind(type) !== "image") return { file, type };
+
+    const needsConversion = !ALLOWED_IMAGE_TYPES.includes(type);
+    const tooBig = file.size > MAX_IMAGE_BYTES;
+
+    // Un GIF perdrait son animation en passant par le canvas : on le laisse
+    // intact tant que sa taille reste acceptable.
+    if (type === "image/gif" && !tooBig) return { file, type };
+
+    if (!needsConversion && !tooBig) return { file, type };
+
+    let converted: File;
+    try {
+      converted = await resizeImageToJpegFile(file);
+      if (converted.size > MAX_IMAGE_BYTES) {
+        converted = await resizeImageToJpegFile(file, 1280, 0.72);
+      }
+    } catch (error) {
+      console.error("Vestiaire — conversion photo :", error);
+      throw new Error(
+        needsConversion
+          ? `Ce format de photo (${type || "inconnu"}) n'est pas lisible par ce navigateur. Réessaie en JPEG ou PNG.`
+          : "Cette photo n'a pas pu être compressée. Réessaie avec une version plus légère."
+      );
+    }
+
+    if (converted.size > MAX_IMAGE_BYTES) {
+      throw new Error("Cette photo reste au-dessus de 8 Mo même compressée.");
+    }
+
+    return { file: converted, type: "image/jpeg" };
+  }
+
+  function randomFileId() {
+    // `crypto.randomUUID` n'existe pas hors contexte sécurisé ni sur les
+    // Safari un peu anciens : sans repli, tout l'envoi de photo échouait.
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    return `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+  }
+
   async function uploadChatImages(files: File[]) {
     const urls: string[] = [];
 
-    for (const file of files) {
-      const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const path = `${currentUserId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+    for (const original of files) {
+      const { file, type } = await prepareMedia(original);
+
+      // L'extension vient du type MIME réel (et non du nom du fichier, qui
+      // peut être trompeur ou absent) : `isVideoUrl` s'appuie dessus pour
+      // afficher une vidéo comme une vidéo.
+      const extension =
+        MEDIA_EXTENSION_BY_TYPE[type] || fileExtension(file.name) || "jpg";
+      const path = `${currentUserId}/${Date.now()}-${randomFileId()}.${extension}`;
 
       const { error: uploadError } = await supabase.storage
         .from("chat-images")
         .upload(path, file, {
           cacheControl: "3600",
           upsert: false,
-          contentType: file.type,
+          contentType: type,
         });
 
       if (uploadError) throw uploadError;
@@ -2434,7 +2580,7 @@ function VestiairePage() {
                           event.preventDefault();
                           void sendMessage();
                         }}
-                        className="flex items-center gap-1.5"
+                        className="flex items-end gap-1.5"
                       >
                         <div className="relative shrink-0">
                           <button
@@ -2538,7 +2684,11 @@ function VestiairePage() {
                         <input
                           ref={fileInputRef}
                           type="file"
-                          accept={[...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES].join(",")}
+                          accept={[
+                            ...ALLOWED_IMAGE_TYPES,
+                            ...CONVERTIBLE_IMAGE_TYPES,
+                            ...ALLOWED_VIDEO_TYPES,
+                          ].join(",")}
                           multiple
                           className="hidden"
                           onChange={(event) => {
@@ -2547,16 +2697,31 @@ function VestiairePage() {
                           }}
                         />
 
-                        <input
+                        {/* Zone de saisie multi-ligne : un <input> simple
+                            écrasait les retours à la ligne (un texte collé
+                            depuis ailleurs arrivait en un seul bloc) et
+                            coupait à 1000 caractères, ce qui rendait
+                            impossible la publication d'une annonce mise en
+                            forme (classement, récap de journée…).
+                            Entrée envoie, Maj+Entrée saute une ligne. */}
+                        <textarea
+                          ref={draftInputRef}
                           value={draft}
                           onChange={(event) => setDraft(event.target.value)}
                           onPaste={handlePaste}
-                          maxLength={1000}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" && !event.shiftKey) {
+                              event.preventDefault();
+                              void sendMessage();
+                            }
+                          }}
+                          rows={1}
+                          maxLength={MAX_MESSAGE_LENGTH}
                           disabled={!currentUserId || sending}
                           placeholder={
                             currentUserId ? "Écris ton message..." : "Connecte-toi pour écrire..."
                           }
-                          className="min-w-0 flex-1 bg-transparent px-1 text-sm text-white outline-none placeholder:text-slate-600"
+                          className="min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-relaxed text-white outline-none placeholder:text-slate-600"
                         />
 
                         <button
@@ -2651,10 +2816,19 @@ function VestiairePage() {
                       <div className="mt-1.5 flex items-center justify-between px-2">
                         <div className="flex items-center gap-2 text-[9px] text-slate-600">
                           <Paperclip size={11} />
-                          <span>Photos · emojis · glisser-déposer · Ctrl+V</span>
+                          {/* Une photo de téléphone est recompressée avant
+                              l'envoi, ce qui peut prendre quelques secondes :
+                              sans ce retour, l'attente ressemble à un bug. */}
+                          {sending && pendingFiles.length > 0 ? (
+                            <span className="text-emerald-300">
+                              Préparation et envoi {pendingFiles.length > 1 ? "des photos" : "de la photo"}…
+                            </span>
+                          ) : (
+                            <span>Photos · emojis · glisser-déposer · Maj+Entrée = saut de ligne</span>
+                          )}
                         </div>
                         <span className="text-[9px] text-slate-700">
-                          {draft.length}/1000
+                          {draft.length}/{MAX_MESSAGE_LENGTH}
                         </span>
                       </div>
                     </div>
