@@ -18,6 +18,10 @@ import {
 import { AppShell } from "@/components/prono/AppShell";
 import { CountdownBlocksIconic } from "@/components/prono/Countdown";
 import { supabase } from "@/lib/supabase";
+import {
+  isMatchLocked as isMatchLockedByDeadline,
+  matchLockDate,
+} from "@/lib/predictionDeadline";
 import { useFavoriteTeam } from "@/hooks/useFavoriteTeam";
 import { useTeamTheme } from "@/hooks/useTeamTheme";
 import { withAlpha } from "@/lib/team-theme";
@@ -1179,32 +1183,14 @@ function PronosticsPage() {
   // - AUTO -1 MIN : chaque match est verrouillé 1 minute avant son coup d'envoi
   // Le verrouillage est calculé côté joueur avec les vrais kickoff UTC.
   // ============================================================
-  const selectedDeadlineMode = selectedMatchday?.deadline_mode ?? "manual";
+  // La règle elle-même vit dans src/lib/predictionDeadline.ts : l'Accueil s'en
+  // sert pour annoncer « il te reste N pronos à faire », et doit fermer les
+  // matchs exactement au même instant que cette page.
+  const getMatchLockDate = (match: MatchRow): Date | null =>
+    matchLockDate(match, selectedMatchday);
 
-  const getMatchLockDate = (match: MatchRow): Date | null => {
-    if (!match.kickoff) return selectedMatchday?.deadline ? new Date(selectedMatchday.deadline) : null;
-
-    const kickoff = new Date(match.kickoff);
-    if (Number.isNaN(kickoff.getTime())) return null;
-
-    const autoLock = new Date(kickoff.getTime() - 60_000);
-
-    if (selectedDeadlineMode === "auto_minus_1") {
-      return autoLock;
-    }
-
-    if (selectedMatchday?.deadline) {
-      const manual = new Date(selectedMatchday.deadline);
-      if (!Number.isNaN(manual.getTime())) return manual;
-    }
-
-    return null;
-  };
-
-  const isMatchLocked = (match: MatchRow): boolean => {
-    const lockDate = getMatchLockDate(match);
-    return Boolean(lockDate && Date.now() >= lockDate.getTime());
-  };
+  const isMatchLocked = (match: MatchRow): boolean =>
+    isMatchLockedByDeadline(match, selectedMatchday);
 
   // FAILLE CORRIGEE — selectBonusMatch ne verifiait que le match VISE :
   //     if (!match || isMatchLocked(match)) return;

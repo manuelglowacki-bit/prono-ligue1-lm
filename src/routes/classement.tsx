@@ -14,6 +14,7 @@ import { matchday as currentMatchday } from "@/lib/prono-data";
 import { calculateCareerScore, aggregateCareerStatsByUser } from "@/lib/careerLevel";
 import { computeLeagueStats } from "@/lib/leaderboardStats";
 import { rankMovement, rankPlayers } from "@/lib/leaderboardRanking";
+import { computeEvolutionBaseline } from "@/lib/leaderboardEvolution";
 import { computePrizeByRank } from "@/lib/prizePool";
 import { fetchLiveApiMatches, reconcileMatchesWithLive, markLiveMatchesScorable } from "@/lib/liveMatches";
 
@@ -58,17 +59,6 @@ type RankedPlayer = PlayerProfile & {
   careerLevel: number;
   careerTitle: string;
 };
-
-/**
- * ÉVOLUTION — nombre de matchs terminés couverts par la pastille.
- *
- * La référence avance d'un cran à chaque coup de sifflet final : la pastille
- * bouge donc à chaque fin de match. Une fenêtre de 3 matchs (et non 1) évite
- * qu'une écrasante majorité de joueurs reste à « — » : un seul résultat ne
- * fait bouger que quelques rangs, trois en font bouger beaucoup plus, tout en
- * gardant une lecture « forme du moment ».
- */
-const EVOLUTION_WINDOW_MATCHES = 3;
 
 /**
  * Réduit progressivement la taille d'un nom de joueur trop long au lieu de le
@@ -574,47 +564,6 @@ function ClassementPage() {
           .map(([dayNumber]) => dayNumber)
           .sort((a, b) => a - b);
 
-        // RÉFÉRENCE DE L'ÉVOLUTION — FENÊTRE GLISSANTE DE MATCHS.
-        //
-        // La colonne « Évolution » montre les places gagnées ou perdues sur les
-        // EVOLUTION_WINDOW_MATCHES derniers matchs TERMINÉS. La référence
-        // avance donc d'un cran à chaque coup de sifflet final : la pastille
-        // bouge à chaque fin de match, y compris entre deux journées.
-        //
-        // BUG CORRIGÉ : la référence était « le classement après la dernière
-        // journée entièrement terminée ». Entre deux journées, cette référence
-        // EST le classement affiché : l'écart de rang était nul pour tout le
-        // monde et la colonne affichait « — » du 1er au dernier — c'est ce
-        // qu'on voyait sur les premières places. Seuls les joueurs à égalité de
-        // points semblaient bouger, et uniquement à cause d'un départage
-        // incohérent (voir plus bas).
-        //
-        // Ordre des résultats : le coup d'envoi (`kickoff`) est le seul repère
-        // chronologique dont on dispose — la base ne stocke aucune heure de fin.
-        // Les matchs joués simultanément sont départagés par leur id, pour que
-        // la fenêtre reste stable d'un rafraîchissement à l'autre.
-        //
-        // On part de l'état RÉEL des matchs (liveMatches/bonusMatches), jamais
-        // de la vue « scorable » : un match en cours n'entre ni dans la fenêtre
-        // ni dans la référence. Son score live ne joue donc que sur le
-        // classement affiché — la pastille réagit en direct sans que la
-        // référence, elle, ne bouge avant le coup de sifflet final.
-        const finishedInOrder = [...liveMatches, ...bonusMatches]
-          .filter((m) => m.finished === true && m.home_score != null && m.away_score != null)
-          .sort((a, b) => {
-            const kickoffA = a.kickoff ? new Date(a.kickoff).getTime() : 0;
-            const kickoffB = b.kickoff ? new Date(b.kickoff).getTime() : 0;
-            if (kickoffA !== kickoffB) return kickoffA - kickoffB;
-            return String(a.id).localeCompare(String(b.id));
-          });
-
-        const windowSize = Math.min(EVOLUTION_WINDOW_MATCHES, finishedInOrder.length);
-        const baselineMatchIds = new Set(
-          finishedInOrder
-            .slice(0, finishedInOrder.length - windowSize)
-            .map((m) => String(m.id)),
-        );
-
         // RÉGULARITÉ :
         // - regularitySuccess = nombre de pronostics ayant rapporté au moins 1 point
         // - predictionsCount = nombre de pronostics effectivement scorés
@@ -633,60 +582,28 @@ function ClassementPage() {
           playedMatchdaysByUser[userId] = days.size;
         });
 
-        // Classement de référence : EXACTEMENT le même moteur que le classement
-        // affiché (computeLeagueStats + rankPlayers), appliqué aux seuls
-        // résultats antérieurs à la fenêtre.
+        // ÉVOLUTION — fenêtre glissante sur les derniers matchs terminés.
+        // Même fonction que l'Accueil (src/lib/leaderboardEvolution.ts) : deux
+        // calculs séparés finiraient par diverger, et un joueur verrait « +2 »
+        // sur une page et « — » sur l'autre.
         //
-        // BUG CORRIGÉ : la référence était ré-agrégée à la main ici et
-        // n'alimentait ni `participation` ni `participationTotal`. rankPlayers
-        // retombait donc, pour elle seule, sur l'ancien départage au taux de
-        // RÉUSSITE, alors que le classement affiché départage à la
-        // PARTICIPATION. Deux joueurs à égalité de points pouvaient ainsi
-        // changer de place d'un classement à l'autre sans avoir rien joué :
-        // c'est ce qui fabriquait les « +4 » et « -1 » fantômes du bas de
-        // tableau pendant que le haut restait figé sur « — ».
-        //
-        // `bonusOptions` est passé entier : computeLeagueStats ne compte un
-        // bonus que si le match correspondant fait partie de la liste reçue,
-        // donc filtrer les matchs suffit.
-        const baselineStats = computeLeagueStats(
-          liveMatches.filter((m) => baselineMatchIds.has(String(m.id))),
-          bonusMatches.filter((m) => baselineMatchIds.has(String(m.id))),
+        // On passe l'état RÉEL des matchs (liveMatches/bonusMatches), jamais la
+        // vue « scorable » : un match en cours n'entre ni dans la fenêtre ni
+        // dans la référence. Son score live ne joue donc que sur le classement
+        // affiché — la pastille réagit en direct sans que la référence bouge
+        // avant le coup de sifflet final.
+        const { previousRankByUser: previousRanks, windowSize } = computeEvolutionBaseline({
+          ligue1Matches: liveMatches,
+          bonusMatches,
           bonusOptions,
-          (predictionsData ?? []).filter((p: any) => baselineMatchIds.has(String(p.match_id))),
+          predictions: predictionsData ?? [],
           profiles,
           teamNameById,
-          {
+          history: {
             seasonByMatchdayId: seasonByMatchdayIdObj,
             favoriteTeamBySeason,
           },
-        );
-
-        const baselineRanking = rankPlayers(
-          profiles.map((p) => ({
-            ...p,
-            points: baselineStats.pointsByUser[p.id] ?? 0,
-            exactScores: baselineStats.exactScoresByUser[p.id] ?? 0,
-            predictionsCount: baselineStats.predictionsCountByUser[p.id] ?? 0,
-            regularitySuccess: baselineStats.regularitySuccessByUser[p.id] ?? 0,
-            participation: baselineStats.participationByUser[p.id] ?? 0,
-            participationTotal: baselineStats.participationTotalByUser[p.id] ?? 0,
-            careerLevel: 1,
-            careerTitle: "Débutant",
-          })) as any,
-        );
-
-        // Aucun résultat antérieur à la fenêtre (tout début de saison) : la
-        // référence mettrait tout le monde à 0 point, donc à égalité, et le
-        // classement se réduirait à l'ordre alphabétique — des évolutions
-        // inventées de toutes pièces. On préfère « — » pour tout le monde
-        // (map laissée vide, voir `hasPreviousRanking` côté rendu).
-        const previousRanks: Record<string, number> = {};
-        if (baselineMatchIds.size > 0) {
-          baselineRanking.forEach((player: any) => {
-            previousRanks[player.id] = player.rank;
-          });
-        }
+        });
 
         if (!isStale()) {
           setPlayers(profiles);
@@ -701,7 +618,7 @@ function ClassementPage() {
           setBestMatchday(topMatchday);
           setCareerStatsByUser(Object.fromEntries(careerByUser));
           setPreviousRankByUser(previousRanks);
-          setEvolutionWindowSize(baselineMatchIds.size > 0 ? windowSize : 0);
+          setEvolutionWindowSize(windowSize);
 
           // SOURCE DE VÉRITÉ POUR LE PROFIL :
           // le Profil lit ce snapshot produit par la page Classement,

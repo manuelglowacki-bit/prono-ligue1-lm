@@ -14,12 +14,18 @@ import {
   Check,
   ChevronRight,
   Sparkles,
-  Star
+  Star,
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Minus
 } from "lucide-react";
 import { CountdownBlocks } from "@/components/prono/Countdown";
 import { useTeamTheme } from "@/hooks/useTeamTheme";
 import { calculateCareerScore, aggregateCareerStatsByUser, CAREER_LEVEL_TITLES } from "@/lib/careerLevel";
-import { rankPlayers } from "@/lib/leaderboardRanking";
+import { rankMovement, rankPlayers } from "@/lib/leaderboardRanking";
+import { computeEvolutionBaseline } from "@/lib/leaderboardEvolution";
+import { isMatchLocked, matchLockDate } from "@/lib/predictionDeadline";
 import { computePrizeByRank } from "@/lib/prizePool";
 import { computeLeagueStats } from "@/lib/leaderboardStats";
 import { fetchAllRows } from "@/lib/supabaseFetchAll";
@@ -55,13 +61,24 @@ function IndexPage() {
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  // Rangs de référence pour la pastille d'évolution du mini-classement —
+  // MÊME calcul que la page Classement (src/lib/leaderboardEvolution.ts).
+  const [previousRankByUser, setPreviousRankByUser] = useState<Record<string, number>>({});
+  // Grille de la prochaine journée : ce qu'il reste à jouer, et jusqu'à quand.
+  // `null` tant qu'on n'a pas de journée à venir identifiable.
+  const [pendingPronos, setPendingPronos] = useState<{
+    day: string;
+    missing: number;
+    total: number;
+    bonusMissing: boolean;
+    closesAt: number | null;
+  } | null>(null);
   const [myStats, setMyStats] = useState({
     rank: 0,
     points: 0,
     exactScores: 0,
     successRate: 0,
     totalPronos: 0,
-    avgPoints: 0,
     bestDay: "-",
     bestDayPoints: 0,
     // Régularité = participation : rencontres pronostiquées sur celles que ce
@@ -153,9 +170,13 @@ function IndexPage() {
             .select("entry_fee, favorite_team_deadline, favorite_team_auto_lock")
             .eq("id", 1)
             .maybeSingle(),
+          // `number`, `deadline` et `deadline_mode` servent au bloc « pronos à
+          // faire » : le numéro de journée fiable (plutôt que le texte libre
+          // porté par les matchs) et la règle de fermeture, appliquée via
+          // src/lib/predictionDeadline.ts — la même que la page Pronos.
           supabase
             .from("matchdays")
-            .select("id,season_id,season,competition_id"),
+            .select("id,number,season_id,season,competition_id,deadline,deadline_mode"),
           supabase.from("competitions").select("id, code, external_code"),
           // Actives ET historiques — même raison que classement.tsx : un
           // pronostic bonus reste valable même si l'admin a changé la
@@ -442,6 +463,131 @@ function IndexPage() {
           const career = calculateCareerScore(mineCareer);
           setCareerLevel(career.level);
         }
+        // -------- Évolution du mini-classement --------
+        // Même fonction que la page Classement : deux calculs séparés
+        // finiraient par diverger, et un joueur verrait « +2 » ici et « — »
+        // là-bas. On lui passe l'état RÉEL des matchs (reconciledMatches),
+        // jamais la vue « scorable » : un match en cours ne doit pas faire
+        // bouger la référence avant le coup de sifflet final.
+        const realLigue1Matches = (reconciledMatches || []).filter(
+          (m: any) =>
+            !m.is_bonus && m.matchday_id && ligue1MatchdayIds.has(String(m.matchday_id)),
+        );
+        const realBonusMatches = (reconciledMatches || []).filter((m: any) =>
+          bonusMatchIds.has(String(m.id)),
+        );
+
+        // Population et pseudos identiques à ceux du classement affiché : le
+        // départage final de rankPlayers est alphabétique, un pseudo manquant
+        // suffirait à décaler la référence.
+        const evolutionProfiles = normalizedRankings.map((row) => {
+          const source: any = profileById.get(row.user_id) || {};
+          return {
+            id: row.user_id,
+            pseudo: row.pseudo,
+            favorite_team_id: source.favorite_team_id ?? null,
+            favorite_team: source.favorite_team ?? null,
+          };
+        });
+
+        const { previousRankByUser: evolutionPreviousRanks } = computeEvolutionBaseline({
+          ligue1Matches: realLigue1Matches,
+          bonusMatches: realBonusMatches,
+          bonusOptions,
+          predictions: predictions || [],
+          profiles: evolutionProfiles,
+          teamNameById,
+          history: { seasonByMatchdayId, favoriteTeamBySeason },
+        });
+        setPreviousRankByUser(evolutionPreviousRanks);
+
+        // -------- Grille de la prochaine journée --------
+        // L'Accueil affichait un compte à rebours vers l'ouverture de la
+        // journée sans jamais dire si la grille du joueur était remplie.
+        // C'est pourtant la seule action qu'il a à faire d'ici là.
+        //
+        // La fermeture d'un match suit la règle de la page Pronos
+        // (src/lib/predictionDeadline.ts) : jamais une seconde règle ici, qui
+        // annoncerait un match « à faire » que la page Pronos refuse déjà.
+        const matchdayById = new Map(
+          (matchdays || []).map((md: any) => [String(md.id), md]),
+        );
+        const journeeOfMatch = (m: any) => {
+          const day = m?.matchday_id ? matchdayById.get(String(m.matchday_id)) : null;
+          const value = Number(day?.number ?? m?.matchday ?? m?.match_day ?? 0);
+          return Number.isFinite(value) && value > 0 ? value : 0;
+        };
+
+        if (user?.id && nextDay) {
+          const [nextJournee] = nextDay;
+          const dayMatches = realLigue1Matches.filter(
+            (m: any) => journeeOfMatch(m) === nextJournee,
+          );
+          // La journée est portée par une seule ligne `matchdays` : c'est elle
+          // qui définit le mode de fermeture, y compris pour le match bonus
+          // (même règle que la page Pronos, qui applique la journée Ligue 1
+          // sélectionnée à ses candidats bonus).
+          const dayMatchdayRow = dayMatches
+            .map((m: any) => matchdayById.get(String(m.matchday_id)))
+            .find(Boolean);
+
+          const myPredictedMatchIds = new Set(
+            (predictions || [])
+              .filter((pred: any) => pred.user_id === user.id)
+              .map((pred: any) => String(pred.match_id)),
+          );
+
+          const openMatches = dayMatches.filter(
+            (m: any) => !isMatchLocked(m, dayMatchdayRow, now),
+          );
+          const missing = openMatches.filter(
+            (m: any) => !myPredictedMatchIds.has(String(m.id)),
+          ).length;
+
+          // Bonus : une seule option est retenue par journée. Il reste « à
+          // faire » tant que le joueur n'en a choisi aucune ET qu'au moins une
+          // option est encore ouverte.
+          const dayMatchdayIds = new Set(
+            dayMatches.map((m: any) => String(m.matchday_id)),
+          );
+          const dayBonusMatchIds = bonusOptions
+            .filter((option) => dayMatchdayIds.has(String(option.matchday_id)))
+            .map((option) => String(option.match_id));
+          const bonusChosen = dayBonusMatchIds.some((id) => myPredictedMatchIds.has(id));
+          const bonusStillOpen = dayBonusMatchIds.some((id) => {
+            const bonusMatch = matchById.get(id);
+            return bonusMatch && !isMatchLocked(bonusMatch, dayMatchdayRow, now);
+          });
+
+          // Prochaine fermeture réelle : en mode « auto -1 min », les matchs
+          // d'une journée se ferment un par un — ce qui intéresse le joueur est
+          // le prochain instant où il ne pourra plus jouer.
+          const nextClose = openMatches
+            .map((m: any) => matchLockDate(m, dayMatchdayRow))
+            .filter((date): date is Date => Boolean(date) && date!.getTime() > now)
+            .sort((a, b) => a.getTime() - b.getTime())[0];
+
+          // Rien d'ouvert = rien a annoncer. Sans ce garde, une journee dont
+          // les matchs ne sont pas encore importes en base (dayMatches vide)
+          // afficherait un rassurant "grille complete" alors qu'il n'y a
+          // simplement rien a compter — et une journee dont la deadline
+          // manuelle est passee avant le coup d'envoi afficherait la meme
+          // chose alors que le joueur ne peut plus rien jouer.
+          setPendingPronos(
+            openMatches.length > 0
+              ? {
+                  day: `J${nextJournee}`,
+                  missing,
+                  total: openMatches.length,
+                  bonusMissing: !bonusChosen && bonusStillOpen,
+                  closesAt: nextClose ? nextClose.getTime() : null,
+                }
+              : null,
+          );
+        } else {
+          setPendingPronos(null);
+        }
+
 setLeaderboard(rankedRankings);
 
         // -------- Journée la plus récente terminée --------
@@ -466,7 +612,6 @@ setLeaderboard(rankedRankings);
         // Mêmes valeurs que le Classement (computeLeagueStats ci-dessus) —
         // plus de recalcul séparé ni de lecture de predictions.points.
         if (user?.id) {
-          const mine = (predictions || []).filter((p: any) => p.user_id === user.id);
           const meRanking = rankedRankings.find((r: any) => r.user_id === user.id);
           const points = rankingPointsByUser[user.id] || 0;
           const exacts = rankingExactByUser[user.id] || 0;
@@ -485,8 +630,6 @@ setLeaderboard(rankedRankings);
           });
 
           const myPointsByDay = pointsByUserAndMatchday[user.id] ?? {};
-          const daysPlayedCount = Object.keys(myPointsByDay).length;
-
           let bestDay = "-";
           let bestDayPoints = 0;
           Object.entries(myPointsByDay).forEach(([matchdayId, value]) => {
@@ -505,9 +648,15 @@ setLeaderboard(rankedRankings);
             rank,
             points: finalPoints,
             exactScores: finalExacts,
-            successRate: mine.length ? Math.round((bons / mine.length) * 100) : 0,
+            // Le denominateur est le nombre de pronostics REELLEMENT scores
+            // (totalCount), pas le nombre total de lignes en base : celui-ci
+            // inclut les pronostics deposes sur des matchs pas encore joues,
+            // donc remplir la journee suivante faisait CHUTER le pourcentage
+            // sans qu'aucun resultat n'ait change. C'est aussi le chiffre
+            // affiche juste en dessous ("N pronos") : les deux parlent enfin
+            // de la meme chose.
+            successRate: totalCount ? Math.round((bons / totalCount) * 100) : 0,
             totalPronos: finalCount,
-            avgPoints: daysPlayedCount ? Number((points / daysPlayedCount).toFixed(1)) : 0,
             bestDay,
             bestDayPoints,
             participation: rankingParticipationByUser[user.id] ?? 0,
@@ -568,6 +717,35 @@ setLeaderboard(rankedRankings);
     const timer = window.setInterval(() => setCurrentTime(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  // Echeance de la grille, relative et vivante : `currentTime` bat a la
+  // seconde, donc le libelle se met a jour sans rechargement.
+  const pronosCloseLabel = useMemo(() => {
+    if (!pendingPronos?.closesAt) return null;
+    const remaining = pendingPronos.closesAt - currentTime.getTime();
+    if (remaining <= 0) return null;
+    const minutes = Math.floor(remaining / 60000);
+    if (minutes < 60) return `ferme dans ${Math.max(minutes, 1)} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `ferme dans ${hours} h`;
+    return `ferme dans ${Math.floor(hours / 24)} j`;
+  }, [pendingPronos?.closesAt, currentTime]);
+
+  // La phrase sous le mini-classement etait ecrite en dur ("Ligue ultra serree
+  // en tete !") : elle s'affichait a l'identique que le leader ait 1 point ou
+  // 40 d'avance. Elle dit maintenant l'ecart reel.
+  const leadSentence = useMemo(() => {
+    if (leaderboard.length < 2) return "En attente des premiers résultats.";
+    const gap =
+      Number(leaderboard[0]?.total_points ?? 0) - Number(leaderboard[1]?.total_points ?? 0);
+    if (gap <= 0) return "1er et 2e à égalité parfaite !";
+    if (gap <= 2) return `Ça se joue à ${gap} pt${gap > 1 ? "s" : ""} en tête.`;
+    return `${gap} pts d'avance pour le leader.`;
+  }, [leaderboard]);
+
+  // Sans reference exploitable (debut de saison), la colonne affiche "—"
+  // plutot que des mouvements inventes — meme regle que le Classement.
+  const hasEvolution = Object.keys(previousRankByUser).length > 0;
 
   const isFavoriteTeamLocked = Boolean(
     favoriteTeamAutoLock &&
@@ -761,6 +939,47 @@ setLeaderboard(rankedRankings);
                   </span>
                 </div>
               )}
+
+              {/* CE QUI RESTE A FAIRE.
+                  Le compte a rebours annoncait l'ouverture de la journee sans
+                  jamais dire si la grille du joueur etait remplie — c'est
+                  pourtant la seule action qu'il ait a faire d'ici la. La regle
+                  de fermeture est celle de la page Pronos
+                  (src/lib/predictionDeadline.ts), jamais une seconde regle
+                  ecrite ici, qui annoncerait "a faire" un match deja bloque. */}
+              {pendingPronos && (pendingPronos.missing > 0 || pendingPronos.bonusMissing) ? (
+                <Link
+                  to="/pronostics"
+                  className="tap flex max-w-md items-center gap-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 transition-colors hover:bg-amber-400/[.16]"
+                >
+                  <AlertTriangle size={18} className="shrink-0 text-amber-300" />
+                  <span className="min-w-0">
+                    <span className="block font-display text-sm font-bold text-amber-100">
+                      {pendingPronos.missing > 0
+                        ? `${pendingPronos.missing} prono${pendingPronos.missing > 1 ? "s" : ""} à faire pour la ${pendingPronos.day}`
+                        : `Bonus de la ${pendingPronos.day} à choisir`}
+                    </span>
+                    <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-wider text-amber-200/70">
+                      {[
+                        pendingPronos.missing > 0 && pendingPronos.bonusMissing
+                          ? "bonus non choisi"
+                          : null,
+                        pronosCloseLabel,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "à remplir avant le coup d'envoi"}
+                    </span>
+                  </span>
+                  <ArrowRight size={16} className="ml-auto shrink-0 text-amber-300" />
+                </Link>
+              ) : pendingPronos ? (
+                <div className="flex max-w-md items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/[.07] px-4 py-3">
+                  <Check size={18} className="shrink-0 text-emerald-400" />
+                  <span className="font-display text-sm font-bold text-emerald-200">
+                    Grille complète pour la {pendingPronos.day}
+                  </span>
+                </div>
+              ) : null}
 
               {/* flex-col sur mobile : boutons pleine largeur, empilés
                   proprement (grande cible tactile), plutôt qu'un flex-wrap
@@ -1030,22 +1249,44 @@ setLeaderboard(rankedRankings);
                 points, gain. Trois cartes empilées disaient moins que cinq
                 lignes, et n'affichaient pas les gains. */}
             <div className="relative z-10 space-y-1.5">
-              <div className="grid grid-cols-[28px_minmax(0,1fr)_52px_64px] items-center gap-2 px-2 pb-1 font-mono text-[9px] font-bold uppercase tracking-[.16em] text-slate-500">
+              <div className="grid grid-cols-[28px_minmax(0,1fr)_38px_52px_64px] items-center gap-2 px-2 pb-1 font-mono text-[9px] font-bold uppercase tracking-[.16em] text-slate-500">
                 <span>#</span>
                 <span>Joueur</span>
+                {/* Meme pastille que la page Classement, meme calcul
+                    (src/lib/leaderboardEvolution.ts) : un joueur ne peut pas
+                    lire "+2" ici et "—" la-bas. */}
+                <span
+                  className="text-center"
+                  title={
+                    hasEvolution
+                      ? "Places gagnées ou perdues sur les derniers matchs terminés"
+                      : "Pas encore assez de matchs joués pour mesurer une évolution"
+                  }
+                >
+                  Évo
+                </span>
                 <span className="text-right">Pts</span>
                 <span className="text-right">Gain</span>
               </div>
 
               {leaderboard.slice(0, 5).map((player, index) => {
-                const place = index + 1;
+                const place = Number(player?.rank ?? index + 1);
                 const prize = homePrizeByRank[place] ?? 0;
-                const isMe = myStats.rank === place;
+                // Comparaison directe sur l'identifiant : l'ancien
+                // `myStats.rank === place` confrontait un rang a un index de
+                // ligne, ce qui ne tenait que tant que les rangs restaient
+                // strictement sequentiels.
+                const isMe = Boolean(user?.id) && String(player?.user_id ?? "") === String(user?.id);
+                const movement = rankMovement(
+                  previousRankByUser[String(player?.user_id ?? "")],
+                  place,
+                  hasEvolution,
+                );
 
                 return (
                   <div
                     key={player?.user_id || `place-${place}`}
-                    className={`dash-fade-up grid grid-cols-[28px_minmax(0,1fr)_52px_64px] items-center gap-2 rounded-xl border px-2 py-2 transition-colors ${
+                    className={`dash-fade-up grid grid-cols-[28px_minmax(0,1fr)_38px_52px_64px] items-center gap-2 rounded-xl border px-2 py-2 transition-colors ${
                       isMe
                         ? "border-emerald-400/30 bg-emerald-400/[.07]"
                         : place === 1
@@ -1090,6 +1331,30 @@ setLeaderboard(rankedRankings);
                       )}
                     </div>
 
+                    <span
+                      className={`mx-auto inline-flex items-center justify-center gap-0.5 rounded-full border px-1 py-0.5 font-mono text-[9px] font-black ${
+                        movement.trend === "up"
+                          ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                          : movement.trend === "down"
+                            ? "border-rose-400/30 bg-rose-400/10 text-rose-300"
+                            : "border-slate-700/60 bg-slate-800/40 text-slate-500"
+                      }`}
+                    >
+                      {movement.trend === "up" ? (
+                        <>
+                          <ArrowUp size={9} />
+                          {Math.abs(movement.delta)}
+                        </>
+                      ) : movement.trend === "down" ? (
+                        <>
+                          <ArrowDown size={9} />
+                          {Math.abs(movement.delta)}
+                        </>
+                      ) : (
+                        <Minus size={9} />
+                      )}
+                    </span>
+
                     <span className="text-right font-display text-base font-black text-white">
                       {Number(player?.total_points || 0)}
                     </span>
@@ -1113,7 +1378,7 @@ setLeaderboard(rankedRankings);
             </div>
 
             <div className="relative z-10 mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between font-mono">
-              <span className="text-[13px] text-slate-300 font-medium">Ligue ultra serrée en tête !</span>
+              <span className="text-[13px] text-slate-300 font-medium">{leadSentence}</span>
               <span className="text-sm text-amber-400 font-black">Cagnotte : {potAmount.toFixed(0)} €</span>
             </div>
           </div>
