@@ -13,7 +13,8 @@ import { useAuth } from "@/context/AuthContext";
 import { matchday as currentMatchday } from "@/lib/prono-data";
 import { calculateCareerScore, aggregateCareerStatsByUser } from "@/lib/careerLevel";
 import { computeLeagueStats } from "@/lib/leaderboardStats";
-import { rankPlayers } from "@/lib/leaderboardRanking";
+import { rankMovement, rankPlayers } from "@/lib/leaderboardRanking";
+import { computeEvolutionBaseline } from "@/lib/leaderboardEvolution";
 import { computePrizeByRank } from "@/lib/prizePool";
 import { fetchLiveApiMatches, reconcileMatchesWithLive, markLiveMatchesScorable } from "@/lib/liveMatches";
 
@@ -149,6 +150,9 @@ function ClassementPage() {
   const [finishedMatchdayCount, setFinishedMatchdayCount] = useState(0);
   const [careerStatsByUser, setCareerStatsByUser] = useState<Record<string, { points: number; exactScores: number }>>({});
   const [previousRankByUser, setPreviousRankByUser] = useState<Record<string, number>>({});
+  // Nombre de matchs terminés réellement couverts par la pastille
+  // « Évolution » — sert uniquement à son infobulle.
+  const [evolutionWindowSize, setEvolutionWindowSize] = useState(0);
   // Liste des journées Ligue 1 de la saison (id + numéro) — sert uniquement au
   // sélecteur visuel sous le titre. Le classement lui-même reste un cumul
   // saison complet : ce sélecteur est préparé pour un futur filtrage réel
@@ -560,17 +564,6 @@ function ClassementPage() {
           .map(([dayNumber]) => dayNumber)
           .sort((a, b) => a - b);
 
-        // BASELINE DE L'ÉVOLUTION — doit être le classement juste avant la
-        // journée EN COURS, jamais "il y a deux journées". `latestFinishedNumber`
-        // est la dernière journée où TOUS les matchs Ligue 1 sont réellement
-        // FINISHED (voir matchesByDayNumber ci-dessus, sur l'état réel non
-        // forcé) : c'est exactement "avant la journée en cours", que celle-ci
-        // soit en direct ou pas encore commencée. Cette référence ne bouge
-        // JAMAIS pendant la journée en cours (elle ne dépend d'aucun score
-        // live) : seul currentRanks (plus bas, calculé sur scorableLigue1Matches/
-        // scorableBonusMatches) évolue à chaque refresh.
-        const latestFinishedNumber = finishedNumbers.at(-1) ?? null;
-
         // RÉGULARITÉ :
         // - regularitySuccess = nombre de pronostics ayant rapporté au moins 1 point
         // - predictionsCount = nombre de pronostics effectivement scorés
@@ -589,74 +582,27 @@ function ClassementPage() {
           playedMatchdaysByUser[userId] = days.size;
         });
 
-        const previousPointsByUser: Record<string, number> = {};
-        const previousExactByUser: Record<string, number> = {};
-        const previousRegularityByUser: Record<string, number> = {};
-        const previousPredictionsByUser: Record<string, number> = {};
-
-        const outcomeCorrect = (p: any, m: any) => {
-          if (p.home_prediction == null || p.away_prediction == null || m?.home_score == null || m?.away_score == null) {
-            return false;
-          }
-          const predictedDiff = Number(p.home_prediction) - Number(p.away_prediction);
-          const actualDiff = Number(m.home_score) - Number(m.away_score);
-          return Math.sign(predictedDiff) === Math.sign(actualDiff);
-        };
-
-        if (latestFinishedNumber != null) {
-          for (const p of predictionsData ?? []) {
-            const userId = String(p.user_id ?? "");
-            const dayNumber = matchdayNumberByMatchId.get(String(p.match_id));
-            if (!userId || dayNumber == null || dayNumber > latestFinishedNumber) continue;
-
-            previousPredictionsByUser[userId] = (previousPredictionsByUser[userId] ?? 0) + 1;
-            previousPointsByUser[userId] =
-              (previousPointsByUser[userId] ?? 0) +
-              (pointsByPredictionKey[`${p.user_id}:${p.match_id}`] ?? 0);
-
-            const match = matchByIdForCareer.get(String(p.match_id));
-            // Le classement précédent reste STRICTEMENT officiel : un match
-            // encore en direct ne doit jamais entrer dans la comparaison de
-            // l'évolution, même si son score live est déjà connu.
-            if (!match || !match.finished || match.home_score == null || match.away_score == null) continue;
-
-            if (isExactPrediction(p)) {
-              previousExactByUser[userId] = (previousExactByUser[userId] ?? 0) + 1;
-            }
-            if (outcomeCorrect(p, match)) {
-              previousRegularityByUser[userId] = (previousRegularityByUser[userId] ?? 0) + 1;
-            }
-          }
-        }
-
-        const previousRankedInput = profiles.map((p) => ({
-          ...p,
-          points: previousPointsByUser[p.id] ?? 0,
-          exactScores: previousExactByUser[p.id] ?? 0,
-          predictionsCount: previousPredictionsByUser[p.id] ?? 0,
-          regularitySuccess: previousRegularityByUser[p.id] ?? 0,
-          careerLevel: 1,
-          careerTitle: "Débutant",
-        }));
-
-        // Base d'évolution LIVE : classement avant le début de la journée en cours.
-        const baselineRanking = latestFinishedNumber != null
-          ? rankPlayers(previousRankedInput as any)
-          : rankPlayers(
-              profiles.map((p) => ({
-                ...p,
-                points: 0,
-                exactScores: 0,
-                predictionsCount: 0,
-                regularitySuccess: 0,
-                careerLevel: 1,
-                careerTitle: "Débutant",
-              })) as any,
-            );
-
-        const previousRanks: Record<string, number> = {};
-        baselineRanking.forEach((player: any) => {
-          previousRanks[player.id] = player.rank;
+        // ÉVOLUTION — fenêtre glissante sur les derniers matchs terminés.
+        // Même fonction que l'Accueil (src/lib/leaderboardEvolution.ts) : deux
+        // calculs séparés finiraient par diverger, et un joueur verrait « +2 »
+        // sur une page et « — » sur l'autre.
+        //
+        // On passe l'état RÉEL des matchs (liveMatches/bonusMatches), jamais la
+        // vue « scorable » : un match en cours n'entre ni dans la fenêtre ni
+        // dans la référence. Son score live ne joue donc que sur le classement
+        // affiché — la pastille réagit en direct sans que la référence bouge
+        // avant le coup de sifflet final.
+        const { previousRankByUser: previousRanks, windowSize } = computeEvolutionBaseline({
+          ligue1Matches: liveMatches,
+          bonusMatches,
+          bonusOptions,
+          predictions: predictionsData ?? [],
+          profiles,
+          teamNameById,
+          history: {
+            seasonByMatchdayId: seasonByMatchdayIdObj,
+            favoriteTeamBySeason,
+          },
         });
 
         if (!isStale()) {
@@ -672,6 +618,7 @@ function ClassementPage() {
           setBestMatchday(topMatchday);
           setCareerStatsByUser(Object.fromEntries(careerByUser));
           setPreviousRankByUser(previousRanks);
+          setEvolutionWindowSize(windowSize);
 
           // SOURCE DE VÉRITÉ POUR LE PROFIL :
           // le Profil lit ce snapshot produit par la page Classement,
@@ -808,6 +755,10 @@ function ClassementPage() {
   const prizePool = totalPlayers * 10;
   const prizeByRank = computePrizeByRank(prizePool);
 
+  // Y a-t-il un classement de référence exploitable ? (calculé une seule fois
+  // ici, au lieu d'être recalculé pour chaque ligne dans les deux listes.)
+  const hasPreviousRanking = Object.keys(previousRankByUser).length > 0;
+
   return (
     <AppShell>
       <main className="relative mx-auto w-full max-w-[1400px] overflow-hidden px-3 pb-28 pt-3 sm:px-5 lg:px-8">
@@ -908,7 +859,20 @@ function ClassementPage() {
                 <span className="text-center">Écart pts</span>
                 <span className="text-center">Score exact</span>
                 <span>Régularité</span>
-                <span className="text-center">Évolution</span>
+                <span
+                  className="text-center"
+                  title={
+                    hasPreviousRanking && evolutionWindowSize > 0
+                      ? `Places gagnées ou perdues sur ${
+                          evolutionWindowSize > 1
+                            ? `les ${evolutionWindowSize} derniers matchs terminés`
+                            : "le dernier match terminé"
+                        }`
+                      : "Pas encore assez de matchs joués pour mesurer une évolution"
+                  }
+                >
+                  Évolution
+                </span>
               </div>
 
               <div className="space-y-2.5">
@@ -937,11 +901,11 @@ function ClassementPage() {
                   return list.map((p) => {
                     const team = p.favorite_team_id ? teamsById[p.favorite_team_id] : undefined;
                     const isMe = p.id === user?.id;
-                    const previousRank = previousRankByUser[p.id];
-                    const rankDelta = previousRank != null ? previousRank - p.rank : 0;
-                    const hasPreviousRanking = Object.keys(previousRankByUser).length > 0;
-                    const trend = !hasPreviousRanking ? "same" : rankDelta > 0 ? "up" : rankDelta < 0 ? "down" : "same";
-                    const trendLabel = rankDelta > 0 ? `+${rankDelta}` : rankDelta < 0 ? `${rankDelta}` : "—";
+                    const { trend, label: trendLabel } = rankMovement(
+                      previousRankByUser[p.id],
+                      p.rank,
+                      hasPreviousRanking,
+                    );
 
                     const leaderPoints = list[0]?.points ?? 0;
                     const pointsGap = Math.max(0, leaderPoints - p.points);
@@ -1139,18 +1103,11 @@ function ClassementPage() {
                 return list.map((p) => {
                   const team = p.favorite_team_id ? teamsById[p.favorite_team_id] : undefined;
                   const isMe = p.id === user?.id;
-                  const previousRank = previousRankByUser[p.id];
-                  const rankDelta = previousRank != null ? previousRank - p.rank : 0;
-                  const hasPreviousRanking = Object.keys(previousRankByUser).length > 0;
-                  const trend = !hasPreviousRanking
-                    ? "same"
-                    : rankDelta > 0
-                      ? "up"
-                      : rankDelta < 0
-                        ? "down"
-                        : "same";
-                  const trendLabel =
-                    rankDelta > 0 ? `+${rankDelta}` : rankDelta < 0 ? `${rankDelta}` : "—";
+                  const { trend, label: trendLabel } = rankMovement(
+                    previousRankByUser[p.id],
+                    p.rank,
+                    hasPreviousRanking,
+                  );
 
                   const tone =
                     p.rank === 1
