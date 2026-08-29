@@ -60,6 +60,17 @@ type RankedPlayer = PlayerProfile & {
 };
 
 /**
+ * ÉVOLUTION — nombre de matchs terminés couverts par la pastille.
+ *
+ * La référence avance d'un cran à chaque coup de sifflet final : la pastille
+ * bouge donc à chaque fin de match. Une fenêtre de 3 matchs (et non 1) évite
+ * qu'une écrasante majorité de joueurs reste à « — » : un seul résultat ne
+ * fait bouger que quelques rangs, trois en font bouger beaucoup plus, tout en
+ * gardant une lecture « forme du moment ».
+ */
+const EVOLUTION_WINDOW_MATCHES = 3;
+
+/**
  * Réduit progressivement la taille d'un nom de joueur trop long au lieu de le
  * tronquer — retourne un facteur d'échelle à appliquer à la taille de police
  * de base (via calc(... * facteur)).
@@ -149,9 +160,9 @@ function ClassementPage() {
   const [finishedMatchdayCount, setFinishedMatchdayCount] = useState(0);
   const [careerStatsByUser, setCareerStatsByUser] = useState<Record<string, { points: number; exactScores: number }>>({});
   const [previousRankByUser, setPreviousRankByUser] = useState<Record<string, number>>({});
-  // Journée dont l'évolution est affichée (la dernière journée COMMENCÉE) —
-  // sert uniquement à l'infobulle de la colonne « Évolution ».
-  const [evolutionMatchdayNumber, setEvolutionMatchdayNumber] = useState<number | null>(null);
+  // Nombre de matchs terminés réellement couverts par la pastille
+  // « Évolution » — sert uniquement à son infobulle.
+  const [evolutionWindowSize, setEvolutionWindowSize] = useState(0);
   // Liste des journées Ligue 1 de la saison (id + numéro) — sert uniquement au
   // sélecteur visuel sous le titre. Le classement lui-même reste un cumul
   // saison complet : ce sélecteur est préparé pour un futur filtrage réel
@@ -563,47 +574,46 @@ function ClassementPage() {
           .map(([dayNumber]) => dayNumber)
           .sort((a, b) => a - b);
 
-        // JOURNÉE DE RÉFÉRENCE DE L'ÉVOLUTION.
+        // RÉFÉRENCE DE L'ÉVOLUTION — FENÊTRE GLISSANTE DE MATCHS.
         //
-        // La colonne « Évolution » répond à une seule question : qu'est-ce que
-        // la DERNIÈRE journée a changé ? La référence est donc le classement
-        // tel qu'il était avant la dernière journée COMMENCÉE.
+        // La colonne « Évolution » montre les places gagnées ou perdues sur les
+        // EVOLUTION_WINDOW_MATCHES derniers matchs TERMINÉS. La référence
+        // avance donc d'un cran à chaque coup de sifflet final : la pastille
+        // bouge à chaque fin de match, y compris entre deux journées.
         //
-        // BUG CORRIGÉ (« pourquoi pas d'évolution sur les premières places ? ») :
-        // la référence était « toutes les journées entièrement terminées ».
-        // Entre deux journées — J11 finie, J12 pas encore jouée — cette
-        // référence EST le classement affiché : l'écart de rang était nul pour
-        // tout le monde et la colonne affichait « — » du 1er au dernier. Seuls
-        // les joueurs à égalité de points semblaient bouger, et uniquement à
-        // cause d'un départage incohérent (voir plus bas). Résultat : les
-        // premières places, aux points distincts, restaient éternellement à
-        // « — ». Désormais, entre deux journées on compare bien à l'avant-J11,
-        // donc l'évolution de la J11 reste lisible jusqu'au coup d'envoi de
-        // la J12.
+        // BUG CORRIGÉ : la référence était « le classement après la dernière
+        // journée entièrement terminée ». Entre deux journées, cette référence
+        // EST le classement affiché : l'écart de rang était nul pour tout le
+        // monde et la colonne affichait « — » du 1er au dernier — c'est ce
+        // qu'on voyait sur les premières places. Seuls les joueurs à égalité de
+        // points semblaient bouger, et uniquement à cause d'un départage
+        // incohérent (voir plus bas).
         //
-        // Pendant une journée en direct, le comportement ne change pas : la
-        // référence est le classement d'avant cette journée, et elle ne bouge
-        // plus jusqu'à la journée suivante (elle ne dépend d'aucun score live).
-        const startedNumbers = new Set<number>();
-        scorableLigue1Matches.forEach((m) => {
-          const dayNumber = m.matchday_id ? l1NumberById.get(String(m.matchday_id)) : undefined;
-          if (dayNumber == null || dayNumber <= 0) return;
-          // `scorableLigue1Matches` marque `finished: true` dès qu'un match a
-          // commencé ET porte un score : c'est exactement « journée entamée ».
-          if (m.finished === true && m.home_score != null && m.away_score != null) {
-            startedNumbers.add(dayNumber);
-          }
-        });
-        const latestStartedNumber =
-          startedNumbers.size > 0 ? Math.max(...startedNumbers) : null;
-        // Référence = la dernière journée commencée AVANT celle-ci. `null`
-        // quand il n'y en a pas (première journée de la saison) : il n'y a
-        // alors rien à comparer, et la colonne affiche « — ».
-        const previousStartedNumbers = [...startedNumbers].filter(
-          (n) => latestStartedNumber != null && n < latestStartedNumber,
+        // Ordre des résultats : le coup d'envoi (`kickoff`) est le seul repère
+        // chronologique dont on dispose — la base ne stocke aucune heure de fin.
+        // Les matchs joués simultanément sont départagés par leur id, pour que
+        // la fenêtre reste stable d'un rafraîchissement à l'autre.
+        //
+        // On part de l'état RÉEL des matchs (liveMatches/bonusMatches), jamais
+        // de la vue « scorable » : un match en cours n'entre ni dans la fenêtre
+        // ni dans la référence. Son score live ne joue donc que sur le
+        // classement affiché — la pastille réagit en direct sans que la
+        // référence, elle, ne bouge avant le coup de sifflet final.
+        const finishedInOrder = [...liveMatches, ...bonusMatches]
+          .filter((m) => m.finished === true && m.home_score != null && m.away_score != null)
+          .sort((a, b) => {
+            const kickoffA = a.kickoff ? new Date(a.kickoff).getTime() : 0;
+            const kickoffB = b.kickoff ? new Date(b.kickoff).getTime() : 0;
+            if (kickoffA !== kickoffB) return kickoffA - kickoffB;
+            return String(a.id).localeCompare(String(b.id));
+          });
+
+        const windowSize = Math.min(EVOLUTION_WINDOW_MATCHES, finishedInOrder.length);
+        const baselineMatchIds = new Set(
+          finishedInOrder
+            .slice(0, finishedInOrder.length - windowSize)
+            .map((m) => String(m.id)),
         );
-        const evolutionBaselineNumber =
-          previousStartedNumbers.length > 0 ? Math.max(...previousStartedNumbers) : null;
 
         // RÉGULARITÉ :
         // - regularitySuccess = nombre de pronostics ayant rapporté au moins 1 point
@@ -624,8 +634,8 @@ function ClassementPage() {
         });
 
         // Classement de référence : EXACTEMENT le même moteur que le classement
-        // affiché (computeLeagueStats + rankPlayers), appliqué aux seules
-        // journées antérieures à la dernière journée commencée.
+        // affiché (computeLeagueStats + rankPlayers), appliqué aux seuls
+        // résultats antérieurs à la fenêtre.
         //
         // BUG CORRIGÉ : la référence était ré-agrégée à la main ici et
         // n'alimentait ni `participation` ni `participationTotal`. rankPlayers
@@ -635,26 +645,15 @@ function ClassementPage() {
         // changer de place d'un classement à l'autre sans avoir rien joué :
         // c'est ce qui fabriquait les « +4 » et « -1 » fantômes du bas de
         // tableau pendant que le haut restait figé sur « — ».
-        const inBaseline = (matchId: string) => {
-          if (evolutionBaselineNumber == null) return false;
-          const dayNumber = matchdayNumberByMatchId.get(String(matchId));
-          return dayNumber != null && dayNumber > 0 && dayNumber <= evolutionBaselineNumber;
-        };
-
-        // On repart de l'état RÉEL des matchs (liveMatches/bonusMatches), pas de
-        // la vue « scorable » : une rencontre encore en direct ne doit jamais
-        // entrer dans la référence, sinon celle-ci bougerait pendant le match
-        // et l'évolution sauterait à chaque rafraîchissement. computeLeagueStats
-        // ignore d'office tout match non terminé.
+        //
+        // `bonusOptions` est passé entier : computeLeagueStats ne compte un
+        // bonus que si le match correspondant fait partie de la liste reçue,
+        // donc filtrer les matchs suffit.
         const baselineStats = computeLeagueStats(
-          liveMatches.filter((m) => inBaseline(String(m.id))),
-          bonusMatches.filter((m) => inBaseline(String(m.id))),
-          bonusOptions.filter((option) => {
-            if (evolutionBaselineNumber == null) return false;
-            const dayNumber = l1NumberById.get(String(option.matchday_id));
-            return dayNumber != null && dayNumber > 0 && dayNumber <= evolutionBaselineNumber;
-          }),
-          (predictionsData ?? []).filter((p: any) => inBaseline(String(p.match_id))),
+          liveMatches.filter((m) => baselineMatchIds.has(String(m.id))),
+          bonusMatches.filter((m) => baselineMatchIds.has(String(m.id))),
+          bonusOptions,
+          (predictionsData ?? []).filter((p: any) => baselineMatchIds.has(String(p.match_id))),
           profiles,
           teamNameById,
           {
@@ -677,11 +676,13 @@ function ClassementPage() {
           })) as any,
         );
 
-        // Aucune journée de référence : on n'invente aucune évolution, la
-        // colonne affichera « — » pour tout le monde (map laissée vide, voir
-        // `hasPreviousRanking` côté rendu).
+        // Aucun résultat antérieur à la fenêtre (tout début de saison) : la
+        // référence mettrait tout le monde à 0 point, donc à égalité, et le
+        // classement se réduirait à l'ordre alphabétique — des évolutions
+        // inventées de toutes pièces. On préfère « — » pour tout le monde
+        // (map laissée vide, voir `hasPreviousRanking` côté rendu).
         const previousRanks: Record<string, number> = {};
-        if (evolutionBaselineNumber != null) {
+        if (baselineMatchIds.size > 0) {
           baselineRanking.forEach((player: any) => {
             previousRanks[player.id] = player.rank;
           });
@@ -700,7 +701,7 @@ function ClassementPage() {
           setBestMatchday(topMatchday);
           setCareerStatsByUser(Object.fromEntries(careerByUser));
           setPreviousRankByUser(previousRanks);
-          setEvolutionMatchdayNumber(latestStartedNumber);
+          setEvolutionWindowSize(baselineMatchIds.size > 0 ? windowSize : 0);
 
           // SOURCE DE VÉRITÉ POUR LE PROFIL :
           // le Profil lit ce snapshot produit par la page Classement,
@@ -944,9 +945,13 @@ function ClassementPage() {
                 <span
                   className="text-center"
                   title={
-                    evolutionMatchdayNumber != null && hasPreviousRanking
-                      ? `Places gagnées ou perdues sur la J${evolutionMatchdayNumber}`
-                      : "Aucune journée de référence : l'évolution s'affichera après la 2e journée"
+                    hasPreviousRanking && evolutionWindowSize > 0
+                      ? `Places gagnées ou perdues sur ${
+                          evolutionWindowSize > 1
+                            ? `les ${evolutionWindowSize} derniers matchs terminés`
+                            : "le dernier match terminé"
+                        }`
+                      : "Pas encore assez de matchs joués pour mesurer une évolution"
                   }
                 >
                   Évolution
