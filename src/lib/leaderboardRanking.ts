@@ -65,3 +65,27 @@ export function rankPlayers<T extends RankablePlayer>(players: T[]): (T & { rank
     })
     .map((player, index) => ({ ...player, rank: index + 1 }));
 }
+
+/**
+ * ÉVOLUTION AU CLASSEMENT — un seul calcul, partagé par la liste desktop et
+ * la liste mobile (elles en avaient chacune une copie, avec des règles
+ * légèrement différentes : le libellé ignorait `hasBaseline`).
+ *
+ * `previousRank` vient du classement de référence calculé par la page
+ * Classement (voir « JOURNÉE DE RÉFÉRENCE DE L'ÉVOLUTION »). Sans référence
+ * exploitable,
+ * on affiche « — » : on ne fabrique jamais une tendance à partir du rang
+ * courant.
+ */
+export function rankMovement(
+  previousRank: number | undefined,
+  rank: number,
+  hasBaseline: boolean,
+) {
+  const delta = hasBaseline && previousRank != null ? previousRank - rank : 0;
+  return {
+    delta,
+    trend: delta > 0 ? "up" : delta < 0 ? "down" : "same",
+    label: delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : "—",
+  } as const;
+}
