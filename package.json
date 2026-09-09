@@ -31,7 +31,8 @@
     "verif-options-bonus": "tsx src/lib/optionsBonusColonnes.verif.ts",
     "verif-journee-bonus": "tsx src/lib/journeeBonus.verif.ts",
     "verif-journee-gazette": "tsx src/lib/journeeGazette.verif.ts",
-    "verif-annonce-niveau": "tsx src/lib/annonceNiveau.verif.ts"
+    "verif-annonce-niveau": "tsx src/lib/annonceNiveau.verif.ts",
+    "verif-mail-rappel": "tsx src/lib/mailRappel.verif.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -48,6 +48,7 @@ import {
   getSettings,
   updateSettings,
 } from "@/services/adminService";
+import { lienRappel } from "@/lib/mailRappel";
 import {
   type BonusCandidate,
   type BonusCompetitionCode,
@@ -106,6 +107,7 @@ import {
   Megaphone,
   Send,
   FileDown,
+  Mail,
 } from "lucide-react";
 import {
   genererCodeInvitation,
@@ -1283,6 +1285,72 @@ function PronoFollowUpTab({
     });
   }
 
+  // RELANCE PAR MAIL — depuis la boite de l'organisateur, pas d'un service
+  // tiers. Le lien `mailto:` ouvre son application de courrier avec les
+  // retardataires deja en COPIE CACHEE et le message pret : l'expediteur est
+  // son adresse a lui, les joueurs peuvent lui repondre, et il n'y a ni cle
+  // d'API, ni domaine a verifier, ni cout.
+  //
+  // Les adresses ne sont PAS dans `profiles` : elles vivent dans auth.users,
+  // que le navigateur ne peut pas lire. Elles sont demandees a la fonction
+  // `emails_des_joueurs()` (migration 20260909100000), qui verifie elle-meme
+  // que l'appelant est admin et ne renvoie que l'identifiant et l'adresse.
+  const [preparationMail, setPreparationMail] = useState(false);
+
+  async function relancerParMail() {
+    if (pendingRows.length === 0) {
+      notify("Aucun joueur à relancer pour cette journée.");
+      return;
+    }
+
+    setPreparationMail(true);
+    try {
+      const { data, error } = await supabase.rpc("emails_des_joueurs");
+      if (error) throw error;
+
+      const parId = new Map<string, string>();
+      for (const ligne of (data ?? []) as { id: string; email: string }[]) {
+        if (ligne?.id) parId.set(String(ligne.id), ligne.email);
+      }
+
+      const dayLabel = selectedMatchday
+        ? `journée ${selectedMatchday.number}`
+        : "prochaine journée";
+
+      const { url, destinataires, sansAdresse } = lienRappel(
+        pendingRows.map((row) => ({
+          pseudo: row.player.pseudo,
+          email: parId.get(String(row.player.id)) ?? null,
+        })),
+        `Prono Ligue 1 — tes pronostics de la ${dayLabel}`,
+        `Salut,\n\nTu n'as pas encore terminé tes pronostics pour la ${dayLabel}.\n` +
+          `C'est par ici : ${siteUrl}\n\nÀ tout de suite !`,
+      );
+
+      if (!url) {
+        notify("❌ Aucune adresse mail connue pour ces joueurs.");
+        return;
+      }
+
+      // Ouvre l'application de courrier. On reste sur la page : `location.href`
+      // vers un `mailto:` ne navigue pas, il passe la main au systeme.
+      window.location.href = url;
+
+      const parts = [
+        `📧 Message prêt pour ${destinataires.length} joueur${destinataires.length > 1 ? "s" : ""}`,
+      ];
+      if (sansAdresse.length > 0) {
+        parts.push(`sans adresse connue : ${sansAdresse.join(", ")}`);
+      }
+      notify(parts.join(" · "));
+    } catch (e) {
+      console.error("Relance par mail :", e);
+      notify(`❌ Impossible de préparer le mail${errorMessage(e, "") ? ` : ${errorMessage(e, "")}` : "."}`);
+    } finally {
+      setPreparationMail(false);
+    }
+  }
+
   async function remindAll() {
     // Cible EXCLUSIVEMENT les joueurs incomplete/none — jamais les complets
     // (§4/§18, validé Phase 1 : `rows.filter(row => row.status !== "complete")`).
@@ -1426,6 +1494,16 @@ function PronoFollowUpTab({
               >
                 {copiedGroup ? <Check size={12} /> : <Share2 size={12} />}
                 {copiedGroup ? "Copié !" : "Partager un rappel"}
+              </GhostButton>
+
+              <GhostButton
+                onClick={() => void relancerParMail()}
+                disabled={preparationMail || pendingRows.length === 0}
+                className="!px-3 !py-2 text-[11px] sm:!px-4 sm:!py-2.5 sm:text-xs"
+                title="Ouvre ta boîte mail avec les retardataires en copie cachée"
+              >
+                <Mail size={12} className={preparationMail ? "animate-pulse" : ""} />
+                {preparationMail ? "Préparation…" : "Relancer par mail"}
               </GhostButton>
 
               {/* Compact sur mobile (padding/texte réduits) mais reste la
