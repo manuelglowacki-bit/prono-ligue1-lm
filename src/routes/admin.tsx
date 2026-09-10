@@ -1287,68 +1287,98 @@ function PronoFollowUpTab({
 
   // RELANCE PAR MAIL — depuis la boite de l'organisateur, pas d'un service
   // tiers. Le lien `mailto:` ouvre son application de courrier avec les
-  // retardataires deja en COPIE CACHEE et le message pret : l'expediteur est
-  // son adresse a lui, les joueurs peuvent lui repondre, et il n'y a ni cle
+  // joueurs CHOISIS en copie cachee et le message pret : l'expediteur est son
+  // adresse a lui, les joueurs peuvent lui repondre, et il n'y a ni cle
   // d'API, ni domaine a verifier, ni cout.
+  //
+  // Il choisit lui-meme les destinataires. Les retardataires sont
+  // pre-coches — c'est le cas courant — mais rien n'est fige : il peut
+  // ajouter quelqu'un qui a deja joue, ou retirer un joueur qu'il vient
+  // d'avoir au telephone.
   //
   // Les adresses ne sont PAS dans `profiles` : elles vivent dans auth.users,
   // que le navigateur ne peut pas lire. Elles sont demandees a la fonction
   // `emails_des_joueurs()` (migration 20260909100000), qui verifie elle-meme
   // que l'appelant est admin et ne renvoie que l'identifiant et l'adresse.
+  const [mailPanelOuvert, setMailPanelOuvert] = useState(false);
+  const [mailAdresses, setMailAdresses] = useState<Record<string, string> | null>(null);
+  const [mailSelection, setMailSelection] = useState<Set<string>>(new Set());
   const [preparationMail, setPreparationMail] = useState(false);
 
-  async function relancerParMail() {
-    if (pendingRows.length === 0) {
-      notify("Aucun joueur à relancer pour cette journée.");
+  async function ouvrirRelanceMail() {
+    if (mailPanelOuvert) {
+      setMailPanelOuvert(false);
       return;
     }
 
     setPreparationMail(true);
     try {
-      const { data, error } = await supabase.rpc("emails_des_joueurs");
-      if (error) throw error;
-
-      const parId = new Map<string, string>();
-      for (const ligne of (data ?? []) as { id: string; email: string }[]) {
-        if (ligne?.id) parId.set(String(ligne.id), ligne.email);
+      // Les adresses ne changent pas d'une journee a l'autre : une seule
+      // lecture suffit pour toute la session.
+      let adresses = mailAdresses;
+      if (!adresses) {
+        const { data, error } = await supabase.rpc("emails_des_joueurs");
+        if (error) throw error;
+        adresses = {};
+        for (const ligne of (data ?? []) as { id: string; email: string }[]) {
+          if (ligne?.id) adresses[String(ligne.id)] = ligne.email;
+        }
+        setMailAdresses(adresses);
       }
 
-      const dayLabel = selectedMatchday
-        ? `journée ${selectedMatchday.number}`
-        : "prochaine journée";
-
-      const { url, destinataires, sansAdresse } = lienRappel(
-        pendingRows.map((row) => ({
-          pseudo: row.player.pseudo,
-          email: parId.get(String(row.player.id)) ?? null,
-        })),
-        `Prono Ligue 1 — tes pronostics de la ${dayLabel}`,
-        `Salut,\n\nTu n'as pas encore terminé tes pronostics pour la ${dayLabel}.\n` +
-          `C'est par ici : ${siteUrl}\n\nÀ tout de suite !`,
-      );
-
-      if (!url) {
-        notify("❌ Aucune adresse mail connue pour ces joueurs.");
-        return;
+      // Pre-selection : les retardataires de la journee affichee, et
+      // uniquement ceux dont on connait l'adresse.
+      const preselection = new Set<string>();
+      for (const row of pendingRows) {
+        const id = String(row.player.id);
+        if (adresses[id]) preselection.add(id);
       }
-
-      // Ouvre l'application de courrier. On reste sur la page : `location.href`
-      // vers un `mailto:` ne navigue pas, il passe la main au systeme.
-      window.location.href = url;
-
-      const parts = [
-        `📧 Message prêt pour ${destinataires.length} joueur${destinataires.length > 1 ? "s" : ""}`,
-      ];
-      if (sansAdresse.length > 0) {
-        parts.push(`sans adresse connue : ${sansAdresse.join(", ")}`);
-      }
-      notify(parts.join(" · "));
+      setMailSelection(preselection);
+      setMailPanelOuvert(true);
     } catch (e) {
-      console.error("Relance par mail :", e);
-      notify(`❌ Impossible de préparer le mail${errorMessage(e, "") ? ` : ${errorMessage(e, "")}` : "."}`);
+      console.error("Lecture des adresses :", e);
+      notify(`❌ Impossible de lire les adresses${errorMessage(e, "") ? ` : ${errorMessage(e, "")}` : "."}`);
     } finally {
       setPreparationMail(false);
     }
+  }
+
+  function basculerDestinataire(id: string) {
+    setMailSelection((avant) => {
+      const apres = new Set(avant);
+      if (apres.has(id)) apres.delete(id);
+      else apres.add(id);
+      return apres;
+    });
+  }
+
+  function envoyerRelanceMail() {
+    const adresses = mailAdresses ?? {};
+    const choisis = rows.filter((row) => mailSelection.has(String(row.player.id)));
+
+    const dayLabel = selectedMatchday
+      ? `journée ${selectedMatchday.number}`
+      : "prochaine journée";
+
+    const { url, destinataires } = lienRappel(
+      choisis.map((row) => ({
+        pseudo: row.player.pseudo,
+        email: adresses[String(row.player.id)] ?? null,
+      })),
+      `Prono Ligue 1 — tes pronostics de la ${dayLabel}`,
+      `Salut,\n\nTu n'as pas encore terminé tes pronostics pour la ${dayLabel}.\n` +
+        `C'est par ici : ${siteUrl}\n\nÀ tout de suite !`,
+    );
+
+    if (!url) {
+      notify("❌ Aucun destinataire sélectionné.");
+      return;
+    }
+
+    // Ouvre l'application de courrier. On reste sur la page : `location.href`
+    // vers un `mailto:` ne navigue pas, il passe la main au systeme.
+    window.location.href = url;
+    notify(`📧 Message prêt pour ${destinataires.length} joueur${destinataires.length > 1 ? "s" : ""}`);
   }
 
   async function remindAll() {
@@ -1497,13 +1527,17 @@ function PronoFollowUpTab({
               </GhostButton>
 
               <GhostButton
-                onClick={() => void relancerParMail()}
-                disabled={preparationMail || pendingRows.length === 0}
+                onClick={() => void ouvrirRelanceMail()}
+                disabled={preparationMail || rows.length === 0}
                 className="!px-3 !py-2 text-[11px] sm:!px-4 sm:!py-2.5 sm:text-xs"
-                title="Ouvre ta boîte mail avec les retardataires en copie cachée"
+                title="Choisir les joueurs à relancer, puis ouvrir ta boîte mail"
               >
                 <Mail size={12} className={preparationMail ? "animate-pulse" : ""} />
-                {preparationMail ? "Préparation…" : "Relancer par mail"}
+                {preparationMail
+                  ? "Lecture…"
+                  : mailPanelOuvert
+                    ? "Fermer la liste"
+                    : "Relancer par mail"}
               </GhostButton>
 
               {/* Compact sur mobile (padding/texte réduits) mais reste la
@@ -1523,6 +1557,95 @@ function PronoFollowUpTab({
               </PrimaryButton>
             </div>
           </div>
+
+          {/* LISTE DES DESTINATAIRES — toutes les adresses, avec le choix.
+              Les retardataires sont pre-coches, mais rien n'est fige : on
+              peut ajouter quelqu'un qui a deja joue, ou retirer un joueur
+              qu'on vient d'avoir au telephone. Un joueur dont l'adresse est
+              inconnue reste visible, grise et non cochable : le savoir vaut
+              mieux que de le voir disparaitre en silence. */}
+          {mailPanelOuvert && (
+            <div className="border-t border-slate-800 px-5 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="font-mono text-[10px] font-black uppercase tracking-[.16em] text-emerald-300">
+                  Qui reçoit le mail ?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const joignables = rows
+                      .map((row) => String(row.player.id))
+                      .filter((id) => (mailAdresses ?? {})[id]);
+                    setMailSelection(
+                      mailSelection.size === joignables.length ? new Set() : new Set(joignables),
+                    );
+                  }}
+                  className="rounded-lg border border-slate-700 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[.1em] text-slate-300 transition-colors hover:border-slate-500 hover:text-white"
+                >
+                  {mailSelection.size > 0 ? "Tout décocher" : "Tout cocher"}
+                </button>
+              </div>
+
+              <div className="mt-3 max-h-72 space-y-1 overflow-y-auto pr-1">
+                {rows.map((row) => {
+                  const id = String(row.player.id);
+                  const email = (mailAdresses ?? {})[id] ?? null;
+                  const coche = mailSelection.has(id);
+                  const retardataire = row.status !== "complete";
+
+                  return (
+                    <label
+                      key={id}
+                      className={`flex items-center gap-3 rounded-xl border px-3 py-2 transition-colors ${
+                        !email
+                          ? "cursor-not-allowed border-slate-800 bg-slate-900/30 opacity-60"
+                          : coche
+                            ? "cursor-pointer border-emerald-400/35 bg-emerald-400/[.06]"
+                            : "cursor-pointer border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={coche}
+                        disabled={!email}
+                        onChange={() => basculerDestinataire(id)}
+                        className="size-4 shrink-0 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-0 disabled:opacity-40"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-semibold text-white">
+                            {row.player.pseudo || "Joueur"}
+                          </span>
+                          {retardataire && (
+                            <span className="shrink-0 rounded-full border border-amber-300/30 bg-amber-300/10 px-1.5 py-0.5 font-mono text-[8px] font-black uppercase tracking-[.1em] text-amber-200">
+                              {row.status === "none" ? "rien joué" : "incomplet"}
+                            </span>
+                          )}
+                        </span>
+                        <span className="mt-0.5 block truncate font-mono text-[10px] text-slate-500">
+                          {email ?? "adresse inconnue"}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="font-mono text-[10px] text-slate-500">
+                  {mailSelection.size} destinataire{mailSelection.size > 1 ? "s" : ""} · en copie cachée
+                </p>
+                <PrimaryButton
+                  onClick={envoyerRelanceMail}
+                  disabled={mailSelection.size === 0}
+                  className="!px-3 !py-2 text-[11px] sm:!px-4 sm:!py-2 sm:text-xs"
+                >
+                  <Mail size={13} />
+                  Ouvrir le mail ({mailSelection.size})
+                </PrimaryButton>
+              </div>
+            </div>
+          )}
         </div>
 
         {error && (
