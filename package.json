@@ -30,6 +30,7 @@
     "verif-score": "tsx src/lib/scoreAffiche.verif.ts",
     "verif-options-bonus": "tsx src/lib/optionsBonusColonnes.verif.ts",
     "verif-journee-bonus": "tsx src/lib/journeeBonus.verif.ts",
+    "verif-journee-en-cours": "tsx src/lib/journeeEnCours.verif.ts",
     "verif-journee-gazette": "tsx src/lib/journeeGazette.verif.ts",
     "verif-annonce-niveau": "tsx src/lib/annonceNiveau.verif.ts",
     "verif-mail-rappel": "tsx src/lib/mailRappel.verif.ts",

@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { calculateCareerScore, aggregateCareerStatsByUser } from "@/lib/careerLevel";
 import { computeLeagueStats } from "@/lib/leaderboardStats";
 import { rankPlayers } from "@/lib/leaderboardRanking";
+import { numeroJourneeEnCours } from "@/lib/journeeEnCours";
 import { computePrizeByRank } from "@/lib/prizePool";
 import { calculerBadges, CATALOGUE_BADGES, type Badge } from "@/lib/classementBadges";
 import { fetchLiveApiMatches, reconcileMatchesWithLive, markLiveMatchesScorable } from "@/lib/liveMatches";
@@ -184,6 +185,9 @@ function ClassementPage() {
   // meme facon qu'on en ait pris 12 ou 1 ce week-end. Affiche en petit sous
   // le total, il ne prend pas la place du classement.
   const [gainDerniereJournee, setGainDerniereJournee] = useState<Record<string, number>>({});
+  // Le numero de la journee en cours, `null` tant qu'aucune n'a commence.
+  // Sert a savoir s'il faut afficher un compteur, meme a zero.
+  const [journeeEnCours, setJourneeEnCours] = useState<number | null>(null);
   const [careerStatsByUser, setCareerStatsByUser] = useState<Record<string, { points: number; exactScores: number }>>({});
   const [previousRankByUser, setPreviousRankByUser] = useState<Record<string, number>>({});
   // Liste des journées Ligue 1 de la saison (id + numéro) — sert uniquement au
@@ -303,7 +307,10 @@ function ClassementPage() {
             setRegularitySuccessByUser({});
             setPlayedMatchdaysByUser({});
           setGainDerniereJournee({});
+          setJourneeEnCours(null);
             setGainDerniereJournee({});
+          setJourneeEnCours(null);
+            setJourneeEnCours(null);
             setFinishedMatchdayCount(0);
             setLatestMatchdayNumber(null);
             setBestMatchday(null);
@@ -758,18 +765,40 @@ function ClassementPage() {
               scoresExactsParJoueur: exactScores,
             }),
           );
-          // Les points de la derniere journee TERMINEE, joueur par joueur.
+          // LA JOURNEE EN COURS, et non la derniere terminee.
+          //
+          // C'est la journee la plus recente dont AU MOINS UN MATCH a ete
+          // donne : elle repart donc de zero au coup d'envoi du premier
+          // match, et monte match apres match. Entre deux journees, elle
+          // reste sur celle qui vient de s'achever — le compteur ne
+          // s'efface pas le lundi matin, il attend le prochain coup
+          // d'envoi pour se remettre a zero.
+          // Regle ecrite et verifiee une seule fois : src/lib/journeeEnCours.ts.
+          const journeeEnCoursNumero = numeroJourneeEnCours(
+            [...matchesByDayNumber.entries()].map(([numero, matchsDuJour]) => ({
+              numero,
+              coupsDenvoi: matchsDuJour.map((m) => m.kickoff ?? null),
+            })),
+            Date.now(),
+          );
+
+          const journeeEnCoursId =
+            journeeEnCoursNumero !== null ? numeroVersId.get(journeeEnCoursNumero) ?? null : null;
+
           // Rien n'est recalcule : pointsByUserAndMatchday sort du moteur,
-          // c'est la meme source que le total affiche a cote.
-          const derniereJourneeId = journeesTerminees[journeesTerminees.length - 1] ?? null;
+          // c'est la meme source que le total affiche a cote. Et comme le
+          // Classement score deja les matchs EN COURS
+          // (markLiveMatchesScorable), le compteur bouge pendant les matchs
+          // sans rien ajouter ici.
           const gains: Record<string, number> = {};
-          if (derniereJourneeId) {
+          if (journeeEnCoursId) {
             (profiles ?? []).forEach((profil: any) => {
               const uid = String(profil.id);
-              gains[uid] = Number(pointsByUserAndMatchday?.[uid]?.[derniereJourneeId] ?? 0);
+              gains[uid] = Number(pointsByUserAndMatchday?.[uid]?.[journeeEnCoursId] ?? 0);
             });
           }
           setGainDerniereJournee(gains);
+          setJourneeEnCours(journeeEnCoursNumero);
 
           setLatestMatchdayNumber(latestFinishedNumber);
           setBestMatchday(topMatchday);
@@ -825,6 +854,7 @@ function ClassementPage() {
           setRegularitySuccessByUser({});
           setPlayedMatchdaysByUser({});
           setGainDerniereJournee({});
+          setJourneeEnCours(null);
           setFinishedMatchdayCount(0);
           setLatestMatchdayNumber(null);
           setBestMatchday(null);
@@ -1176,12 +1206,20 @@ function ClassementPage() {
 
                           <div className="text-center">
                             <div className={`font-display text-3xl font-black leading-none ${pointTone}`}>{p.points}</div>
-                            {/* Ce qu'il vient de prendre. Rien quand il n'a
-                                rien marque : « +0 » n'apprend rien et alourdit
-                                vingt-trois lignes. */}
-                            {(gainDerniereJournee[p.id] ?? 0) > 0 && (
-                              <div className="mt-0.5 font-mono text-[9px] font-black tabular-nums text-emerald-400">
-                                +{gainDerniereJournee[p.id]} pts
+                            {/* CE QU'IL A PRIS SUR LA JOURNEE EN COURS.
+                                Le zero est affiche, lui aussi : pendant une
+                                journee, « pas encore marque » est une
+                                information, pas un vide. Il reste gris tant
+                                qu'il n'y a rien a feter. */}
+                            {journeeEnCours !== null && (
+                              <div
+                                className={`mt-0.5 font-mono text-[9px] font-black tabular-nums ${
+                                  (gainDerniereJournee[p.id] ?? 0) > 0
+                                    ? "text-emerald-400"
+                                    : "text-slate-500"
+                                }`}
+                              >
+                                +{gainDerniereJournee[p.id] ?? 0} pts
                               </div>
                             )}
                           </div>
@@ -1412,12 +1450,19 @@ function ClassementPage() {
                           <div className={`font-display text-[23px] font-black leading-none ${pointTone}`}>
                             {p.points}
                           </div>
-                          {/* Sur telephone, ce qu'il vient de prendre remplace
+                          {/* Sur telephone, le compteur de la journee remplace
                               le mot « points » : la colonne est etroite, et un
-                              chiffre en dit plus qu'un mot qu'on devine deja. */}
-                          {(gainDerniereJournee[p.id] ?? 0) > 0 ? (
-                            <div className="mt-0.5 font-mono text-[8px] font-black tabular-nums text-emerald-400">
-                              +{gainDerniereJournee[p.id]}
+                              chiffre en dit plus qu'un mot qu'on devine deja.
+                              Hors journee, le mot reprend sa place. */}
+                          {journeeEnCours !== null ? (
+                            <div
+                              className={`mt-0.5 font-mono text-[8px] font-black tabular-nums ${
+                                (gainDerniereJournee[p.id] ?? 0) > 0
+                                  ? "text-emerald-400"
+                                  : "text-slate-500"
+                              }`}
+                            >
+                              +{gainDerniereJournee[p.id] ?? 0}
                             </div>
                           ) : (
                             <div className="mt-0.5 font-mono text-[6px] font-bold uppercase tracking-widest text-slate-400">
